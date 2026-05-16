@@ -1,11 +1,6 @@
 ﻿using Aplicacion.Core;
-using Aplicacion.Services.ConfiguracionesApp;
-using Aplicacion.Services.Seguridad;
-using CrossCutting.Configuration;
 using Infraestructura.Context;
-using Infraestructura.Core.Jwtoken;
-using Infraestructura.Core.RestClient;
-using Microsoft.EntityFrameworkCore;
+using WebServices.Extensions;
 using WebServices.Jwtoken;
 using WebServices.Middleware;
 
@@ -34,32 +29,23 @@ builder.Services.AddCors(options =>
         });
 });
 
-string connectionString = builder.Configuration.GetConnectionString("conectionDataBase");
-
-// ✅ Inicialización única — carga la tabla ConfiguracionesDetalle en memoria
-AppSettingsManager.Initialize(connectionString);
-
-builder.Services.AddDbContext<MyContext>(
-        dbContextOption => dbContextOption.UseSqlServer(connectionString), ServiceLifetime.Transient
-    );
-
-builder.Services.AddTransient<IDataContext, MyContext>();
-builder.Services.AddTransient(typeof(IGenericRepository<>), typeof(GenericRepository<>));
-
-//Register Json Web Token
-builder.Services.AddTransient<ITokenService, JwtTokenService>();
-
-
-RestClientFactory.SetCurrent(new HttpRestClientFactory());
-//builder.Services.AddTransient<IRestClient, HttpRestClient>();
-//builder.Services.AddTransient<IRestClientFactory, HttpRestClientFactory>();
-
-builder.Services.AddScoped<SecurityAplicationService>();
-builder.Services.AddScoped<IConfiguracionesApplicationService, ConfiguracionesApplicationService>();
+builder.Services.AddPersistenceInfrastructure(builder.Configuration);
+builder.Services.AddApplicationServices();          
+builder.Services.AddExternalAndSecurityServices();
 
 builder.Services.AddTransient<GlobalExceptionHandlingMiddleware>();
 
 var app = builder.Build();
+
+// 🔹 Seeder: insertar datos iniciales
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<MyContext>();
+
+    // Inserta datos iniciales solo si no existen
+    DataSeeder.Seed(context);
+}
+
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
