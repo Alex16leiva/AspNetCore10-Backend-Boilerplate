@@ -1,39 +1,190 @@
-<h1 align="center">TemplateBackEndNetCore</h1>
+# 🚀 AspNetCore10 Backend Boilerplate
 
-Template base para crear proyectos backend Asp.net core 8.
-## 🚀 Tecnologias
+A production-ready, clean architecture **ASP.NET Core** backend template built with **.NET 10** and **EF Core 8**. Designed to be a solid starting point for any enterprise-level API, including security, authentication with Refresh Tokens, role-based access control, audit logging, and modern API documentation.
 
-- C#
-- .NET Core 8
-- Entity Framework Core
-- AutoMapper
-- BCrypt
-- Swagger
-- JWT
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?style=for-the-badge&logo=dotnet)](https://dotnet.microsoft.com/)
+[![EF Core](https://img.shields.io/badge/EF%20Core-8.0-512BD4?style=for-the-badge&logo=dotnet)](https://docs.microsoft.com/ef/core/)
+[![SQL Server](https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver)](https://www.microsoft.com/sql-server)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
-## Instalación
+---
 
-1. Clona el repositorio a tu máquina local.
-2. Abre el proyecto en Visual Studio o tu IDE preferido.
-3. Configura la cadena de conexión a la base de datos en el archivo `appsettings.json`.
-4. Ejecuta el comando `Update-Database` en la Consola del Administrador de Paquetes para aplicar las migraciones a la base de datos.
+## ✨ Features
 
-## Uso
+| Feature | Details |
+|---|---|
+| 🏗️ **Clean Architecture** | Dominio, Aplicacion, Infraestructura, WebServices |
+| 🔐 **JWT Authentication** | Access Token + Refresh Token |
+| 🔒 **BCrypt Password Hashing** | Secure, salted hashing with `BCrypt.Net-Next` |
+| 👥 **Role-Based Access Control** | Fine-grained screen/action permissions per role |
+| 🗃️ **EF Core Migrations** | Code-first database schema with migration support |
+| 📋 **Audit Log** | Full transaction logging for all entity changes |
+| 🗺️ **AutoMapper 16** | Modern object mapping configuration |
+| 📖 **Scalar API Docs** | Modern OpenAPI 3.1 UI (replaces Swagger) |
+| ⚡ **DataSeeder** | Automatic seeding of default roles, users, and permissions |
+| 🌐 **CORS** | Pre-configured for frontend integration |
+| 🛡️ **Global Exception Middleware** | Centralized error handling |
 
-Describe cómo usar el proyecto template, incluyendo ejemplos de código si es necesario.
+---
 
-## Contribución
+## 🏛️ Architecture
 
-Si deseas contribuir a este proyecto, por favor sigue las siguientes pautas:
-- Abre un issue para discutir los cambios que deseas realizar.
-- Realiza tus cambios en una nueva rama.
-- Envía un Pull Request con una descripción clara de los cambios propuestos.
+The solution follows **Clean Architecture** principles, organized into four layers:
 
-## Licencia
+```
+📦 TemplateBackEndNetCore
+ ├── 📂 Dominio           → Entities, domain contracts, value objects
+ ├── 📂 Aplicacion        → Use cases, DTOs, application services
+ ├── 📂 Infraestructura   → EF Core, repositories, JWT, migrations
+ ├── 📂 WebServices       → ASP.NET Core API, controllers, middleware
+ └── 📂 CrossCutting      → Shared utilities (config, helpers)
+```
 
-Este proyecto está bajo la licencia [insertar licencia aquí].
+---
 
-## Estructura de Archivos
+## 🔑 Authentication Flow
 
-Describe la estructura de directorios y archivos importantes en el proyecto.
+### Login
+```
+POST /api/User/login
+```
+Returns an **Access Token** (short-lived) and a **Refresh Token** (long-lived, stored in DB).
 
+### Refresh Token
+```
+POST /api/User/refresh-token
+```
+Exchange an expired Access Token + Refresh Token for a new pair, without re-entering credentials.
+
+---
+
+## 📋 API Endpoints
+
+### 🔓 Public
+| Method | Route | Description |
+|---|---|---|
+| `POST` | `/api/User/login` | Authenticate and get tokens |
+| `POST` | `/api/User/refresh-token` | Renew tokens |
+
+### 🔒 Protected (requires JWT Bearer token)
+| Method | Route | Description |
+|---|---|---|
+| `POST` | `/api/User/crear-usuario` | Create a new user |
+| `POST` | `/api/User/editar-usuario` | Edit an existing user |
+| `POST` | `/api/User/obtener-usuarios` | Paginated user list |
+| `GET`  | `/api/User/obtener-roles` | List all roles |
+| `POST` | `/api/User/crear-rol` | Create a new role |
+| `POST` | `/api/User/editar-rol` | Edit a role |
+| `GET`  | `/api/User/obtener-pantalla` | List all screens |
+| `POST` | `/api/User/edicion-permisos` | Assign permissions to a role |
+
+---
+
+## 🗃️ Database
+
+The project uses **SQL Server** with **EF Core Code-First Migrations**.
+
+### Schemas
+- `Seguridad` — Users, Roles, Permissions, Screens
+- `Comunes` — Configurations, Transaction Logs
+
+### Apply Migrations
+```bash
+dotnet ef database update --context MyContext --project Infraestructura --startup-project WebServices
+```
+
+### Default Seed Data
+On first run, the `DataSeeder` automatically creates:
+
+| Type | Value |
+|---|---|
+| **Default Admin User** | `admin` / `admin123*` |
+| **Roles** | `Admin`, `User` |
+| **Screen** | `Seguridad` |
+| **Permission** | Admin → Seguridad (Ver, Editar, Eliminar) |
+
+---
+
+## ⚙️ Configuration
+
+### `appsettings.json`
+```json
+{
+  "ConnectionStrings": {
+    "conectionDataBase": "Server=YOUR_SERVER;Database=YOUR_DB;User Id=YOUR_USER;Password=YOUR_PASS;TrustServerCertificate=true"
+  },
+  "JwtSettings": {
+    "Secret": "YOUR_SUPER_SECRET_KEY_MIN_32_CHARS",
+    "ExpirationInMinutes": 60,
+    "RefreshTokenExpirationInDays": 7,
+    "Issuer": "YourIssuer",
+    "Audience": "YourAudience"
+  }
+}
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- SQL Server 2019+ (or LocalDB for development)
+
+### Setup
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/Alex16leiva/AspNetCore10-Backend-Boilerplate.git
+cd AspNetCore10-Backend-Boilerplate
+
+# 2. Configure your connection string in WebServices/appsettings.json
+
+# 3. Apply EF Core migrations
+dotnet ef database update --context MyContext --project Infraestructura --startup-project WebServices
+
+# 4. Run the API
+cd WebServices
+dotnet run
+```
+
+### API Documentation
+Once running, open your browser at:
+```
+https://localhost:7217/scalar/v1
+```
+
+---
+
+## 🛡️ Security Highlights
+
+- ✅ **BCrypt** — Password hashing with automatic salt (replaces plain SHA-256)
+- ✅ **JWT Bearer** — Stateless authentication
+- ✅ **Refresh Token Rotation** — New refresh token issued on every renewal
+- ✅ **Refresh Token Expiry** — Configurable expiration (default: 7 days)
+- ✅ **Secure Dependencies** — All NuGet packages audited for known vulnerabilities
+
+---
+
+## 📦 Key Packages
+
+| Package | Version | Purpose |
+|---|---|---|
+| `Microsoft.AspNetCore.OpenApi` | 10.0.x | Native OpenAPI 3.1 generation |
+| `Scalar.AspNetCore` | 2.x | Modern API documentation UI |
+| `Microsoft.EntityFrameworkCore.SqlServer` | 8.x | ORM + SQL Server provider |
+| `AutoMapper` | 16.x | Object-object mapping |
+| `BCrypt.Net-Next` | Latest | Secure password hashing |
+| `Microsoft.AspNetCore.Authentication.JwtBearer` | 8.x | JWT middleware |
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** — free to use, modify, and distribute.
+
+---
+
+<div align="center">
+  Made with ❤️ by <a href="https://github.com/Alex16leiva">Alex16leiva</a>
+</div>
