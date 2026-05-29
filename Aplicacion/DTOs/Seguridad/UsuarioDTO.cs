@@ -1,4 +1,4 @@
-﻿using Dominio.Core.Extensions;
+using Dominio.Core.Extensions;
 using System.Text;
 
 namespace Aplicacion.DTOs.Seguridad
@@ -10,6 +10,7 @@ namespace Aplicacion.DTOs.Seguridad
         public string? Apellido { get; set; }
         public string? Contrasena { get; set; }
         public string? Token { get; set; }
+        public string? RefreshToken { get; set; }
         public bool UsuarioAutenticado { get; set; }
         public string? RolId { get; set; }
         public bool EditarContrasena { get; set; } = true;

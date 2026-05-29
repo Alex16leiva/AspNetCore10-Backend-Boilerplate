@@ -1,5 +1,6 @@
-﻿using Aplicacion.Core;
+using Aplicacion.Core;
 using Infraestructura.Context;
+using Scalar.AspNetCore;
 using WebServices.Extensions;
 using WebServices.Jwtoken;
 using WebServices.Middleware;
@@ -7,16 +8,13 @@ using WebServices.Middleware;
 var builder = WebApplication.CreateBuilder(args);
 
 
-// Add services to the container.
-
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddOpenApi();
 
 builder.ConfigureJwt();
 
-builder.Services.AddAutoMapper(typeof(AutoMapperProfile));
+builder.Services.AddAutoMapper(cfg => cfg.AddMaps(typeof(AutoMapperProfile).Assembly));
 
 const string AllowAllOriginsPolicy = "AllowAllOriginsPolicy";
 
@@ -50,8 +48,8 @@ using (var scope = app.Services.CreateScope())
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.UseCors(policy => policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());

@@ -1,4 +1,4 @@
-﻿using Dominio.Context.Entidades;
+using Dominio.Context.Entidades;
 using Dominio.Context.Entidades.Seguridad;
 
 namespace Infraestructura.Context
@@ -47,7 +47,7 @@ namespace Infraestructura.Context
                         UsuarioId = "admin", 
                         Nombre = "Administrador", 
                         Apellido = "Sistema",
-                        Contrasena = PasswordEncryptor.Encrypt("admin123*"), 
+                        Contrasena = PasswordEncryptor.HashPassword("admin123*"), 
                         RolId = "Admin",
                         Activo = true,
                         DescripcionTransaccion = descripcionTransaccion, 

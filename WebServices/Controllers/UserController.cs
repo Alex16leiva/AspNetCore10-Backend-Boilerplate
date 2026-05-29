@@ -1,4 +1,4 @@
-﻿using Aplicacion.DTOs;
+using Aplicacion.DTOs;
 using Aplicacion.DTOs.Seguridad;
 using Aplicacion.Services.Seguridad;
 using Microsoft.AspNetCore.Authorization;
@@ -23,6 +23,14 @@ namespace WebServices.Controllers
         {
             UsuarioDTO usuario = _securityAppService.IniciarSesion(request);
 
+            return usuario;
+        }
+
+        [AllowAnonymous]
+        [HttpPost("refresh-token")]
+        public UsuarioDTO RefreshToken([FromBody] TokenRequest request)
+        {
+            UsuarioDTO usuario = _securityAppService.RefreshToken(request);
             return usuario;
         }
 

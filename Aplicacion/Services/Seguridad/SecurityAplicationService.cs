@@ -1,4 +1,4 @@
-﻿using Aplicacion.Core;
+using Aplicacion.Core;
 using Aplicacion.DTOs;
 using Aplicacion.DTOs.Seguridad;
 using Aplicacion.Helpers;
@@ -48,7 +48,7 @@ namespace Aplicacion.Services.Seguridad
 
             if (request.Usuario.EditarContrasena)
             {
-                usuarioExiste.Contrasena = PasswordEncryptor.Encrypt(request.Usuario.Contrasena);
+                usuarioExiste.Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena);
             }
 
             usuarioExiste.Nombre = request.Usuario.Nombre.ValueOrEmpty();
@@ -130,7 +130,7 @@ namespace Aplicacion.Services.Seguridad
             var usuario = new Usuario
             {
                 Apellido = request.Usuario.Apellido.ValueOrEmpty(),
-                Contrasena = PasswordEncryptor.Encrypt(request.Usuario.Contrasena),
+                Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena),
                 Nombre = request.Usuario.Nombre.ValueOrEmpty(),
                 RolId = request.Usuario.RolId.ValueOrEmpty(),
                 UsuarioId = request.Usuario.UsuarioId.ValueOrEmpty(),
@@ -147,22 +147,36 @@ namespace Aplicacion.Services.Seguridad
         {
             List<string> includes = ["Rol", "Rol.Permisos"];
 
-            string passwordEncrypted = PasswordEncryptor.Encrypt(request?.Password);
+            Usuario usuario = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.UsuarioId, includes);
 
-            Usuario usuario = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.UsuarioId && r.Contrasena == passwordEncrypted, includes);
-
-            if (usuario.IsNotNull())
+            if (usuario.IsNotNull() && PasswordEncryptor.VerifyPassword(request?.Password, usuario.Contrasena))
             {
                 if (!usuario.Activo)
                 {
                     return new UsuarioDTO { Message = $"Usuario {usuario.UsuarioId} esta desactivado" };
                 }
+                var newAccessToken = _tokenService.Generate(usuario);
+                var newRefreshToken = _tokenService.GenerateRefreshToken();
+
+                usuario.RefreshToken = newRefreshToken;
+                usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7); 
+                
+                var tInfo = new TransactionInfo {
+                    TransaccionUId = Guid.NewGuid(),
+                    TipoTransaccion = "IniciarSesion",
+                    FechaTransaccion = DateTime.Now,
+                    ModificadoPor = usuario.UsuarioId,
+                    DescripcionTransaccion = "Refresh Token update"
+                };
+                _genericRepository.UnitOfWork.Commit(tInfo);
+
                 return new UsuarioDTO
                 {
                     Apellido = usuario.Apellido,
                     Nombre = usuario.Nombre,
                     RolId = usuario.RolId,
-                    Token = _tokenService.Generate(usuario),
+                    Token = newAccessToken,
+                    RefreshToken = newRefreshToken,
                     UsuarioAutenticado = true,
                     UsuarioId = usuario.UsuarioId,
                     Permisos = MapPermisosDto(usuario.Rol?.Permisos)
@@ -173,6 +187,48 @@ namespace Aplicacion.Services.Seguridad
             {
                 Message = "Usuario o Contraseña no valido",
                 UsuarioAutenticado = false
+            };
+        }
+
+        public UsuarioDTO RefreshToken(TokenRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.AccessToken) || string.IsNullOrWhiteSpace(request.RefreshToken))
+            {
+                return new UsuarioDTO { Message = "Solicitud de token inválida", UsuarioAutenticado = false };
+            }
+            
+            var usuario = _genericRepository.GetSingle<Usuario>(u => u.RefreshToken == request.RefreshToken, ["Rol", "Rol.Permisos"]);
+
+            if (usuario == null || usuario.RefreshToken != request.RefreshToken || usuario.RefreshTokenExpiryTime <= DateTime.UtcNow)
+            {
+                return new UsuarioDTO { Message = "Token de refresco inválido o expirado", UsuarioAutenticado = false };
+            }
+
+            var newAccessToken = _tokenService.Generate(usuario);
+            var newRefreshToken = _tokenService.GenerateRefreshToken();
+
+            usuario.RefreshToken = newRefreshToken;
+            usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+
+            var tInfo = new TransactionInfo {
+                TransaccionUId = Guid.NewGuid(),
+                TipoTransaccion = "RefreshToken",
+                FechaTransaccion = DateTime.Now,
+                ModificadoPor = usuario.UsuarioId,
+                DescripcionTransaccion = "Refresh Token issue"
+            };
+            _genericRepository.UnitOfWork.Commit(tInfo);
+
+            return new UsuarioDTO
+            {
+                Apellido = usuario.Apellido,
+                Nombre = usuario.Nombre,
+                RolId = usuario.RolId,
+                Token = newAccessToken,
+                RefreshToken = newRefreshToken,
+                UsuarioAutenticado = true,
+                UsuarioId = usuario.UsuarioId,
+                Permisos = MapPermisosDto(usuario.Rol?.Permisos)
             };
         }
 

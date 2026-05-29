@@ -1,4 +1,4 @@
-﻿using Aplicacion.Core;
+using Aplicacion.Core;
 using Aplicacion.Services.ConfiguracionesApp;
 using Aplicacion.Services.Seguridad;
 using CrossCutting.Configuration;
@@ -36,7 +36,7 @@ namespace WebServices.Extensions
             services.AddScoped<IConfiguracionesApplicationService, ConfiguracionesApplicationService>();
 
             // AutoMapper
-            services.AddAutoMapper(typeof(AutoMapperProfile));
+            services.AddAutoMapper(cfg => cfg.AddMaps(typeof(AutoMapperProfile).Assembly));
 
             return services;
         }

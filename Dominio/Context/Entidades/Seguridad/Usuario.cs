@@ -1,4 +1,4 @@
-﻿using Dominio.Core;
+using Dominio.Core;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -13,6 +13,8 @@ namespace Dominio.Context.Entidades.Seguridad
         public required string Apellido { get; set; }
         public required bool Activo { get; set; }
         public string? RolId { get; set; }
+        public string? RefreshToken { get; set; }
+        public DateTime? RefreshTokenExpiryTime { get; set; }
 
         [NotMapped]
         public string? Token { get; set; }
