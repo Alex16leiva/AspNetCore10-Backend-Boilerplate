@@ -110,7 +110,7 @@ namespace Dominio.Core.Extensions
         /// </example>
         public static bool OccursBefore(this DateTime? date, DateTime? startDate)
         {
-            if (date.IsNull() || startDate.IsNull()) return false;
+            if (!date.HasValue || !startDate.HasValue) return false;
 
             return startDate.Value.Ticks > date.Value.Ticks;
         }
