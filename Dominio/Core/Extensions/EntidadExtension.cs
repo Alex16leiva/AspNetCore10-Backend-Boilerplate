@@ -38,18 +38,17 @@ namespace Dominio.Core.Extensions
         public static T DeepCopy<T>(this T theSource) 
             where T : class 
         {
-            T theCopy;
+            ArgumentNullException.ThrowIfNull(theSource);
 
             var theDataContactSerializer = new DataContractSerializer(typeof(T));
 
-            using (var memStream = new MemoryStream())
-            {
-                theDataContactSerializer.WriteObject(memStream, theSource);
-                memStream.Position = 0;
-                theCopy = (T)theDataContactSerializer.ReadObject(memStream);
-            }
+            using var memStream = new MemoryStream();
 
-            return theCopy;
+            theDataContactSerializer.WriteObject(memStream, theSource);
+            memStream.Position = 0;
+            var theCopy = theDataContactSerializer.ReadObject(memStream) as T;
+
+            return theCopy ?? throw new SerializationException($"No se pudo deserializar el objeto como {typeof(T).Name}.");
         }
     }
 }
