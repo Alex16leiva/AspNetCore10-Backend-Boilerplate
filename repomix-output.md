@@ -58,8 +58,13 @@ Aplicacion/Helpers/TransactionInfoExtensions.cs
 Aplicacion/Helpers/TransactionInfoHelper.cs
 Aplicacion/Services/ConfiguracionesApp/ConfiguracionesApplicationService.cs
 Aplicacion/Services/ConfiguracionesApp/IConfiguracionesApplicationService.cs
+Aplicacion/Services/Seguridad/Examples/ResultPatternExamples.cs
 Aplicacion/Services/Seguridad/ISecurityApplicationService.cs
 Aplicacion/Services/Seguridad/SecurityAplicationService.cs
+Aplicacion/Services/Seguridad/Validators/EdicionUsuarioRequestValidator.cs
+Aplicacion/Services/Seguridad/Validators/TokenRequestValidator.cs
+Aplicacion/Services/Seguridad/Validators/UserRequestValidator.cs
+Aplicacion/Services/Seguridad/Validators/UsuarioDTOValidator.cs
 CrossCutting/Configuration/AppSettingsException.cs
 CrossCutting/Configuration/AppSettingsManager.cs
 CrossCutting/CrossCutting.csproj
@@ -82,6 +87,9 @@ Dominio/Core/Extensions/ReflectionManager.cs
 Dominio/Core/Extensions/StringExtensions.cs
 Dominio/Core/Jwtoken/JwtSettings.cs
 Dominio/Core/PagedCollection.cs
+Dominio/Core/Result/IResult.cs
+Dominio/Core/Result/Result.cs
+Dominio/Core/Result/Result{T}.cs
 Dominio/Core/TransactionInfo.cs
 Dominio/Dominio.csproj
 EstructuraBaseDatos.txt
@@ -122,6 +130,7 @@ Infraestructura/Migrations/20260529013725_AddRefreshToken.cs
 Infraestructura/Migrations/20260529013725_AddRefreshToken.Designer.cs
 Infraestructura/Migrations/MyContextModelSnapshot.cs
 README.md
+RESULT_PATTERN_GUIDE.md
 TemplateBackEndNetCore.sln
 WebServices/appsettings.Development.json
 WebServices/appsettings.json
@@ -1029,25 +1038,268 @@ namespace Aplicacion.Services.ConfiguracionesApp
 }
 ````
 
-## File: Aplicacion/Services/Seguridad/ISecurityApplicationService.cs
+## File: Aplicacion/Services/Seguridad/Examples/ResultPatternExamples.cs
 ````csharp
-using Aplicacion.DTOs;
-using Aplicacion.DTOs.Seguridad;
+using Dominio.Core.Result;
 
-namespace Aplicacion.Services.Seguridad
+namespace Aplicacion.Services.Seguridad.Examples
 {
-    public interface ISecurityApplicationService
+    /// <summary>
+    /// Ejemplos de cómo refactorizar los métodos del SecurityAplicationService
+    /// para utilizar el Patrón Result en lugar de retornar DTOs con propiedades de mensaje.
+    /// 
+    /// Este archivo documenta el patrón y NO debe ser incluido en la compilación final.
+    /// Sirve como referencia durante la migración gradual del código.
+    /// </summary>
+    public class ResultPatternExamples
     {
-        UsuarioDTO EditarUsuario(EdicionUsuarioRequest request);
-        List<PantallaDTO> ObtenerPantallas();
-        RolDTO EdicionPermisos(EdicionPermisosRequest request);
-        UsuarioDTO CrearUsuario(EdicionUsuarioRequest request);
-        UsuarioDTO IniciarSesion(UserRequest request);
-        UsuarioDTO RefreshToken(TokenRequest request);
-        SearchResult<UsuarioDTO> ObtenerUsuario(GetUserRequest request);
-        RolDTO CrearRol(EdicionRolRequest request);
-        RolDTO EditarRol(EdicionRolRequest request);
-        List<RolDTO> ObtenerRoles();
+        /*
+        EJEMPLO 1: Método que devuelve éxito o fallo simple
+        =====================================================
+        
+        // ANTES (usando DTO con propiedades de mensaje):
+        public UsuarioDTO IniciarSesion(UserRequest request)
+        {
+            if (usuario.IsNotNull() && PasswordEncryptor.VerifyPassword(request?.Password, usuario.Contrasena))
+            {
+                return new UsuarioDTO { ... Token = newAccessToken, ... UsuarioAutenticado = true };
+            }
+            return new UsuarioDTO { Message = "Usuario o Contraseña no valido", UsuarioAutenticado = false };
+        }
+        
+        // DESPUÉS (usando Result<T>):
+        public Result<UsuarioDTO> IniciarSesion(UserRequest request)
+        {
+            if (usuario == null)
+            {
+                return Result<UsuarioDTO>.Failure("Usuario no encontrado", "USER_NOT_FOUND");
+            }
+            
+            if (!PasswordEncryptor.VerifyPassword(request?.Password, usuario.Contrasena))
+            {
+                return Result<UsuarioDTO>.Failure("Contraseña incorrecta", "INVALID_PASSWORD");
+            }
+            
+            var usuarioDto = new UsuarioDTO { ... Token = newAccessToken, ... };
+            return Result<UsuarioDTO>.Success(usuarioDto, "Sesión iniciada correctamente");
+        }
+        
+        // USO EN CONTROLADOR:
+        [HttpPost("login")]
+        public IActionResult Login([FromBody] UserRequest request)
+        {
+            var result = _securityService.IniciarSesion(request);
+            
+            if (!result.IsSuccess)
+            {
+                return BadRequest(new { message = result.Message, errorCode = result.ErrorCode });
+            }
+            
+            return Ok(result.Data);
+        }
+        
+        
+        EJEMPLO 2: Validación con múltiples errores
+        ============================================
+        
+        public Result<UsuarioDTO> CrearUsuario(EdicionUsuarioRequest request)
+        {
+            var validationErrors = new List<string>();
+            
+            if (request.Usuario is null)
+            {
+                validationErrors.Add("El usuario es obligatorio");
+            }
+            
+            if (string.IsNullOrEmpty(request.Usuario?.UsuarioId))
+            {
+                validationErrors.Add("El ID de usuario es obligatorio");
+            }
+            
+            if (validationErrors.Any())
+            {
+                return Result<UsuarioDTO>.ValidationFailure(
+                    "Validación fallida",
+                    validationErrors,
+                    "VALIDATION_ERROR"
+                );
+            }
+            
+            var usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
+            
+            if (usuarioExiste.IsNotNull())
+            {
+                return Result<UsuarioDTO>.Failure("Usuario ya está registrado", "USER_ALREADY_EXISTS");
+            }
+            
+            var usuario = new Usuario { ... };
+            _genericRepository.Add(usuario);
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+            
+            return Result<UsuarioDTO>.Success(
+                _mapper.Map<UsuarioDTO>(usuario),
+                "Usuario creado exitosamente"
+            );
+        }
+        
+        // USO EN CONTROLADOR:
+        [HttpPost("create")]
+        public IActionResult CreateUser([FromBody] EdicionUsuarioRequest request)
+        {
+            var result = _securityService.CrearUsuario(request);
+            
+            if (!result.IsSuccess)
+            {
+                if (result.Errors.Any())
+                {
+                    return BadRequest(new 
+                    { 
+                        message = result.Message,
+                        errors = result.Errors.ToList(),
+                        errorCode = result.ErrorCode 
+                    });
+                }
+                
+                return BadRequest(new { message = result.Message, errorCode = result.ErrorCode });
+            }
+            
+            return Created($"users/{result.Data.UsuarioId}", result.Data);
+        }
+        
+        
+        EJEMPLO 3: Encadenamiento con Bind
+        ===================================
+        
+        public Result<PermisosDTO> AsignarPermisos(int usuarioId, List<PermisoRequest> permisos)
+        {
+            return ObtenerUsuarioVerificado(usuarioId)
+                .Bind(usuario => ValidarPermisos(permisos))
+                .Bind(permisosValidos => GuardarPermisos(usuarioId, permisosValidos))
+                .Map(permisosGuardados => new PermisosDTO { ... });
+        }
+        
+        
+        EJEMPLO 4: Transformación con Map
+        ==================================
+        
+        var resultado = _securityService.ObtenerUsuario(userId)
+            .Map(usuario => new UsuarioResumenDTO 
+            { 
+                Id = usuario.UsuarioId,
+                NombreCompleto = $"{usuario.Nombre} {usuario.Apellido}"
+            });
+        
+        if (resultado.IsSuccess)
+        {
+            return Ok(resultado.Data);
+        }
+        
+        return NotFound(new { message = resultado.Message });
+        */
+
+        /// <summary>
+        /// Ventajas del Patrón Result:
+        /// 
+        /// 1. Type-safe: El compilador asegura que verificas IsSuccess antes de acceder a Data
+        /// 2. Explícito: Los errores son parte del contrato del método
+        /// 3. Sin excepciones: Evita el overhead de las excepciones para casos esperados
+        /// 4. Composable: Puedes usar Map y Bind para encadenar operaciones
+        /// 5. Testeable: Fácil de testear sin necesidad de mocking de excepciones
+        /// 6. API consistente: Todos los métodos retornan Result<T>
+        /// 
+        /// Pasos para migrar el código actual:
+        /// 
+        /// 1. Cambiar tipos de retorno de métodos:
+        ///    UsuarioDTO IniciarSesion(...) → Result<UsuarioDTO> IniciarSesion(...)
+        ///
+        /// 2. Reemplazar retornos con message por Result.Success() o Result.Failure():
+        ///    return new UsuarioDTO { Message = "Error" } → Result<UsuarioDTO>.Failure("Error")
+        ///
+        /// 3. Actualizar controladores para revisar IsSuccess y acceder a Data:
+        ///    var usuario = dto; → var result = service.Method(); if (result.IsSuccess) { var usuario = result.Data; }
+        ///
+        /// 4. Manejar errores de validación con ValidationFailure()
+        ///
+        /// 5. Usar Map para transformaciones simples
+        /// 6. Usar Bind para operaciones que devuelven otro Result
+        /// </summary>
+        public class MigrationGuide { }
+    }
+}
+````
+
+## File: Aplicacion/Services/Seguridad/Validators/EdicionUsuarioRequestValidator.cs
+````csharp
+using Aplicacion.DTOs.Seguridad;
+using FluentValidation;
+
+namespace Aplicacion.Services.Seguridad.Validators
+{
+    public class EdicionUsuarioRequestValidator : AbstractValidator<EdicionUsuarioRequest>
+    {
+        public EdicionUsuarioRequestValidator()
+        {
+            RuleFor(x => x.Usuario).NotNull().WithMessage("Usuario es requerido").SetValidator(new UsuarioDTOValidator());
+        }
+    }
+}
+````
+
+## File: Aplicacion/Services/Seguridad/Validators/TokenRequestValidator.cs
+````csharp
+using Aplicacion.DTOs.Seguridad;
+using FluentValidation;
+
+namespace Aplicacion.Services.Seguridad.Validators
+{
+    public class TokenRequestValidator : AbstractValidator<TokenRequest>
+    {
+        public TokenRequestValidator()
+        {
+            RuleFor(x => x.AccessToken).NotEmpty().WithMessage("AccessToken es requerido");
+            RuleFor(x => x.RefreshToken).NotEmpty().WithMessage("RefreshToken es requerido");
+        }
+    }
+}
+````
+
+## File: Aplicacion/Services/Seguridad/Validators/UserRequestValidator.cs
+````csharp
+using Aplicacion.DTOs.Seguridad;
+using FluentValidation;
+
+namespace Aplicacion.Services.Seguridad.Validators
+{
+    public class UserRequestValidator : AbstractValidator<UserRequest>
+    {
+        public UserRequestValidator()
+        {
+            RuleFor(x => x.UsuarioId).NotEmpty().WithMessage("UsuarioId es requerido").MaximumLength(25);
+            RuleFor(x => x.Password).NotEmpty().WithMessage("Password es requerido").MinimumLength(8);
+        }
+    }
+}
+````
+
+## File: Aplicacion/Services/Seguridad/Validators/UsuarioDTOValidator.cs
+````csharp
+using Aplicacion.DTOs.Seguridad;
+using FluentValidation;
+
+namespace Aplicacion.Services.Seguridad.Validators
+{
+    public class UsuarioDTOValidator : AbstractValidator<UsuarioDTO>
+    {
+        public UsuarioDTOValidator()
+        {
+            RuleFor(x => x.UsuarioId).NotEmpty().WithMessage("UsuarioId es requerido").MaximumLength(25);
+            RuleFor(x => x.Nombre).NotEmpty().WithMessage("Nombre es requerido");
+            RuleFor(x => x.Apellido).NotEmpty().WithMessage("Apellido es requerido");
+            RuleFor(x => x.RolId).NotEmpty().WithMessage("RolId es requerido");
+            RuleFor(x => x.Contrasena)
+                .MinimumLength(8).WithMessage("La contraseña debe tener al menos 8 caracteres")
+                .When(x => x.EditarContrasena);
+        }
     }
 }
 ````
@@ -6139,6 +6391,216 @@ namespace Infraestructura.Migrations
 }
 ````
 
+## File: RESULT_PATTERN_GUIDE.md
+````markdown
+# Patrón Result - Guía de Implementación
+
+## Descripción General
+
+El **Patrón Result** encapsula el resultado de una operación (éxito o fallo) en un objeto type-safe. Reemplaza la necesidad de retornar DTOs con propiedades de mensaje o lanzar excepciones para casos de error esperados.
+
+## Estructura
+
+### 1. **IResult** (Interfaz Base)
+```csharp
+public interface IResult
+{
+    bool IsSuccess { get; }           // ¿Operación exitosa?
+    string Message { get; }            // Mensaje de resultado
+    string? ErrorCode { get; }         // Código de error (opcional)
+    IReadOnlyCollection<string> Errors { get; } // Errores detallados
+}
+```
+
+### 2. **Result** (Clase Base)
+Resultados sin valor genérico, para operaciones que no retornan datos.
+
+```csharp
+// Crear resultado exitoso
+var success = Result.Success("Operación completada");
+
+// Crear resultado fallido
+var failure = Result.Failure("Algo falló", errorCode: "ERR_001");
+
+// Crear resultado con múltiples errores
+var validation = Result.ValidationFailure(
+    "Validación fallida",
+    new[] { "Campo 1 requerido", "Campo 2 inválido" },
+    errorCode: "VALIDATION_ERROR"
+);
+```
+
+### 3. **Result<T>** (Clase Genérica)
+Para operaciones que retornan un valor de tipo `T`.
+
+```csharp
+// Crear resultado exitoso con datos
+var success = Result<Usuario>.Success(usuario, "Usuario creado");
+
+// Crear resultado fallido (sin datos)
+var failure = Result<Usuario>.Failure("Usuario no encontrado", "USER_NOT_FOUND");
+
+// Crear resultado con errores de validación
+var validation = Result<Usuario>.ValidationFailure(
+    "Datos inválidos",
+    new[] { "Email duplicado", "Contraseña muy corta" }
+);
+```
+
+## Uso en Servicios
+
+### Antes (Antipatrón)
+```csharp
+public UsuarioDTO CrearUsuario(EdicionUsuarioRequest request)
+{
+    if (usuarioExiste)
+    {
+        return new UsuarioDTO { Message = "Usuario ya existe", UsuarioId = "" };
+    }
+    
+    return new UsuarioDTO { UsuarioId = nuevoUsuario.Id, Message = "Éxito" };
+}
+```
+
+### Después (Patrón Result)
+```csharp
+public Result<UsuarioDTO> CrearUsuario(EdicionUsuarioRequest request)
+{
+    if (usuarioExiste)
+    {
+        return Result<UsuarioDTO>.Failure("Usuario ya existe", "USER_EXISTS");
+    }
+    
+    var usuarioDto = _mapper.Map<UsuarioDTO>(nuevoUsuario);
+    return Result<UsuarioDTO>.Success(usuarioDto, "Usuario creado exitosamente");
+}
+```
+
+## Uso en Controladores
+
+### Con Result<T>
+```csharp
+[HttpPost("create")]
+public IActionResult Create([FromBody] EdicionUsuarioRequest request)
+{
+    var result = _securityService.CrearUsuario(request);
+    
+    // Verificación simplificada
+    if (!result.IsSuccess)
+    {
+        if (result.Errors.Any())
+        {
+            return BadRequest(new { message = result.Message, errors = result.Errors });
+        }
+        return BadRequest(new { message = result.Message });
+    }
+    
+    return Created($"/users/{result.Data.UsuarioId}", result.Data);
+}
+```
+
+## Métodos Auxiliares
+
+### **Map<TNew>** - Transformación de Datos
+Transforma el valor exitoso sin afectar el estado de error.
+
+```csharp
+var usuarioResult = _service.ObtenerUsuario(id);
+
+var dtoResult = usuarioResult.Map(usuario => new UsuarioResumenDTO
+{
+    Id = usuario.Id,
+    NombreCompleto = $"{usuario.Nombre} {usuario.Apellido}"
+});
+
+if (dtoResult.IsSuccess)
+{
+    return Ok(dtoResult.Data); // UsuarioResumenDTO
+}
+```
+
+### **Bind<TNew>** - Encadenamiento de Operaciones
+Encadena operaciones que retornan otro `Result<T>`.
+
+```csharp
+public Result<PermisoDTO> ObtenerPermisosDeUsuario(int usuarioId)
+{
+    return ObtenerUsuario(usuarioId)           // Result<Usuario>
+        .Bind(usuario => ObtenerRol(usuario.RolId))  // Result<Rol>
+        .Bind(rol => ObtenerPermisos(rol.Id))        // Result<List<Permiso>>
+        .Map(permisos => new PermisoDTO { ... });    // Result<PermisoDTO>
+}
+```
+
+## Manejo de Errores de Validación
+
+```csharp
+public Result<UsuarioDTO> EditarUsuario(EdicionUsuarioRequest request)
+{
+    var erroresValidacion = new List<string>();
+    
+    if (request.Usuario is null)
+        erroresValidacion.Add("El usuario es obligatorio");
+    
+    if (string.IsNullOrEmpty(request.Usuario?.UsuarioId))
+        erroresValidacion.Add("ID de usuario es obligatorio");
+    
+    if (erroresValidacion.Any())
+    {
+        return Result<UsuarioDTO>.ValidationFailure(
+            "Validación fallida",
+            erroresValidacion,
+            "VALIDATION_ERROR"
+        );
+    }
+    
+    // Resto de la lógica...
+    return Result<UsuarioDTO>.Success(usuarioDto);
+}
+```
+
+## Beneficios
+
+| Aspecto | Benefit |
+|--------|---------|
+| **Type-Safe** | El compilador fuerza revisión de errores |
+| **Explícito** | Los errores son parte del contrato del método |
+| **Sin Excepciones** | Evita overhead para casos esperados |
+| **Composable** | Map y Bind para composición funcional |
+| **Testeable** | Fácil de testear sin mocking complejo |
+| **Mantenible** | Código más limpio y predecible |
+
+## Plan de Migración (Gradual)
+
+1. ✅ **Implementar clases Result** (Done)
+2. 🔄 **Refactorizar SecurityApplicationService** (Próximo)
+   - CrearUsuario
+   - EditarUsuario
+   - IniciarSesion
+   - RefreshToken
+3. 🔄 **Actualizar Controladores** (Después)
+4. 🔄 **Extender a otros servicios** (Opcional)
+
+## Ejemplos de Códigos de Error
+
+```
+USER_NOT_FOUND       → Usuario no existe
+INVALID_PASSWORD     → Contraseña incorrecta
+USER_ALREADY_EXISTS  → Usuario duplicado
+ROLE_NOT_FOUND       → Rol no existe
+VALIDATION_ERROR     → Error de validación
+UNAUTHORIZED         → No autorizado
+FORBIDDEN            → Acceso denegado
+INTERNAL_ERROR       → Error interno del servidor
+```
+
+## Referencias
+
+- Patrón Result: https://github.com/nlkl/Optional
+- Railway-Oriented Programming: https://fsharpforfunandprofit.com/posts/recipe-part2/
+- C# Result Pattern: https://github.com/MbarkT3SL/SimpleResult
+````
+
 ## File: WebServices/appsettings.Development.json
 ````json
 {
@@ -6287,6 +6749,30 @@ namespace Aplicacion.Helpers
 
             return param;
         }
+    }
+}
+````
+
+## File: Aplicacion/Services/Seguridad/ISecurityApplicationService.cs
+````csharp
+using Aplicacion.DTOs;
+using Aplicacion.DTOs.Seguridad;
+using Dominio.Core.Result;
+
+namespace Aplicacion.Services.Seguridad
+{
+    public interface ISecurityApplicationService
+    {
+        Task<Result<UsuarioDTO>> EditarUsuario(EdicionUsuarioRequest request);
+        Task<Result<List<PantallaDTO>>> ObtenerPantallas();
+        Task<Result<RolDTO>> EdicionPermisos(EdicionPermisosRequest request);
+        Task<Result<UsuarioDTO>> CrearUsuario(EdicionUsuarioRequest request);
+        Task<Result<UsuarioDTO>> IniciarSesion(UserRequest request);
+        Task<Result<UsuarioDTO>> RefreshToken(TokenRequest request);
+        Task<Result<SearchResult<UsuarioDTO>>> ObtenerUsuario(GetUserRequest request);
+        Task<Result<RolDTO>> CrearRol(EdicionRolRequest request);
+        Task<Result<RolDTO>> EditarRol(EdicionRolRequest request);
+        Task<Result<List<RolDTO>>> ObtenerRoles();
     }
 }
 ````
@@ -7467,672 +7953,6 @@ namespace Dominio.Core.Extensions
 }
 ````
 
-## File: Dominio/Core/Extensions/StringExtensions.cs
-````csharp
-using System.Text.RegularExpressions;
-
-namespace Dominio.Core.Extensions
-{
-    public static class StringExtensions
-    {
-        /// <summary>
-        /// Convierte una cadena en un arreglo de objetos con un único elemento,
-        /// asegurando que el valor no sea nulo mediante <c>ValueOrEmpty()</c>.
-        /// </summary>
-        /// <param name="value">La cadena que se desea convertir.</param>
-        /// <returns>
-        /// Un arreglo de objetos que contiene un único elemento:
-        /// la cadena original o una cadena vacía si es nula.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// string texto1 = "Hola";
-        /// string texto2 = null;
-        ///
-        /// object[] resultado1 = texto1.ToObject(); // { "Hola" }
-        /// object[] resultado2 = texto2.ToObject(); // { "" }
-        ///
-        /// Console.WriteLine($"Resultado1: {resultado1[0]}");
-        /// Console.WriteLine($"Resultado2: {resultado2[0]}");
-        /// </code>
-        /// </example>
-        public static object[] ToObject(this string value)
-        {
-            return new object[] { value.ValueOrEmpty() };
-        }
-
-        /// <summary>
-        /// Convierte una cadena en un valor <see cref="decimal"/>.
-        /// Si la cadena es nula, vacía o no puede convertirse, devuelve 0.
-        /// </summary>
-        /// <param name="decimalStringValue">La cadena que representa un número decimal.</param>
-        /// <returns>
-        /// El valor convertido a <see cref="decimal"/> si la cadena es válida; en caso contrario, 0.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// string texto1 = "123.45";
-        /// string texto2 = "abc";
-        /// string texto3 = null;
-        ///
-        /// decimal resultado1 = texto1.ToDecimal(); // 123.45
-        /// decimal resultado2 = texto2.ToDecimal(); // 0
-        /// decimal resultado3 = texto3.ToDecimal(); // 0
-        ///
-        /// Console.WriteLine($"Resultado1: {resultado1}");
-        /// Console.WriteLine($"Resultado2: {resultado2}");
-        /// Console.WriteLine($"Resultado3: {resultado3}");
-        /// </code>
-        /// </example>
-        public static decimal ToDecimal(this string decimalStringValue)
-        {
-            decimal decimalValue = 0;
-            if (decimalStringValue.HasValue())
-            {
-                Decimal.TryParse(decimalStringValue, out decimalValue);
-            }
-            return decimalValue;
-        }
-
-        /// <summary>
-        /// Convierte una cadena en un valor <see cref="int"/>.
-        /// Si la cadena es nula, vacía o no puede convertirse, devuelve 0.
-        /// </summary>
-        /// <param name="decimalStringValue">La cadena que representa un número entero.</param>
-        /// <returns>
-        /// El valor convertido a <see cref="int"/> si la cadena es válida; en caso contrario, 0.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// string texto1 = "123";
-        /// string texto2 = "abc";
-        /// string texto3 = null;
-        ///
-        /// int resultado1 = texto1.ToInt(); // 123
-        /// int resultado2 = texto2.ToInt(); // 0
-        /// int resultado3 = texto3.ToInt(); // 0
-        ///
-        /// Console.WriteLine($"Resultado1: {resultado1}");
-        /// Console.WriteLine($"Resultado2: {resultado2}");
-        /// Console.WriteLine($"Resultado3: {resultado3}");
-        /// </code>
-        /// </example>
-        public static int ToInt(this string decimalStringValue)
-        {
-            int decimalValue = 0;
-            if (decimalStringValue.HasValue())
-            {
-                Int32.TryParse(decimalStringValue, out decimalValue);
-            }
-            return decimalValue;
-        }
-
-        /// <summary>
-        /// Extrae todos los caracteres numéricos de una cadena,
-        /// devolviendo una nueva cadena compuesta únicamente por dígitos.
-        /// </summary>
-        /// <param name="decimalStringValue">La cadena de entrada que puede contener números y otros caracteres.</param>
-        /// <returns>
-        /// Una cadena que contiene únicamente los dígitos presentes en <paramref name="decimalStringValue"/>.
-        /// Si la cadena es nula o vacía, devuelve una cadena vacía.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// string texto1 = "Tel: +504-9876-1234";
-        /// string texto2 = "Precio: $123.45";
-        /// string texto3 = null;
-        ///
-        /// string resultado1 = texto1.GetNumericValues(); // "50498761234"
-        /// string resultado2 = texto2.GetNumericValues(); // "12345"
-        /// string resultado3 = texto3.GetNumericValues(); // ""
-        ///
-        /// Console.WriteLine($"Resultado1: {resultado1}");
-        /// Console.WriteLine($"Resultado2: {resultado2}");
-        /// Console.WriteLine($"Resultado3: {resultado3}");
-        /// </code>
-        /// </example>
-        public static string GetNumericValues(this string decimalStringValue)
-        {
-            string output = string.Empty;
-            if (decimalStringValue.HasValue())
-            {
-                output = new string(decimalStringValue.ToCharArray().Where(c => char.IsDigit(c)).ToArray());
-            }
-            return output;
-        }
-
-        /// <summary>
-        /// Verifica si una cadena tiene un valor válido,
-        /// es decir, que no sea nula, vacía ni compuesta únicamente por espacios en blanco.
-        /// </summary>
-        /// <param name="stringValue">La cadena que se desea evaluar.</param>
-        /// <returns>
-        /// <c>true</c> si la cadena contiene un valor válido; en caso contrario, <c>false</c>.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// string texto1 = "Hola";
-        /// string texto2 = "";
-        /// string texto3 = "   ";
-        /// string texto4 = null;
-        ///
-        /// bool resultado1 = texto1.HasValue(); // true
-        /// bool resultado2 = texto2.HasValue(); // false
-        /// bool resultado3 = texto3.HasValue(); // false
-        /// bool resultado4 = texto4.HasValue(); // false
-        ///
-        /// Console.WriteLine($"Texto1: {resultado1}, Texto2: {resultado2}, Texto3: {resultado3}, Texto4: {resultado4}");
-        /// </code>
-        /// </example>
-        public static bool HasValue(this string stringValue)
-        {
-            return !string.IsNullOrEmpty(stringValue) && !string.IsNullOrWhiteSpace(stringValue);
-        }
-
-        /// <summary>
-        /// Devuelve la cadena original si contiene un valor válido,
-        /// o una cadena vacía si es nula, vacía o compuesta únicamente por espacios.
-        /// </summary>
-        /// <param name="stringValue">La cadena que se desea evaluar.</param>
-        /// <returns>
-        /// La cadena original recortada con <see cref="string.Trim"/> si tiene valor;
-        /// en caso contrario, <see cref="string.Empty"/>.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// string texto1 = " Hola ";
-        /// string texto2 = "";
-        /// string texto3 = "   ";
-        /// string texto4 = null;
-        ///
-        /// string resultado1 = texto1.ValueOrEmpty(); // "Hola"
-        /// string resultado2 = texto2.ValueOrEmpty(); // ""
-        /// string resultado3 = texto3.ValueOrEmpty(); // ""
-        /// string resultado4 = texto4.ValueOrEmpty(); // ""
-        ///
-        /// Console.WriteLine($"Texto1: '{resultado1}', Texto2: '{resultado2}', Texto3: '{resultado3}', Texto4: '{resultado4}'");
-        /// </code>
-        /// </example>
-        public static string ValueOrEmpty(this string stringValue)
-        {
-            return HasValue(stringValue) ? stringValue.Trim() : string.Empty;
-        }
-
-        /// <summary>
-        /// Convierte un objeto en su representación de cadena.
-        /// Si el objeto es nulo, devuelve una cadena vacía.
-        /// </summary>
-        /// <param name="stringValue">El objeto que se desea convertir a cadena.</param>
-        /// <returns>
-        /// La representación en cadena del objeto, recortada con <see cref="string.Trim"/> si no es nulo;
-        /// en caso contrario, <see cref="string.Empty"/>.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// object valor1 = " Hola ";
-        /// object valor2 = 123;
-        /// object valor3 = null;
-        ///
-        /// string resultado1 = valor1.ToStringValue(); // "Hola"
-        /// string resultado2 = valor2.ToStringValue(); // "123"
-        /// string resultado3 = valor3.ToStringValue(); // ""
-        ///
-        /// Console.WriteLine($"Resultado1: '{resultado1}', Resultado2: '{resultado2}', Resultado3: '{resultado3}'");
-        /// </code>
-        /// </example>
-        public static string ToStringValue(this object stringValue)
-        {
-            return stringValue != null ? stringValue.ToString().Trim() : string.Empty;
-        }
-
-        /// <summary>
-        /// Verifica si una cadena está vacía, es nula o contiene únicamente espacios en blanco.
-        /// </summary>
-        /// <param name="stringValue">La cadena que se desea evaluar.</param>
-        /// <returns>
-        /// <c>true</c> si la cadena no tiene un valor válido (es nula, vacía o solo espacios);
-        /// en caso contrario, <c>false</c>.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// string texto1 = "Hola";
-        /// string texto2 = "";
-        /// string texto3 = "   ";
-        /// string texto4 = null;
-        ///
-        /// bool resultado1 = texto1.IsMissingValue(); // false
-        /// bool resultado2 = texto2.IsMissingValue(); // true
-        /// bool resultado3 = texto3.IsMissingValue(); // true
-        /// bool resultado4 = texto4.IsMissingValue(); // true
-        ///
-        /// Console.WriteLine($"Texto1: {resultado1}, Texto2: {resultado2}, Texto3: {resultado3}, Texto4: {resultado4}");
-        /// </code>
-        /// </example>
-        public static bool IsMissingValue(this string stringValue)
-        {
-            return !HasValue(stringValue);
-        }
-
-        /// <summary>
-        /// Divide una cadena en una lista de subcadenas.
-        /// Si se proporcionan separadores, utiliza el primero de ellos.
-        /// Si no se proporcionan, divide la cadena por saltos de línea.
-        /// </summary>
-        /// <param name="value">La cadena que se desea dividir.</param>
-        /// <param name="separators">
-        /// Opcional: uno o más caracteres separadores. 
-        /// Si se especifican, se usa el primero para realizar la división.
-        /// </param>
-        /// <returns>
-        /// Una lista de subcadenas obtenidas a partir de <paramref name="value"/>.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// string texto1 = "uno,dos,tres";
-        /// string texto2 = "linea1\r\nlinea2\r\nlinea3";
-        ///
-        /// List<string> lista1 = texto1.SplitIntoList(','); 
-        /// // { "uno", "dos", "tres" }
-        ///
-        /// List<string> lista2 = texto2.SplitIntoList(); 
-        /// // { "linea1", "linea2", "linea3" }
-        ///
-        /// Console.WriteLine(string.Join(" | ", lista1));
-        /// Console.WriteLine(string.Join(" | ", lista2));
-        /// </code>
-        /// </example>
-        public static List<string> SplitIntoList(this string value, params char[] separators)
-        {
-            if (separators.HasItems())
-            {
-                var firstSeparator = separators.First();
-                var messagesKeys = value.Split(firstSeparator);
-                return messagesKeys.ToList();
-            }
-            else
-            {
-                var observaciones = value.Replace("\r\n", "\n");
-                var messagesKeys = observaciones.Split('\n');
-                return messagesKeys.ToList();
-            }
-        }
-
-        /// <summary>
-        /// Divide una cadena en una lista de subcadenas utilizando separadores,
-        /// y opcionalmente elimina caracteres especiales definidos en <paramref name="toExclude"/>.
-        /// </summary>
-        /// <param name="value">La cadena que se desea dividir.</param>
-        /// <param name="toExclude">
-        /// Conjunto de caracteres que se deben eliminar de cada subcadena resultante.
-        /// Si está vacío o nulo, no se eliminan caracteres adicionales.
-        /// </param>
-        /// <param name="separators">
-        /// Uno o más caracteres separadores. 
-        /// Si se especifican, se usa el primero para realizar la división.
-        /// Si no se especifican, se divide por saltos de línea.
-        /// </param>
-        /// <returns>
-        /// Una lista de subcadenas obtenidas a partir de <paramref name="value"/>,
-        /// con los caracteres excluidos eliminados si corresponde.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// string texto1 = "uno@,dos#,tres$";
-        /// var lista1 = texto1.SplitIntoListWithOutSpecialCharacters(new[] { '@', '#', '$' }, ',');
-        /// // { "uno", "dos", "tres" }
-        ///
-        /// string texto2 = "linea1\r\nlinea2\r\nlinea3";
-        /// var lista2 = texto2.SplitIntoListWithOutSpecialCharacters(null);
-        /// // { "linea1", "linea2", "linea3" }
-        ///
-        /// Console.WriteLine(string.Join(" | ", lista1));
-        /// Console.WriteLine(string.Join(" | ", lista2));
-        /// </code>
-        /// </example>
-        public static List<string> SplitIntoListWithOutSpecialCharacters(this string value, IEnumerable<char> toExclude, params char[] separators)
-        {
-            if (separators.HasItems())
-            {
-                var firstSeparator = separators.First();
-                var messagesKeys = value.Split(firstSeparator);
-                var returnList = messagesKeys.ToList();
-                var result = new List<string>();
-                if (toExclude.HasItems())
-                {
-                    foreach (var item in returnList)
-                    {
-                        var newString = item.Trim();
-                        foreach (var forbidenItem in toExclude)
-                        {
-                            newString.Replace(forbidenItem.ToString(), string.Empty);
-                        }
-                        result.Add(newString);
-                    }
-                    return result;
-                }
-                return returnList;
-            }
-            else
-            {
-                var observaciones = value.Replace("\r\n", "\n");
-                var messagesKeys = observaciones.Split('\n');
-                return messagesKeys.ToList();
-            }
-        }
-
-        /// <summary>
-        /// Convierte una cadena en un valor <see cref="DateTime"/>.
-        /// Si la cadena es nula, vacía o no puede convertirse, devuelve <see cref="DateTime.MinValue"/>.
-        /// </summary>
-        /// <param name="dateStringValue">La cadena que representa una fecha.</param>
-        /// <returns>
-        /// El valor convertido a <see cref="DateTime"/> si la cadena es válida; 
-        /// en caso contrario, <see cref="DateTime.MinValue"/>.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// string texto1 = "2026-04-02";
-        /// string texto2 = "02/04/2026 16:30";
-        /// string texto3 = "fecha inválida";
-        /// string texto4 = null;
-        ///
-        /// DateTime resultado1 = texto1.ToDateTime(); // 2026-04-02 00:00:00
-        /// DateTime resultado2 = texto2.ToDateTime(); // 2026-04-02 16:30:00
-        /// DateTime resultado3 = texto3.ToDateTime(); // DateTime.MinValue
-        /// DateTime resultado4 = texto4.ToDateTime(); // DateTime.MinValue
-        ///
-        /// Console.WriteLine($"Resultado1: {resultado1}");
-        /// Console.WriteLine($"Resultado2: {resultado2}");
-        /// Console.WriteLine($"Resultado3: {resultado3}");
-        /// Console.WriteLine($"Resultado4: {resultado4}");
-        /// </code>
-        /// </example>
-        public static DateTime ToDateTime(this string dateStringValue)
-        {
-            DateTime dateValue = DateTime.MinValue;
-            if (dateStringValue.HasValue())
-            {
-                DateTime.TryParse(dateStringValue, out dateValue);
-            }
-            return dateValue;
-        }
-
-        /// <summary>
-        /// Inserta espacios antes de cada letra mayúscula en una cadena,
-        /// devolviendo el resultado con un formato más legible.
-        /// </summary>
-        /// <param name="value">La cadena de entrada que contiene letras mayúsculas.</param>
-        /// <returns>
-        /// Una nueva cadena con espacios añadidos antes de cada letra mayúscula.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// string texto1 = "HolaMundo";
-        /// string texto2 = "XMLParserExtension";
-        ///
-        /// string resultado1 = texto1.AddSpacesBeforeCapitalLetters(); 
-        /// // "Hola Mundo"
-        ///
-        /// string resultado2 = texto2.AddSpacesBeforeCapitalLetters(); 
-        /// // "XML Parser Extension"
-        ///
-        /// Console.WriteLine(resultado1);
-        /// Console.WriteLine(resultado2);
-        /// </code>
-        /// </example>
-        public static string AddSpacesBeforeCapitalLetters(this string value)
-        {
-            return string.Concat(value.Select(x => Char.IsUpper(x) ? " " + x : x.ToString())).TrimStart(' ');
-        }
-
-        /// <summary>
-        /// Verifica si una cadena contiene únicamente caracteres numéricos (dígitos).
-        /// </summary>
-        /// <param name="str">La cadena que se desea evaluar.</param>
-        /// <returns>
-        /// <c>true</c> si la cadena contiene solo dígitos.
-        /// Si la cadena es nula o vacía, devuelve <c>true</c> por diseño.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// string texto1 = "12345";
-        /// string texto2 = "12a45";
-        /// string texto3 = "";
-        /// string texto4 = null;
-        ///
-        /// bool resultado1 = texto1.IsNumeric(); // true
-        /// bool resultado2 = texto2.IsNumeric(); // false
-        /// bool resultado3 = texto3.IsNumeric(); // true
-        /// bool resultado4 = texto4.IsNumeric(); // true
-        ///
-        /// Console.WriteLine($"Texto1: {resultado1}, Texto2: {resultado2}, Texto3: {resultado3}, Texto4: {resultado4}");
-        /// </code>
-        /// </example>
-        public static bool IsNumeric(this string str)
-        {
-            if (str.HasValue())
-            {
-                return !str.ToArray().Any(a => !char.IsDigit(a));
-            }
-            return true;
-        }
-
-        /// <summary>
-        /// Verifica si una cadena representa un número decimal válido.
-        /// Se permiten dígitos y los caracteres ',' y '.' como separadores decimales.
-        /// </summary>
-        /// <param name="str">La cadena que se desea evaluar.</param>
-        /// <returns>
-        /// <c>true</c> si la cadena contiene únicamente dígitos y opcionalmente
-        /// los caracteres ',' o '.'; en caso contrario, <c>false</c>.
-        /// Si la cadena es nula o vacía, devuelve <c>false</c>.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// string texto1 = "123.45";
-        /// string texto2 = "123,45";
-        /// string texto3 = "12a45";
-        /// string texto4 = "";
-        /// string texto5 = null;
-        ///
-        /// bool resultado1 = texto1.IsDecimal(); // true
-        /// bool resultado2 = texto2.IsDecimal(); // true
-        /// bool resultado3 = texto3.IsDecimal(); // false
-        /// bool resultado4 = texto4.IsDecimal(); // false
-        /// bool resultado5 = texto5.IsDecimal(); // false
-        ///
-        /// Console.WriteLine($"Texto1: {resultado1}, Texto2: {resultado2}, Texto3: {resultado3}, Texto4: {resultado4}, Texto5: {resultado5}");
-        /// </code>
-        /// </example>
-        public static bool IsDecimal(this string str)
-        {
-            if (str.IsMissingValue())
-            {
-                return false;
-            }
-
-            List<char> charsToexclude = new List<char> { ',', '.' };
-            if (str.HasValue())
-            {
-                var arr = str.ToArray();
-                var chars = arr.Where(w => !char.IsDigit(w) && !charsToexclude.Contains(w));
-
-                return !chars.Any();
-
-            }
-            return true;
-        }
-
-        /// <summary>
-        /// Limita la longitud de una cadena a un máximo especificado.
-        /// Si la cadena es más corta o igual al máximo, se devuelve completa.
-        /// Si es más larga, se devuelve truncada.
-        /// </summary>
-        /// <param name="value">La cadena que se desea truncar.</param>
-        /// <param name="maxLength">La longitud máxima permitida.</param>
-        /// <returns>
-        /// La cadena original si su longitud es menor o igual a <paramref name="maxLength"/>; 
-        /// en caso contrario, una subcadena de longitud máxima.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// string texto1 = "Hola Mundo";
-        /// string texto2 = "Este texto es demasiado largo";
-        ///
-        /// string resultado1 = texto1.Truncate(20); // "Hola Mundo"
-        /// string resultado2 = texto2.Truncate(10); // "Este texto"
-        ///
-        /// Console.WriteLine($"Resultado1: {resultado1}");
-        /// Console.WriteLine($"Resultado2: {resultado2}");
-        /// </code>
-        /// </example>
-        public static string Truncate(this string value, int maxLength)
-        {
-            if (string.IsNullOrEmpty(value)) return value;
-            return value.Length <= maxLength ? value : value.Substring(0, maxLength);
-        }
-
-        /// <summary>
-        /// Elimina todos los espacios y caracteres de espacio en blanco de una cadena,
-        /// devolviendo el resultado sin espacios.
-        /// </summary>
-        /// <param name="str">La cadena de entrada que se desea limpiar.</param>
-        /// <returns>
-        /// Una nueva cadena sin espacios ni caracteres de espacio en blanco.
-        /// Si la cadena es nula, devuelve <c>null</c>.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// string texto1 = "Hola Mundo";
-        /// string texto2 = " 123 \t 456 ";
-        /// string texto3 = null;
-        ///
-        /// string resultado1 = texto1.RemoveSpaceEmpty(); // "HolaMundo"
-        /// string resultado2 = texto2.RemoveSpaceEmpty(); // "123456"
-        /// string resultado3 = texto3.RemoveSpaceEmpty(); // null
-        ///
-        /// Console.WriteLine($"Resultado1: '{resultado1}'");
-        /// Console.WriteLine($"Resultado2: '{resultado2}'");
-        /// Console.WriteLine($"Resultado3: '{resultado3}'");
-        /// </code>
-        /// </example>
-        public static string RemoveSpaceEmpty(this string str)
-        {
-            return Regex.Replace(str, @"\s", "")?.Trim();
-        }
-
-        /// <summary>
-        /// Extensión para cadenas que permite insertar parámetros dinámicos
-        /// usando <see cref="string.Format(string, object[])"/>.
-        /// </summary>
-        /// <param name="str">
-        /// Cadena base que contiene placeholders (ej: "Hola {0}, tienes {1} mensajes").
-        /// </param>
-        /// <param name="parameters">
-        /// Arreglo de objetos que reemplazarán los placeholders en la cadena.
-        /// </param>
-        /// <returns>
-        /// Una nueva cadena con los parámetros reemplazados.
-        /// </returns>
-        /// <example>
-        /// Ejemplo 1:
-        /// string saludo = "Hola {0}".AddStringParameters(new object[] { "Alexander" });
-        /// // Resultado: "Hola Alexander"
-        ///
-        /// Ejemplo 2:
-        /// string info = "El producto {0} cuesta {1:C}".AddStringParameters(new object[] { "Laptop", 1200 });
-        /// // Resultado: "El producto Laptop cuesta $1,200.00"
-        ///
-        /// Ejemplo 3:
-        /// string fecha = "Hoy es {0:dddd}, {0:dd/MM/yyyy}".AddStringParameters(new object[] { DateTime.Now });
-        /// // Resultado: "Hoy es jueves, 02/04/2026"
-        /// </example>
-        public static string AddStringParameters(this string str, object[] parameters)
-        {
-            return string.Format(str, parameters);
-        }
-
-        /// <summary>
-        /// Extensión para ordenar alfabéticamente los elementos de una cadena
-        /// separados por un delimitador específico.
-        /// </summary>
-        /// <param name="strUnordered">
-        /// Cadena original que contiene elementos separados por el delimitador.
-        /// Ejemplo: "perro,gato,ave".
-        /// </param>
-        /// <param name="parameters">
-        /// Carácter delimitador que separa los elementos.
-        /// Ejemplo: ',' o ';'.
-        /// </param>
-        /// <returns>
-        /// Una nueva cadena con los elementos ordenados alfabéticamente.
-        /// Si la cadena está vacía o no contiene el delimitador, se devuelve la original.
-        /// </returns>
-        /// <example>
-        /// Ejemplo 1:
-        /// string animales = "perro,gato,ave".OrderStringAscBySeparator(',');
-        /// // Resultado: "ave,gato,perro"
-        ///
-        /// Ejemplo 2:
-        /// string frutas = "Mango;manzana;Banana".OrderStringAscBySeparator(';');
-        /// // Resultado: "Banana;Mango;manzana"
-        ///
-        /// Ejemplo 3:
-        /// string unico = "ElementoUnico".OrderStringAscBySeparator(',');
-        /// // Resultado: "ElementoUnico"
-        /// </example>
-        public static string OrderStringAscBySeparator(this string strUnordered, char parameters)
-        {
-            if (!strUnordered.HasItems())
-            {
-                return string.Empty;
-            }
-
-            if (parameters.IsNull())
-            {
-                return string.Empty;
-            }
-
-            var arrayOfComponents = strUnordered.Split(parameters);
-
-
-            if (arrayOfComponents.First() == strUnordered)
-            {
-                return strUnordered;
-            }
-
-            var elementsOfArray = arrayOfComponents.Count();
-
-            if (elementsOfArray > 1)
-            {
-                var orderedListOfComponents = arrayOfComponents.OrderBy(e => e.ToUpper());
-                var stringOrdered = string.Join(parameters.ToString(), orderedListOfComponents);
-
-                return stringOrdered;
-            }
-
-            return strUnordered;
-        }
-    }
-}
-````
-
 ## File: Dominio/Core/Jwtoken/JwtSettings.cs
 ````csharp
 namespace Dominio.Core.Jwtoken
@@ -8144,6 +7964,245 @@ namespace Dominio.Core.Jwtoken
         public string Issuer { get; set; }
         public string Audience { get; set; }
         public int RefreshTokenExpirationInDays { get; set; }
+    }
+}
+````
+
+## File: Dominio/Core/Result/IResult.cs
+````csharp
+namespace Dominio.Core.Result
+{
+    /// <summary>
+    /// Define el contrato para un resultado de operación que puede ser exitoso o fallido.
+    /// </summary>
+    public interface IResult
+    {
+        /// <summary>
+        /// Indica si la operación fue exitosa.
+        /// </summary>
+        bool IsSuccess { get; }
+
+        /// <summary>
+        /// Mensaje de resultado (éxito o error).
+        /// </summary>
+        string Message { get; }
+
+        /// <summary>
+        /// Código de error (solo en caso de fallo).
+        /// </summary>
+        string? ErrorCode { get; }
+
+        /// <summary>
+        /// Errores detallados en caso de validación fallida.
+        /// </summary>
+        IReadOnlyCollection<string> Errors { get; }
+
+        /// <summary>
+        /// Indica el tipo/estado del resultado (validación, excepción, error de aplicación, éxito).
+        /// </summary>
+        ResultStatus Status { get; }
+    }
+
+    /// <summary>
+    /// Versión genérica del contrato Result que incluye un valor de datos.
+    /// </summary>
+    public interface IResult<T> : IResult
+    {
+        /// <summary>
+        /// Valor de datos en caso de operación exitosa.
+        /// </summary>
+        T? Data { get; }
+    }
+}
+````
+
+## File: Dominio/Core/Result/Result.cs
+````csharp
+namespace Dominio.Core.Result
+{
+    public enum ResultStatus
+    {
+        Success,
+        ValidationError,
+        ApplicationError,
+        Exception
+    }
+
+    /// <summary>
+    /// Clase base para resultados de operación sin valor genérico.
+    /// Implementa <see cref="IResult"/> y proporciona constructores para casos de éxito y fallo.
+    /// </summary>
+    public class Result : IResult
+    {
+        /// <summary>
+        /// Obtiene un valor que indica si la operación fue exitosa.
+        /// </summary>
+        public bool IsSuccess { get; protected set; }
+
+        /// <summary>
+        /// Obtiene el mensaje asociado al resultado (éxito o error).
+        /// </summary>
+        public string Message { get; protected set; }
+
+        /// <summary>
+        /// Obtiene el código de error (solo en caso de fallo).
+        /// </summary>
+        public string? ErrorCode { get; protected set; }
+
+        /// <summary>
+        /// Obtiene una colección de errores detallados (para validaciones fallidas).
+        /// </summary>
+        public IReadOnlyCollection<string> Errors { get; protected set; }
+
+        /// <summary>
+        /// Estado del resultado (éxito, validación, error de aplicación, excepción).
+        /// </summary>
+        public ResultStatus Status { get; protected set; }
+
+        /// <summary>
+        /// Constructor protegido para inicializar un resultado.
+        /// </summary>
+        protected Result(bool isSuccess, string message, string? errorCode = null, IEnumerable<string>? errors = null, ResultStatus status = ResultStatus.ApplicationError)
+        {
+            IsSuccess = isSuccess;
+            Message = message;
+            ErrorCode = errorCode;
+            Errors = errors?.ToList().AsReadOnly() ?? Array.Empty<string>().AsReadOnly();
+            Status = status;
+        }
+
+        /// <summary>
+        /// Crea un resultado exitoso con un mensaje opcional.
+        /// </summary>
+        public static Result Success(string message = "Operación exitosa")
+        {
+            return new Result(true, message, null, null, ResultStatus.Success);
+        }
+
+        /// <summary>
+        /// Crea un resultado fallido con un mensaje de error y código opcional.
+        /// </summary>
+        public static Result Failure(string message, string? errorCode = null)
+        {
+            return new Result(false, message, errorCode, null, ResultStatus.ApplicationError);
+        }
+
+        /// <summary>
+        /// Crea un resultado fallido con múltiples errores de validación.
+        /// </summary>
+        public static Result ValidationFailure(string message, IEnumerable<string> errors, string? errorCode = null)
+        {
+            return new Result(false, message, errorCode, errors, ResultStatus.ValidationError);
+        }
+    }
+}
+````
+
+## File: Dominio/Core/Result/Result{T}.cs
+````csharp
+namespace Dominio.Core.Result
+{
+    /// <summary>
+    /// Clase genérica para resultados de operación que devuelven un valor de tipo <typeparamref name="T"/>.
+    /// Hereda de <see cref="Result"/> e implementa <see cref="IResult{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">Tipo del valor de datos que devuelve la operación exitosa.</typeparam>
+    public class Result<T> : Result, IResult<T>
+    {
+        /// <summary>
+        /// Obtiene el valor de datos en caso de operación exitosa.
+        /// </summary>
+        public T? Data { get; private set; }
+
+        /// <summary>
+        /// Constructor privado para inicializar un resultado genérico.
+        /// </summary>
+        private Result(bool isSuccess, T? data, string message, string? errorCode = null, IEnumerable<string>? errors = null, ResultStatus status = ResultStatus.ApplicationError)
+            : base(isSuccess, message, errorCode, errors, status)
+        {
+            Data = data;
+        }
+
+        /// <summary>
+        /// Crea un resultado exitoso con un valor de datos.
+        /// </summary>
+        /// <param name="data">El valor que se devuelve en caso de éxito.</param>
+        /// <param name="message">Mensaje opcional de éxito.</param>
+        /// <returns>Un <see cref="Result{T}"/> exitoso con el valor especificado.</returns>
+        public static Result<T> Success(T data, string message = "Operación exitosa")
+        {
+            return new Result<T>(true, data, message, null, null, ResultStatus.Success);
+        }
+
+        /// <summary>
+        /// Crea un resultado fallido sin datos.
+        /// </summary>
+        /// <param name="message">Mensaje de error.</param>
+        /// <param name="errorCode">Código de error opcional.</param>
+        /// <returns>Un <see cref="Result{T}"/> fallido.</returns>
+        public static Result<T> Failure(string message, string? errorCode = null, ResultStatus status = ResultStatus.ApplicationError)
+        {
+            return new Result<T>(false, default, message, errorCode, null, status);
+        }
+
+        /// <summary>
+        /// Crea un resultado fallido con múltiples errores de validación.
+        /// </summary>
+        /// <param name="message">Mensaje de error general.</param>
+        /// <param name="errors">Colección de errores detallados.</param>
+        /// <param name="errorCode">Código de error opcional.</param>
+        /// <returns>Un <see cref="Result{T}"/> con errores de validación.</returns>
+        public static Result<T> ValidationFailure(string message, IEnumerable<string> errors, string? errorCode = null)
+        {
+            return new Result<T>(false, default, message, errorCode, errors, ResultStatus.ValidationError);
+        }
+
+        /// <summary>
+        /// Transforma el valor exitoso aplicando una función de proyección.
+        /// </summary>
+        /// <typeparam name="TNew">Tipo del nuevo valor proyectado.</typeparam>
+        /// <param name="selector">Función que proyecta el valor actual al nuevo tipo.</param>
+        /// <returns>Un nuevo <see cref="Result{TNew}"/> con el valor proyectado, o un fallo si el resultado original fue fallido.</returns>
+        public Result<TNew> Map<TNew>(Func<T?, TNew> selector)
+        {
+            if (!IsSuccess)
+            {
+                return Result<TNew>.Failure(Message, ErrorCode);
+            }
+
+            try
+            {
+                var newData = selector(Data);
+                return Result<TNew>.Success(newData, Message);
+            }
+            catch (Exception ex)
+            {
+                return Result<TNew>.Failure($"Error en proyección: {ex.Message}", "PROJECTION_ERROR", ResultStatus.Exception);
+            }
+        }
+
+        /// <summary>
+        /// Encadena una operación que devuelve otro resultado.
+        /// </summary>
+        /// <typeparam name="TNew">Tipo del valor del resultado encadenado.</typeparam>
+        /// <param name="selector">Función que devuelve un nuevo resultado basado en el valor actual.</param>
+        /// <returns>El resultado de la función encadenada, o un fallo si el resultado original fue fallido.</returns>
+        public Result<TNew> Bind<TNew>(Func<T?, Result<TNew>> selector)
+        {
+            if (!IsSuccess)
+            {
+                return Result<TNew>.Failure(Message, ErrorCode);
+            }
+
+            try
+            {
+                return selector(Data);
+            }
+            catch (Exception ex)
+            {
+                return Result<TNew>.Failure($"Error en encadenamiento: {ex.Message}", "BIND_ERROR", ResultStatus.Exception);
+            }
+        }
     }
 }
 ````
@@ -8745,60 +8804,6 @@ namespace WebServices.Controllers
 }
 ````
 
-## File: WebServices/Jwtoken/JwtConfiguration.cs
-````csharp
-using Dominio.Core.Jwtoken;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using System;
-using System.Configuration;
-using System.Text;
-
-namespace WebServices.Jwtoken
-{
-    public static class JwtConfiguration
-    {
-        public static void ConfigureJwt(this WebApplicationBuilder builder)
-        {
-            builder.Services.Configure<JwtSettings>(options => builder.Configuration.GetSection("JwtSettings").Bind(options));
-
-            AddAuthenticationJwt(builder.Services, builder.Configuration);
-        }
-
-        private static void AddAuthenticationJwt(IServiceCollection services, IConfiguration configuration)
-        {
-            var settings = configuration.GetSection("JwtSettings").Get<JwtSettings>()
-                ?? throw new InvalidOperationException("JwtSettings section is missing.");
-
-            var secret = settings.Secret ?? throw new InvalidOperationException("JwtSettings:Secret must be configured.");
-            var key = Encoding.UTF8.GetBytes(secret);
-
-            services.AddAuthentication(options =>
-            {
-                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            })
-            .AddJwtBearer(options =>
-            {
-                options.RequireHttpsMetadata = true;
-                options.SaveToken = true;
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(key),
-                    ValidateLifetime = true,
-                    ClockSkew = TimeSpan.Zero,
-                    ValidateIssuer = true,
-                    ValidIssuer = settings.Issuer,
-                    ValidateAudience = true,
-                    ValidAudience = settings.Audience,
-                };
-            });
-        }
-    }
-}
-````
-
 ## File: WebServices/Middleware/GlobalExceptionHandlingMiddleware.cs
 ````csharp
 using Dominio.Core.Extensions;
@@ -8897,32 +8902,6 @@ namespace WebServices.Middleware
     }
   }
 }
-````
-
-## File: Aplicacion/Aplicacion.csproj
-````
-<Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="AutoMapper" Version="16.1.1" />
-    <!-- Add safe packages for identity and caching -->
-    <PackageReference Include="Microsoft.Identity.Client" Version="4.84.1" />
-    <PackageReference Include="Azure.Identity" Version="1.21.0" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Dominio\Dominio.csproj" />
-    <ProjectReference Include="..\Infraestructura\Infraestructura.csproj" />
-  </ItemGroup>
-
-</Project>
 ````
 
 ## File: Aplicacion/DTOs/QueryInfo.cs
@@ -9121,426 +9100,674 @@ namespace Dominio.Core.Extensions
 }
 ````
 
-## File: Dominio/Core/Extensions/EnumerableExtensions.cs
+## File: Dominio/Core/Extensions/StringExtensions.cs
 ````csharp
+using System.Text.RegularExpressions;
+
 namespace Dominio.Core.Extensions
 {
-    public static class EnumerableExtensions
+    public static class StringExtensions
     {
         /// <summary>
-        /// Devuelve la colección original si no es nula; 
-        /// en caso contrario, devuelve una colección vacía.
+        /// Convierte una cadena en un arreglo de objetos con un único elemento,
+        /// asegurando que el valor no sea nulo mediante <c>ValueOrEmpty()</c>.
         /// </summary>
-        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
-        /// <param name="list">La colección que se desea evaluar.</param>
+        /// <param name="value">La cadena que se desea convertir.</param>
         /// <returns>
-        /// La colección original si no es nula; de lo contrario, una nueva colección vacía.
+        /// Un arreglo de objetos que contiene un único elemento:
+        /// la cadena original o una cadena vacía si es nula.
         /// </returns>
         /// <example>
         /// Ejemplo de uso:
         /// <code>
-        /// IEnumerable<string> nombres = null;
+        /// string texto1 = "Hola";
+        /// string texto2 = null;
         ///
-        /// // Al usar Items(), evitamos excepciones por referencia nula.
-        /// foreach (var nombre in nombres.Items())
-        /// {
-        ///     Console.WriteLine(nombre);
-        /// }
+        /// object[] resultado1 = texto1.ToObject(); // { "Hola" }
+        /// object[] resultado2 = texto2.ToObject(); // { "" }
         ///
-        /// // Salida: (no imprime nada, pero tampoco lanza excepción)
+        /// Console.WriteLine($"Resultado1: {resultado1[0]}");
+        /// Console.WriteLine($"Resultado2: {resultado2[0]}");
         /// </code>
         /// </example>
-        public static IEnumerable<T> Items<T>(this IEnumerable<T> list)
+        public static object[] ToObject(this string? value)
         {
-            var isNull = IsNull(list);
-
-            return isNull ? new HashSet<T>() : list;
+            return new object[] { value.ValueOrEmpty() };
         }
 
         /// <summary>
-        /// Determina si una colección contiene elementos.
+        /// Convierte una cadena en un valor <see cref="decimal"/>.
+        /// Si la cadena es nula, vacía o no puede convertirse, devuelve 0.
         /// </summary>
-        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
-        /// <param name="list">La colección que se desea evaluar.</param>
+        /// <param name="decimalStringValue">La cadena que representa un número decimal.</param>
         /// <returns>
-        /// <c>true</c> si la colección no es nula y contiene al menos un elemento; 
-        /// en caso contrario, <c>false</c>.
+        /// El valor convertido a <see cref="decimal"/> si la cadena es válida; en caso contrario, 0.
         /// </returns>
         /// <example>
         /// Ejemplo de uso:
         /// <code>
-        /// IEnumerable<int> numeros = new List<int> { 1, 2, 3 };
-        /// IEnumerable<int> vacia = new List<int>();
-        /// IEnumerable<int> nula = null;
+        /// string texto1 = "123.45";
+        /// string texto2 = "abc";
+        /// string texto3 = null;
         ///
-        /// bool tieneNumeros = numeros.HasItems(); // True
-        /// bool tieneVacia = vacia.HasItems();     // False
-        /// bool tieneNula = nula.HasItems();       // False
+        /// decimal resultado1 = texto1.ToDecimal(); // 123.45
+        /// decimal resultado2 = texto2.ToDecimal(); // 0
+        /// decimal resultado3 = texto3.ToDecimal(); // 0
         ///
-        /// Console.WriteLine($"Numeros: {tieneNumeros}");
-        /// Console.WriteLine($"Vacia: {tieneVacia}");
-        /// Console.WriteLine($"Nula: {tieneNula}");
+        /// Console.WriteLine($"Resultado1: {resultado1}");
+        /// Console.WriteLine($"Resultado2: {resultado2}");
+        /// Console.WriteLine($"Resultado3: {resultado3}");
         /// </code>
         /// </example>
-        public static bool HasItems<T>(this IEnumerable<T> list)
+        public static decimal ToDecimal(this string? decimalStringValue)
         {
-            var isNull = IsNull(list);
-
-            if (isNull) return false;
-
-            return list.Any();
-        }
-
-        /// <summary>
-        /// Determina si un objeto es nulo.
-        /// </summary>
-        /// <param name="item">El objeto que se desea evaluar.</param>
-        /// <returns>
-        /// <c>true</c> si <paramref name="item"/> es nulo; en caso contrario, <c>false</c>.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// object objeto1 = null;
-        /// object objeto2 = "Hola mundo";
-        ///
-        /// bool esNulo1 = objeto1.IsNull(); // True
-        /// bool esNulo2 = objeto2.IsNull(); // False
-        ///
-        /// Console.WriteLine($"Objeto1 es nulo: {esNulo1}");
-        /// Console.WriteLine($"Objeto2 es nulo: {esNulo2}");
-        /// </code>
-        /// </example>
-        public static bool IsNull(this object item)
-        {
-            return item == null;
-        }
-
-        /// <summary>
-        /// Determina si un objeto no es nulo.
-        /// </summary>
-        /// <param name="item">El objeto que se desea evaluar.</param>
-        /// <returns>
-        /// <c>true</c> si <paramref name="item"/> no es nulo; en caso contrario, <c>false</c>.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// object objeto1 = null;
-        /// object objeto2 = "Hola mundo";
-        ///
-        /// bool noEsNulo1 = objeto1.IsNotNull(); // False
-        /// bool noEsNulo2 = objeto2.IsNotNull(); // True
-        ///
-        /// Console.WriteLine($"Objeto1 no es nulo: {noEsNulo1}");
-        /// Console.WriteLine($"Objeto2 no es nulo: {noEsNulo2}");
-        /// </code>
-        /// </example>
-        public static bool IsNotNull(this object item)
-        {
-            return item != null;
-        }
-
-        /// <summary>
-        /// Crea una nueva lista a partir de una colección enumerable.
-        /// </summary>
-        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
-        /// <param name="list">La colección enumerable que se desea copiar.</param>
-        /// <returns>
-        /// Una nueva instancia de <see cref="List{T}"/> que contiene los mismos elementos
-        /// que la colección original.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// IEnumerable<string> nombres = new[] { "Ana", "Luis", "Carlos" };
-        ///
-        /// List<string> listaCopiada = nombres.CopyToList();
-        ///
-        /// foreach (var nombre in listaCopiada)
-        /// {
-        ///     Console.WriteLine(nombre);
-        /// }
-        /// // Salida:
-        /// // Ana
-        /// // Luis
-        /// // Carlos
-        /// </code>
-        /// </example>
-        public static IEnumerable<T> CopyToList<T>(this IEnumerable<T> list)
-        {
-            return new List<T>(list);
-        }
-
-        /// <summary>
-        /// Determina si una colección está vacía o es nula.
-        /// </summary>
-        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
-        /// <param name="list">La colección que se desea evaluar.</param>
-        /// <returns>
-        /// <c>true</c> si la colección es nula o no contiene elementos; 
-        /// en caso contrario, <c>false</c>.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// IEnumerable<int> numeros = new List<int>();
-        /// IEnumerable<int> nula = null;
-        /// IEnumerable<int> conDatos = new List<int> { 1, 2, 3 };
-        ///
-        /// Console.WriteLine(numeros.IsEmpty());   // True
-        /// Console.WriteLine(nula.IsEmpty());      // True
-        /// Console.WriteLine(conDatos.IsEmpty());  // False
-        /// </code>
-        /// </example>
-        public static bool IsEmpty<T>(this IEnumerable<T> list)
-        {
-            return !HasItems(list);
-        }
-
-        /// <summary>
-        /// Devuelve una lista con los elementos distintos de la colección especificada.
-        /// </summary>
-        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
-        /// <param name="list">La colección de la cual se obtendrán los elementos únicos.</param>
-        /// <returns>
-        /// Una nueva lista de <typeparamref name="T"/> que contiene solo los elementos distintos.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// IEnumerable<int> numeros = new List<int> { 1, 2, 2, 3, 4, 4, 5 };
-        ///
-        /// List<int> distintos = numeros.DistinctList();
-        ///
-        /// foreach (var n in distintos)
-        /// {
-        ///     Console.WriteLine(n);
-        /// }
-        /// // Salida:
-        /// // 1
-        /// // 2
-        /// // 3
-        /// // 4
-        /// // 5
-        /// </code>
-        /// </example>
-        public static List<T> DistinctList<T>(this IEnumerable<T> list)
-        {
-            return list.Items().Distinct().ToList();
-        }
-
-        /// <summary>
-        /// Excluye de la colección los elementos cuya propiedad especificada
-        /// coincide con el valor proporcionado.
-        /// </summary>
-        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
-        /// <param name="list">La colección de la cual se filtrarán los elementos.</param>
-        /// <param name="nameProperty">El nombre de la propiedad a evaluar.</param>
-        /// <param name="value">El valor de la propiedad que se desea excluir.</param>
-        /// <returns>
-        /// Una nueva lista de <typeparamref name="T"/> que contiene los elementos
-        /// cuya propiedad <paramref name="nameProperty"/> no coincide con <paramref name="value"/>.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// public class Persona
-        /// {
-        ///     public string Nombre { get; set; }
-        ///     public string Ciudad { get; set; }
-        /// }
-        ///
-        /// var personas = new List<Persona>
-        /// {
-        ///     new Persona { Nombre = "Ana", Ciudad = "Madrid" },
-        ///     new Persona { Nombre = "Luis", Ciudad = "Barcelona" },
-        ///     new Persona { Nombre = "Carlos", Ciudad = "Madrid" }
-        /// };
-        ///
-        /// // Excluir las personas cuya Ciudad sea "Madrid"
-        /// var filtradas = personas.ExcludeByPropertyValue("Ciudad", "Madrid");
-        ///
-        /// foreach (var p in filtradas)
-        /// {
-        ///     Console.WriteLine(p.Nombre);
-        /// }
-        /// // Salida:
-        /// // Luis
-        /// </code>
-        /// </example>
-        public static List<T> ExcludeByPropertyValue<T>(this IEnumerable<T> list, string nameProperty, string value)
-        {
-            var filteredCollection = new List<T>();
-            foreach (var item in list)
+            decimal decimalValue = 0;
+            if (decimalStringValue.HasValue())
             {
+                Decimal.TryParse(decimalStringValue, out decimalValue);
+            }
+            return decimalValue;
+        }
 
-                var propertyInfo =
-                    item.GetType()
-                        .GetProperty(nameProperty);
-                if (propertyInfo == null)
-                    return list.ToList();
+        /// <summary>
+        /// Convierte una cadena en un valor <see cref="int"/>.
+        /// Si la cadena es nula, vacía o no puede convertirse, devuelve 0.
+        /// </summary>
+        /// <param name="decimalStringValue">La cadena que representa un número entero.</param>
+        /// <returns>
+        /// El valor convertido a <see cref="int"/> si la cadena es válida; en caso contrario, 0.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// string texto1 = "123";
+        /// string texto2 = "abc";
+        /// string texto3 = null;
+        ///
+        /// int resultado1 = texto1.ToInt(); // 123
+        /// int resultado2 = texto2.ToInt(); // 0
+        /// int resultado3 = texto3.ToInt(); // 0
+        ///
+        /// Console.WriteLine($"Resultado1: {resultado1}");
+        /// Console.WriteLine($"Resultado2: {resultado2}");
+        /// Console.WriteLine($"Resultado3: {resultado3}");
+        /// </code>
+        /// </example>
+        public static int ToInt(this string? decimalStringValue)
+        {
+            int decimalValue = 0;
+            if (decimalStringValue.HasValue())
+            {
+                Int32.TryParse(decimalStringValue, out decimalValue);
+            }
+            return decimalValue;
+        }
 
-                var propertyValue = propertyInfo.GetValue(item, null);
-                if (propertyValue.ToString() != value)
+        /// <summary>
+        /// Extrae todos los caracteres numéricos de una cadena,
+        /// devolviendo una nueva cadena compuesta únicamente por dígitos.
+        /// </summary>
+        /// <param name="decimalStringValue">La cadena de entrada que puede contener números y otros caracteres.</param>
+        /// <returns>
+        /// Una cadena que contiene únicamente los dígitos presentes en <paramref name="decimalStringValue"/>.
+        /// Si la cadena es nula o vacía, devuelve una cadena vacía.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// string texto1 = "Tel: +504-9876-1234";
+        /// string texto2 = "Precio: $123.45";
+        /// string texto3 = null;
+        ///
+        /// string resultado1 = texto1.GetNumericValues(); // "50498761234"
+        /// string resultado2 = texto2.GetNumericValues(); // "12345"
+        /// string resultado3 = texto3.GetNumericValues(); // ""
+        ///
+        /// Console.WriteLine($"Resultado1: {resultado1}");
+        /// Console.WriteLine($"Resultado2: {resultado2}");
+        /// Console.WriteLine($"Resultado3: {resultado3}");
+        /// </code>
+        /// </example>
+        public static string GetNumericValues(this string? decimalStringValue)
+        {
+            string output = string.Empty;
+            if (decimalStringValue.HasValue())
+            {
+                output = new string(decimalStringValue.ToCharArray().Where(c => char.IsDigit(c)).ToArray());
+            }
+            return output;
+        }
+
+        /// <summary>
+        /// Verifica si una cadena tiene un valor válido,
+        /// es decir, que no sea nula, vacía ni compuesta únicamente por espacios en blanco.
+        /// </summary>
+        /// <param name="stringValue">La cadena que se desea evaluar.</param>
+        /// <returns>
+        /// <c>true</c> si la cadena contiene un valor válido; en caso contrario, <c>false</c>.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// string texto1 = "Hola";
+        /// string texto2 = "";
+        /// string texto3 = "   ";
+        /// string texto4 = null;
+        ///
+        /// bool resultado1 = texto1.HasValue(); // true
+        /// bool resultado2 = texto2.HasValue(); // false
+        /// bool resultado3 = texto3.HasValue(); // false
+        /// bool resultado4 = texto4.HasValue(); // false
+        ///
+        /// Console.WriteLine($"Texto1: {resultado1}, Texto2: {resultado2}, Texto3: {resultado3}, Texto4: {resultado4}");
+        /// </code>
+        /// </example>
+        public static bool HasValue(this string? stringValue)
+        {
+            return !string.IsNullOrEmpty(stringValue) && !string.IsNullOrWhiteSpace(stringValue);
+        }
+
+        /// <summary>
+        /// Devuelve la cadena original si contiene un valor válido,
+        /// o una cadena vacía si es nula, vacía o compuesta únicamente por espacios.
+        /// </summary>
+        /// <param name="stringValue">La cadena que se desea evaluar.</param>
+        /// <returns>
+        /// La cadena original recortada con <see cref="string.Trim"/> si tiene valor;
+        /// en caso contrario, <see cref="string.Empty"/>.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// string texto1 = " Hola ";
+        /// string texto2 = "";
+        /// string texto3 = "   ";
+        /// string texto4 = null;
+        ///
+        /// string resultado1 = texto1.ValueOrEmpty(); // "Hola"
+        /// string resultado2 = texto2.ValueOrEmpty(); // ""
+        /// string resultado3 = texto3.ValueOrEmpty(); // ""
+        /// string resultado4 = texto4.ValueOrEmpty(); // ""
+        ///
+        /// Console.WriteLine($"Texto1: '{resultado1}', Texto2: '{resultado2}', Texto3: '{resultado3}', Texto4: '{resultado4}'");
+        /// </code>
+        /// </example>
+        public static string ValueOrEmpty(this string? stringValue)
+        {
+            return HasValue(stringValue) ? stringValue.Trim() : string.Empty;
+        }
+
+        /// <summary>
+        /// Convierte un objeto en su representación de cadena.
+        /// Si el objeto es nulo, devuelve una cadena vacía.
+        /// </summary>
+        /// <param name="stringValue">El objeto que se desea convertir a cadena.</param>
+        /// <returns>
+        /// La representación en cadena del objeto, recortada con <see cref="string.Trim"/> si no es nulo;
+        /// en caso contrario, <see cref="string.Empty"/>.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// object valor1 = " Hola ";
+        /// object valor2 = 123;
+        /// object valor3 = null;
+        ///
+        /// string resultado1 = valor1.ToStringValue(); // "Hola"
+        /// string resultado2 = valor2.ToStringValue(); // "123"
+        /// string resultado3 = valor3.ToStringValue(); // ""
+        ///
+        /// Console.WriteLine($"Resultado1: '{resultado1}', Resultado2: '{resultado2}', Resultado3: '{resultado3}'");
+        /// </code>
+        /// </example>
+        public static string ToStringValue(this object stringValue)
+        {
+            return stringValue != null ? stringValue.ToString().Trim() : string.Empty;
+        }
+
+        /// <summary>
+        /// Verifica si una cadena está vacía, es nula o contiene únicamente espacios en blanco.
+        /// </summary>
+        /// <param name="stringValue">La cadena que se desea evaluar.</param>
+        /// <returns>
+        /// <c>true</c> si la cadena no tiene un valor válido (es nula, vacía o solo espacios);
+        /// en caso contrario, <c>false</c>.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// string texto1 = "Hola";
+        /// string texto2 = "";
+        /// string texto3 = "   ";
+        /// string texto4 = null;
+        ///
+        /// bool resultado1 = texto1.IsMissingValue(); // false
+        /// bool resultado2 = texto2.IsMissingValue(); // true
+        /// bool resultado3 = texto3.IsMissingValue(); // true
+        /// bool resultado4 = texto4.IsMissingValue(); // true
+        ///
+        /// Console.WriteLine($"Texto1: {resultado1}, Texto2: {resultado2}, Texto3: {resultado3}, Texto4: {resultado4}");
+        /// </code>
+        /// </example>
+        public static bool IsMissingValue(this string? stringValue)
+        {
+            return !HasValue(stringValue);
+        }
+
+        /// <summary>
+        /// Divide una cadena en una lista de subcadenas.
+        /// Si se proporcionan separadores, utiliza el primero de ellos.
+        /// Si no se proporcionan, divide la cadena por saltos de línea.
+        /// </summary>
+        /// <param name="value">La cadena que se desea dividir.</param>
+        /// <param name="separators">
+        /// Opcional: uno o más caracteres separadores. 
+        /// Si se especifican, se usa el primero para realizar la división.
+        /// </param>
+        /// <returns>
+        /// Una lista de subcadenas obtenidas a partir de <paramref name="value"/>.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// string texto1 = "uno,dos,tres";
+        /// string texto2 = "linea1\r\nlinea2\r\nlinea3";
+        ///
+        /// List<string> lista1 = texto1.SplitIntoList(','); 
+        /// // { "uno", "dos", "tres" }
+        ///
+        /// List<string> lista2 = texto2.SplitIntoList(); 
+        /// // { "linea1", "linea2", "linea3" }
+        ///
+        /// Console.WriteLine(string.Join(" | ", lista1));
+        /// Console.WriteLine(string.Join(" | ", lista2));
+        /// </code>
+        /// </example>
+        public static List<string> SplitIntoList(this string value, params char[] separators)
+        {
+            if (separators.HasItems())
+            {
+                var firstSeparator = separators.First();
+                var messagesKeys = value.Split(firstSeparator);
+                return messagesKeys.ToList();
+            }
+            else
+            {
+                var observaciones = value.Replace("\r\n", "\n");
+                var messagesKeys = observaciones.Split('\n');
+                return messagesKeys.ToList();
+            }
+        }
+
+        /// <summary>
+        /// Divide una cadena en una lista de subcadenas utilizando separadores,
+        /// y opcionalmente elimina caracteres especiales definidos en <paramref name="toExclude"/>.
+        /// </summary>
+        /// <param name="value">La cadena que se desea dividir.</param>
+        /// <param name="toExclude">
+        /// Conjunto de caracteres que se deben eliminar de cada subcadena resultante.
+        /// Si está vacío o nulo, no se eliminan caracteres adicionales.
+        /// </param>
+        /// <param name="separators">
+        /// Uno o más caracteres separadores. 
+        /// Si se especifican, se usa el primero para realizar la división.
+        /// Si no se especifican, se divide por saltos de línea.
+        /// </param>
+        /// <returns>
+        /// Una lista de subcadenas obtenidas a partir de <paramref name="value"/>,
+        /// con los caracteres excluidos eliminados si corresponde.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// string texto1 = "uno@,dos#,tres$";
+        /// var lista1 = texto1.SplitIntoListWithOutSpecialCharacters(new[] { '@', '#', '$' }, ',');
+        /// // { "uno", "dos", "tres" }
+        ///
+        /// string texto2 = "linea1\r\nlinea2\r\nlinea3";
+        /// var lista2 = texto2.SplitIntoListWithOutSpecialCharacters(null);
+        /// // { "linea1", "linea2", "linea3" }
+        ///
+        /// Console.WriteLine(string.Join(" | ", lista1));
+        /// Console.WriteLine(string.Join(" | ", lista2));
+        /// </code>
+        /// </example>
+        public static List<string> SplitIntoListWithOutSpecialCharacters(this string value, IEnumerable<char> toExclude, params char[] separators)
+        {
+            if (separators.HasItems())
+            {
+                var firstSeparator = separators.First();
+                var messagesKeys = value.Split(firstSeparator);
+                var returnList = messagesKeys.ToList();
+                var result = new List<string>();
+                if (toExclude.HasItems())
                 {
-                    filteredCollection.Add(item);
+                    foreach (var item in returnList)
+                    {
+                        var newString = item.Trim();
+                        foreach (var forbidenItem in toExclude)
+                        {
+                            newString.Replace(forbidenItem.ToString(), string.Empty);
+                        }
+                        result.Add(newString);
+                    }
+                    return result;
                 }
+                return returnList;
             }
-
-            return filteredCollection;
+            else
+            {
+                var observaciones = value.Replace("\r\n", "\n");
+                var messagesKeys = observaciones.Split('\n');
+                return messagesKeys.ToList();
+            }
         }
 
         /// <summary>
-        /// Devuelve una colección con elementos distintos de acuerdo a una clave especificada.
+        /// Convierte una cadena en un valor <see cref="DateTime"/>.
+        /// Si la cadena es nula, vacía o no puede convertirse, devuelve <see cref="DateTime.MinValue"/>.
         /// </summary>
-        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
-        /// <typeparam name="TKey">El tipo de la clave usada para determinar la unicidad.</typeparam>
-        /// <param name="enumerable">La colección de la cual se obtendrán los elementos únicos.</param>
-        /// <param name="keySelector">
-        /// Función que selecciona la clave de cada elemento para evaluar su unicidad.
+        /// <param name="dateStringValue">La cadena que representa una fecha.</param>
+        /// <returns>
+        /// El valor convertido a <see cref="DateTime"/> si la cadena es válida; 
+        /// en caso contrario, <see cref="DateTime.MinValue"/>.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// string texto1 = "2026-04-02";
+        /// string texto2 = "02/04/2026 16:30";
+        /// string texto3 = "fecha inválida";
+        /// string texto4 = null;
+        ///
+        /// DateTime resultado1 = texto1.ToDateTime(); // 2026-04-02 00:00:00
+        /// DateTime resultado2 = texto2.ToDateTime(); // 2026-04-02 16:30:00
+        /// DateTime resultado3 = texto3.ToDateTime(); // DateTime.MinValue
+        /// DateTime resultado4 = texto4.ToDateTime(); // DateTime.MinValue
+        ///
+        /// Console.WriteLine($"Resultado1: {resultado1}");
+        /// Console.WriteLine($"Resultado2: {resultado2}");
+        /// Console.WriteLine($"Resultado3: {resultado3}");
+        /// Console.WriteLine($"Resultado4: {resultado4}");
+        /// </code>
+        /// </example>
+        public static DateTime ToDateTime(this string? dateStringValue)
+        {
+            DateTime dateValue = DateTime.MinValue;
+            if (dateStringValue.HasValue())
+            {
+                DateTime.TryParse(dateStringValue, out dateValue);
+            }
+            return dateValue;
+        }
+
+        /// <summary>
+        /// Inserta espacios antes de cada letra mayúscula en una cadena,
+        /// devolviendo el resultado con un formato más legible.
+        /// </summary>
+        /// <param name="value">La cadena de entrada que contiene letras mayúsculas.</param>
+        /// <returns>
+        /// Una nueva cadena con espacios añadidos antes de cada letra mayúscula.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// string texto1 = "HolaMundo";
+        /// string texto2 = "XMLParserExtension";
+        ///
+        /// string resultado1 = texto1.AddSpacesBeforeCapitalLetters(); 
+        /// // "Hola Mundo"
+        ///
+        /// string resultado2 = texto2.AddSpacesBeforeCapitalLetters(); 
+        /// // "XML Parser Extension"
+        ///
+        /// Console.WriteLine(resultado1);
+        /// Console.WriteLine(resultado2);
+        /// </code>
+        /// </example>
+        public static string AddSpacesBeforeCapitalLetters(this string? value)
+        {
+            if (!value.HasValue())
+            {
+                return string.Empty;
+            }
+
+            return string.Concat(value.Select(x => Char.IsUpper(x) ? " " + x : x.ToString())).TrimStart(' ');
+        }
+
+        /// <summary>
+        /// Verifica si una cadena contiene únicamente caracteres numéricos (dígitos).
+        /// </summary>
+        /// <param name="str">La cadena que se desea evaluar.</param>
+        /// <returns>
+        /// <c>true</c> si la cadena contiene solo dígitos.
+        /// Si la cadena es nula o vacía, devuelve <c>true</c> por diseño.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// string texto1 = "12345";
+        /// string texto2 = "12a45";
+        /// string texto3 = "";
+        /// string texto4 = null;
+        ///
+        /// bool resultado1 = texto1.IsNumeric(); // true
+        /// bool resultado2 = texto2.IsNumeric(); // false
+        /// bool resultado3 = texto3.IsNumeric(); // true
+        /// bool resultado4 = texto4.IsNumeric(); // true
+        ///
+        /// Console.WriteLine($"Texto1: {resultado1}, Texto2: {resultado2}, Texto3: {resultado3}, Texto4: {resultado4}");
+        /// </code>
+        /// </example>
+        public static bool IsNumeric(this string str)
+        {
+            if (str.HasValue())
+            {
+                return !str.ToArray().Any(a => !char.IsDigit(a));
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Verifica si una cadena representa un número decimal válido.
+        /// Se permiten dígitos y los caracteres ',' y '.' como separadores decimales.
+        /// </summary>
+        /// <param name="str">La cadena que se desea evaluar.</param>
+        /// <returns>
+        /// <c>true</c> si la cadena contiene únicamente dígitos y opcionalmente
+        /// los caracteres ',' o '.'; en caso contrario, <c>false</c>.
+        /// Si la cadena es nula o vacía, devuelve <c>false</c>.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// string texto1 = "123.45";
+        /// string texto2 = "123,45";
+        /// string texto3 = "12a45";
+        /// string texto4 = "";
+        /// string texto5 = null;
+        ///
+        /// bool resultado1 = texto1.IsDecimal(); // true
+        /// bool resultado2 = texto2.IsDecimal(); // true
+        /// bool resultado3 = texto3.IsDecimal(); // false
+        /// bool resultado4 = texto4.IsDecimal(); // false
+        /// bool resultado5 = texto5.IsDecimal(); // false
+        ///
+        /// Console.WriteLine($"Texto1: {resultado1}, Texto2: {resultado2}, Texto3: {resultado3}, Texto4: {resultado4}, Texto5: {resultado5}");
+        /// </code>
+        /// </example>
+        public static bool IsDecimal(this string str)
+        {
+            if (str.IsMissingValue())
+            {
+                return false;
+            }
+
+            List<char> charsToexclude = new List<char> { ',', '.' };
+            if (str.HasValue())
+            {
+                var arr = str.ToArray();
+                var chars = arr.Where(w => !char.IsDigit(w) && !charsToexclude.Contains(w));
+
+                return !chars.Any();
+
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Limita la longitud de una cadena a un máximo especificado.
+        /// Si la cadena es más corta o igual al máximo, se devuelve completa.
+        /// Si es más larga, se devuelve truncada.
+        /// </summary>
+        /// <param name="value">La cadena que se desea truncar.</param>
+        /// <param name="maxLength">La longitud máxima permitida.</param>
+        /// <returns>
+        /// La cadena original si su longitud es menor o igual a <paramref name="maxLength"/>; 
+        /// en caso contrario, una subcadena de longitud máxima.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// string texto1 = "Hola Mundo";
+        /// string texto2 = "Este texto es demasiado largo";
+        ///
+        /// string resultado1 = texto1.Truncate(20); // "Hola Mundo"
+        /// string resultado2 = texto2.Truncate(10); // "Este texto"
+        ///
+        /// Console.WriteLine($"Resultado1: {resultado1}");
+        /// Console.WriteLine($"Resultado2: {resultado2}");
+        /// </code>
+        /// </example>
+        public static string Truncate(this string value, int maxLength)
+        {
+            if (string.IsNullOrEmpty(value)) return value;
+            return value.Length <= maxLength ? value : value.Substring(0, maxLength);
+        }
+
+        /// <summary>
+        /// Elimina todos los espacios y caracteres de espacio en blanco de una cadena,
+        /// devolviendo el resultado sin espacios.
+        /// </summary>
+        /// <param name="str">La cadena de entrada que se desea limpiar.</param>
+        /// <returns>
+        /// Una nueva cadena sin espacios ni caracteres de espacio en blanco.
+        /// Si la cadena es nula, devuelve <c>null</c>.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// string texto1 = "Hola Mundo";
+        /// string texto2 = " 123 \t 456 ";
+        /// string texto3 = null;
+        ///
+        /// string resultado1 = texto1.RemoveSpaceEmpty(); // "HolaMundo"
+        /// string resultado2 = texto2.RemoveSpaceEmpty(); // "123456"
+        /// string resultado3 = texto3.RemoveSpaceEmpty(); // null
+        ///
+        /// Console.WriteLine($"Resultado1: '{resultado1}'");
+        /// Console.WriteLine($"Resultado2: '{resultado2}'");
+        /// Console.WriteLine($"Resultado3: '{resultado3}'");
+        /// </code>
+        /// </example>
+        public static string RemoveSpaceEmpty(this string? str)
+        {
+            return str == null
+                ? string.Empty
+                : Regex.Replace(str, @"\s", "").Trim();
+        }
+
+        /// <summary>
+        /// Extensión para cadenas que permite insertar parámetros dinámicos
+        /// usando <see cref="string.Format(string, object[])"/>.
+        /// </summary>
+        /// <param name="str">
+        /// Cadena base que contiene placeholders (ej: "Hola {0}, tienes {1} mensajes").
+        /// </param>
+        /// <param name="parameters">
+        /// Arreglo de objetos que reemplazarán los placeholders en la cadena.
         /// </param>
         /// <returns>
-        /// Una colección de <typeparamref name="T"/> que contiene solo el primer elemento de cada grupo
-        /// definido por la clave.
+        /// Una nueva cadena con los parámetros reemplazados.
         /// </returns>
         /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// var personas = new List<Persona>
-        /// {
-        ///     new Persona { Nombre = "Ana", Ciudad = "Madrid" },
-        ///     new Persona { Nombre = "Luis", Ciudad = "Barcelona" },
-        ///     new Persona { Nombre = "Carlos", Ciudad = "Madrid" }
-        /// };
+        /// Ejemplo 1:
+        /// string saludo = "Hola {0}".AddStringParameters(new object[] { "Alexander" });
+        /// // Resultado: "Hola Alexander"
         ///
-        /// // Obtener personas distintas por Ciudad
-        /// var distintasPorCiudad = personas.DistinctBy(p => p.Ciudad);
+        /// Ejemplo 2:
+        /// string info = "El producto {0} cuesta {1:C}".AddStringParameters(new object[] { "Laptop", 1200 });
+        /// // Resultado: "El producto Laptop cuesta $1,200.00"
         ///
-        /// foreach (var p in distintasPorCiudad)
-        /// {
-        ///     Console.WriteLine($"{p.Nombre} - {p.Ciudad}");
-        /// }
-        /// // Salida posible:
-        /// // Ana - Madrid
-        /// // Luis - Barcelona
-        /// </code>
+        /// Ejemplo 3:
+        /// string fecha = "Hoy es {0:dddd}, {0:dd/MM/yyyy}".AddStringParameters(new object[] { DateTime.Now });
+        /// // Resultado: "Hoy es jueves, 02/04/2026"
         /// </example>
-        public static IEnumerable<T> DistinctBy<T, TKey>(this IEnumerable<T> enumerable, Func<T, TKey> keySelector)
+        public static string AddStringParameters(this string str, object[] parameters)
         {
-            return enumerable.GroupBy(keySelector).Select(s => s.First());
+            return string.Format(str, parameters);
         }
 
         /// <summary>
-        /// Ejecuta de manera asíncrona una función sobre cada elemento de la colección.
+        /// Extensión para ordenar alfabéticamente los elementos de una cadena
+        /// separados por un delimitador específico.
         /// </summary>
-        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
-        /// <param name="enumerable">La colección cuyos elementos se recorrerán.</param>
-        /// <param name="funcAsync">
-        /// Función asíncrona que se aplicará a cada elemento de la colección.
+        /// <param name="strUnordered">
+        /// Cadena original que contiene elementos separados por el delimitador.
+        /// Ejemplo: "perro,gato,ave".
+        /// </param>
+        /// <param name="parameters">
+        /// Carácter delimitador que separa los elementos.
+        /// Ejemplo: ',' o ';'.
         /// </param>
         /// <returns>
-        /// Una tarea que representa la operación asíncrona de recorrer y ejecutar la función sobre todos los elementos.
+        /// Una nueva cadena con los elementos ordenados alfabéticamente.
+        /// Si la cadena está vacía o no contiene el delimitador, se devuelve la original.
         /// </returns>
         /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// var numeros = new List<int> { 1, 2, 3 };
+        /// Ejemplo 1:
+        /// string animales = "perro,gato,ave".OrderStringAscBySeparator(',');
+        /// // Resultado: "ave,gato,perro"
         ///
-        /// await numeros.ForEachAsync(async n =>
-        /// {
-        ///     await Task.Delay(500); // Simula trabajo asíncrono
-        ///     Console.WriteLine($"Procesado: {n}");
-        /// });
+        /// Ejemplo 2:
+        /// string frutas = "Mango;manzana;Banana".OrderStringAscBySeparator(';');
+        /// // Resultado: "Banana;Mango;manzana"
         ///
-        /// // Salida (con retraso de 500ms entre cada elemento):
-        /// // Procesado: 1
-        /// // Procesado: 2
-        /// // Procesado: 3
-        /// </code>
+        /// Ejemplo 3:
+        /// string unico = "ElementoUnico".OrderStringAscBySeparator(',');
+        /// // Resultado: "ElementoUnico"
         /// </example>
-        public static async Task ForEachAsync<T>(this IEnumerable<T> enumerable, Func<T, Task> funcAsync)
+        public static string OrderStringAscBySeparator(this string strUnordered, char parameters)
         {
-            foreach (T item in enumerable)
+            if (!strUnordered.HasItems())
             {
-                await funcAsync(item);
+                return string.Empty;
             }
-        }
 
-        /// <summary>
-        /// Obtiene una lista de valores únicos en formato <see cref="string"/> 
-        /// a partir de una propiedad especificada de los elementos de la colección.
-        /// </summary>
-        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
-        /// <param name="collection">La colección de la cual se extraerán los valores.</param>
-        /// <param name="propertyName">El nombre de la propiedad cuyos valores se desean obtener.</param>
-        /// <returns>
-        /// Una lista de cadenas que representan los valores distintos de la propiedad indicada.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// public class Persona
-        /// {
-        ///     public string Nombre { get; set; }
-        ///     public string Ciudad { get; set; }
-        /// }
-        ///
-        /// var personas = new List<Persona>
-        /// {
-        ///     new Persona { Nombre = "Ana", Ciudad = "Madrid" },
-        ///     new Persona { Nombre = "Luis", Ciudad = "Barcelona" },
-        ///     new Persona { Nombre = "Carlos", Ciudad = "Madrid" }
-        /// };
-        ///
-        /// // Obtener lista de ciudades distintas
-        /// var ciudades = personas.GetStringListOf("Ciudad");
-        ///
-        /// foreach (var ciudad in ciudades)
-        /// {
-        ///     Console.WriteLine(ciudad);
-        /// }
-        /// // Salida:
-        /// // Madrid
-        /// // Barcelona
-        /// </code>
-        /// </example>
-        public static List<string> GetStringListOf<T>(this IEnumerable<T> collection, string propertyName)
-        {
-            var result = collection.Select(s => s.GetType().GetProperty(propertyName).GetValue(s, null).ToString());
-            return result.Distinct().ToList();
-        }
-
-        /// <summary>
-        /// Concatena los elementos de una colección en una sola cadena,
-        /// separados por el delimitador especificado.
-        /// </summary>
-        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
-        /// <param name="collection">La colección cuyos elementos se unirán en una cadena.</param>
-        /// <param name="separator">El separador que se usará entre los elementos.</param>
-        /// <returns>
-        /// Una cadena que contiene los elementos de la colección separados por <paramref name="separator"/>.
-        /// Si la colección es nula o está vacía, devuelve una cadena vacía.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// var nombres = new List<string> { "Ana", "Luis", "Carlos" };
-        ///
-        /// string resultado = nombres.GetStringFromList(", ");
-        /// Console.WriteLine(resultado);
-        ///
-        /// // Salida:
-        /// // Ana, Luis, Carlos
-        /// </code>
-        /// </example>
-        public static string GetStringFromList<T>(this IEnumerable<T> collection, string separator)
-        {
-            if (collection.HasItems())
+            if (parameters.IsNull())
             {
-                return string.Join(separator, collection).Trim();
+                return string.Empty;
             }
-            return string.Empty;
+
+            var arrayOfComponents = strUnordered.Split(parameters);
+
+
+            if (arrayOfComponents.First() == strUnordered)
+            {
+                return strUnordered;
+            }
+
+            var elementsOfArray = arrayOfComponents.Count();
+
+            if (elementsOfArray > 1)
+            {
+                var orderedListOfComponents = arrayOfComponents.OrderBy(e => e.ToUpper());
+                var stringOrdered = string.Join(parameters.ToString(), orderedListOfComponents);
+
+                return stringOrdered;
+            }
+
+            return strUnordered;
         }
     }
 }
@@ -10315,365 +10542,512 @@ namespace Infraestructura.Core
 }
 ````
 
-## File: Aplicacion/Services/Seguridad/SecurityAplicationService.cs
+## File: WebServices/Jwtoken/JwtConfiguration.cs
 ````csharp
-using Aplicacion.Core;
-using Aplicacion.DTOs;
-using Aplicacion.DTOs.Seguridad;
-using Aplicacion.Helpers;
-using AutoMapper;
-using Dominio.Context.Entidades;
-using Dominio.Context.Entidades.Seguridad;
-using Dominio.Core;
-using Dominio.Core.Extensions;
 using Dominio.Core.Jwtoken;
-using Infraestructura.Context;
-using Infraestructura.Core.Jwtoken;
-using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using System.Security.Claims;
+using System;
+using System.Configuration;
+using System.Text;
 
-namespace Aplicacion.Services.Seguridad
+namespace WebServices.Jwtoken
 {
-    public class SecurityAplicationService : BaseDisposable
+    public static class JwtConfiguration
     {
-        private readonly IGenericRepository<IDataContext> _genericRepository;
-        private readonly ITokenService _tokenService;
-        private readonly IMapper _mapper;
-        private readonly JwtSettings _jwtSettings;
-        public SecurityAplicationService(IGenericRepository<IDataContext> genericRepository, ITokenService tokenService, IMapper mapper, IOptions<JwtSettings> jwtSettings)
+        public static void ConfigureJwt(this WebApplicationBuilder builder)
         {
-            _genericRepository = genericRepository;
-            _tokenService = tokenService;
-            _mapper = mapper;
-            _jwtSettings = jwtSettings.Value;
+            builder.Services.Configure<JwtSettings>(options => builder.Configuration.GetSection("JwtSettings").Bind(options));
+
+            AddAuthenticationJwt(builder.Services, builder.Configuration);
         }
 
-        public UsuarioDTO EditarUsuario(EdicionUsuarioRequest request)
+        private static void AddAuthenticationJwt(IServiceCollection services, IConfiguration configuration)
         {
-            string mensajeValidacion = request.Usuario.ValidarCampos();
+            var settings = configuration.GetSection("JwtSettings").Get<JwtSettings>()
+                ?? throw new InvalidOperationException("JwtSettings section is missing.");
 
-            if (mensajeValidacion.HasValue())
+            var secret = settings.Secret;
+            if (string.IsNullOrWhiteSpace(secret) || secret == "CHANGE_ME_TO_A_STRONG_SECRET")
             {
-                return new UsuarioDTO
+                throw new InvalidOperationException("JwtSettings:Secret must be configured in production using an environment variable or a secret manager.");
+            }
+
+            var key = Encoding.UTF8.GetBytes(secret);
+
+            services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+            .AddJwtBearer(options =>
+            {
+                options.RequireHttpsMetadata = true;
+                options.SaveToken = true;
+                options.TokenValidationParameters = new TokenValidationParameters
                 {
-                    Message = mensajeValidacion,
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero,
+                    ValidateIssuer = true,
+                    ValidIssuer = settings.Issuer,
+                    ValidateAudience = true,
+                    ValidAudience = settings.Audience,
                 };
-            }
+            });
+        }
+    }
+}
+````
 
-            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
+## File: Aplicacion/Aplicacion.csproj
+````
+<Project Sdk="Microsoft.NET.Sdk">
 
-            if (usuarioExiste.IsNull())
-            {
-                return new UsuarioDTO
-                {
-                    Message = "El usuario no existe"
-                };
-            }
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
 
-            if (request.Usuario.EditarContrasena)
-            {
-                usuarioExiste.Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena);
-            }
+  <ItemGroup>
+    <PackageReference Include="AutoMapper" Version="16.1.1" />
+    <!-- Add safe packages for identity and caching -->
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.84.1" />
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.0" />
+    <PackageReference Include="FluentValidation" Version="11.3.1" />
+  </ItemGroup>
 
-            usuarioExiste.Nombre = request.Usuario.Nombre.ValueOrEmpty();
-            usuarioExiste.Apellido = request.Usuario.Apellido.ValueOrEmpty();
-            usuarioExiste.RolId = request.Usuario.RolId.ValueOrEmpty();
-            usuarioExiste.Activo = request.Usuario.Activo;
+  <ItemGroup>
+    <ProjectReference Include="..\Dominio\Dominio.csproj" />
+    <ProjectReference Include="..\Infraestructura\Infraestructura.csproj" />
+  </ItemGroup>
 
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarUsuario");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return new UsuarioDTO();
+</Project>
+````
+
+## File: Dominio/Core/Extensions/EnumerableExtensions.cs
+````csharp
+namespace Dominio.Core.Extensions
+{
+    public static class EnumerableExtensions
+    {
+        /// <summary>
+        /// Devuelve la colección original si no es nula; 
+        /// en caso contrario, devuelve una colección vacía.
+        /// </summary>
+        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
+        /// <param name="list">La colección que se desea evaluar.</param>
+        /// <returns>
+        /// La colección original si no es nula; de lo contrario, una nueva colección vacía.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// IEnumerable<string> nombres = null;
+        ///
+        /// // Al usar Items(), evitamos excepciones por referencia nula.
+        /// foreach (var nombre in nombres.Items())
+        /// {
+        ///     Console.WriteLine(nombre);
+        /// }
+        ///
+        /// // Salida: (no imprime nada, pero tampoco lanza excepción)
+        /// </code>
+        /// </example>
+        public static IEnumerable<T> Items<T>(this IEnumerable<T> list)
+        {
+            var isNull = IsNull(list);
+
+            return isNull ? new HashSet<T>() : list;
         }
 
-        public List<PantallaDTO> ObtenerPantallas()
+        /// <summary>
+        /// Determina si una colección contiene elementos.
+        /// </summary>
+        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
+        /// <param name="list">La colección que se desea evaluar.</param>
+        /// <returns>
+        /// <c>true</c> si la colección no es nula y contiene al menos un elemento; 
+        /// en caso contrario, <c>false</c>.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// IEnumerable<int> numeros = new List<int> { 1, 2, 3 };
+        /// IEnumerable<int> vacia = new List<int>();
+        /// IEnumerable<int> nula = null;
+        ///
+        /// bool tieneNumeros = numeros.HasItems(); // True
+        /// bool tieneVacia = vacia.HasItems();     // False
+        /// bool tieneNula = nula.HasItems();       // False
+        ///
+        /// Console.WriteLine($"Numeros: {tieneNumeros}");
+        /// Console.WriteLine($"Vacia: {tieneVacia}");
+        /// Console.WriteLine($"Nula: {tieneNula}");
+        /// </code>
+        /// </example>
+        public static bool HasItems<T>(this IEnumerable<T> list)
         {
-            var pantallas = _genericRepository.GetAll<Pantalla>();
-            return pantallas.Select(r => new PantallaDTO { Descripcion = r.Descripcion, PantallaId = r.PantallaId }).ToList();
+            var isNull = IsNull(list);
+
+            if (isNull) return false;
+
+            return list.Any();
         }
 
-        public RolDTO EdicionPermisos(EdicionPermisosRequest request)
+        /// <summary>
+        /// Determina si un objeto es nulo.
+        /// </summary>
+        /// <param name="item">El objeto que se desea evaluar.</param>
+        /// <returns>
+        /// <c>true</c> si <paramref name="item"/> es nulo; en caso contrario, <c>false</c>.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// object objeto1 = null;
+        /// object objeto2 = "Hola mundo";
+        ///
+        /// bool esNulo1 = objeto1.IsNull(); // True
+        /// bool esNulo2 = objeto2.IsNull(); // False
+        ///
+        /// Console.WriteLine($"Objeto1 es nulo: {esNulo1}");
+        /// Console.WriteLine($"Objeto2 es nulo: {esNulo2}");
+        /// </code>
+        /// </example>
+        public static bool IsNull(this object? item)
         {
-            var permisos = _genericRepository.GetFiltered<Permisos>(r => r.RolId == request.RolId);
+            return item == null;
+        }
 
-            foreach (var item in request.Permisos)
+        /// <summary>
+        /// Determina si un objeto no es nulo.
+        /// </summary>
+        /// <param name="item">El objeto que se desea evaluar.</param>
+        /// <returns>
+        /// <c>true</c> si <paramref name="item"/> no es nulo; en caso contrario, <c>false</c>.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// object objeto1 = null;
+        /// object objeto2 = "Hola mundo";
+        ///
+        /// bool noEsNulo1 = objeto1.IsNotNull(); // False
+        /// bool noEsNulo2 = objeto2.IsNotNull(); // True
+        ///
+        /// Console.WriteLine($"Objeto1 no es nulo: {noEsNulo1}");
+        /// Console.WriteLine($"Objeto2 no es nulo: {noEsNulo2}");
+        /// </code>
+        /// </example>
+        public static bool IsNotNull(this object item)
+        {
+            return item != null;
+        }
+
+        /// <summary>
+        /// Crea una nueva lista a partir de una colección enumerable.
+        /// </summary>
+        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
+        /// <param name="list">La colección enumerable que se desea copiar.</param>
+        /// <returns>
+        /// Una nueva instancia de <see cref="List{T}"/> que contiene los mismos elementos
+        /// que la colección original.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// IEnumerable<string> nombres = new[] { "Ana", "Luis", "Carlos" };
+        ///
+        /// List<string> listaCopiada = nombres.CopyToList();
+        ///
+        /// foreach (var nombre in listaCopiada)
+        /// {
+        ///     Console.WriteLine(nombre);
+        /// }
+        /// // Salida:
+        /// // Ana
+        /// // Luis
+        /// // Carlos
+        /// </code>
+        /// </example>
+        public static IEnumerable<T> CopyToList<T>(this IEnumerable<T> list)
+        {
+            return new List<T>(list);
+        }
+
+        /// <summary>
+        /// Determina si una colección está vacía o es nula.
+        /// </summary>
+        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
+        /// <param name="list">La colección que se desea evaluar.</param>
+        /// <returns>
+        /// <c>true</c> si la colección es nula o no contiene elementos; 
+        /// en caso contrario, <c>false</c>.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// IEnumerable<int> numeros = new List<int>();
+        /// IEnumerable<int> nula = null;
+        /// IEnumerable<int> conDatos = new List<int> { 1, 2, 3 };
+        ///
+        /// Console.WriteLine(numeros.IsEmpty());   // True
+        /// Console.WriteLine(nula.IsEmpty());      // True
+        /// Console.WriteLine(conDatos.IsEmpty());  // False
+        /// </code>
+        /// </example>
+        public static bool IsEmpty<T>(this IEnumerable<T> list)
+        {
+            return !HasItems(list);
+        }
+
+        /// <summary>
+        /// Devuelve una lista con los elementos distintos de la colección especificada.
+        /// </summary>
+        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
+        /// <param name="list">La colección de la cual se obtendrán los elementos únicos.</param>
+        /// <returns>
+        /// Una nueva lista de <typeparamref name="T"/> que contiene solo los elementos distintos.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// IEnumerable<int> numeros = new List<int> { 1, 2, 2, 3, 4, 4, 5 };
+        ///
+        /// List<int> distintos = numeros.DistinctList();
+        ///
+        /// foreach (var n in distintos)
+        /// {
+        ///     Console.WriteLine(n);
+        /// }
+        /// // Salida:
+        /// // 1
+        /// // 2
+        /// // 3
+        /// // 4
+        /// // 5
+        /// </code>
+        /// </example>
+        public static List<T> DistinctList<T>(this IEnumerable<T> list)
+        {
+            return list.Items().Distinct().ToList();
+        }
+
+        /// <summary>
+        /// Excluye de la colección los elementos cuya propiedad especificada
+        /// coincide con el valor proporcionado.
+        /// </summary>
+        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
+        /// <param name="list">La colección de la cual se filtrarán los elementos.</param>
+        /// <param name="nameProperty">El nombre de la propiedad a evaluar.</param>
+        /// <param name="value">El valor de la propiedad que se desea excluir.</param>
+        /// <returns>
+        /// Una nueva lista de <typeparamref name="T"/> que contiene los elementos
+        /// cuya propiedad <paramref name="nameProperty"/> no coincide con <paramref name="value"/>.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// public class Persona
+        /// {
+        ///     public string Nombre { get; set; }
+        ///     public string Ciudad { get; set; }
+        /// }
+        ///
+        /// var personas = new List<Persona>
+        /// {
+        ///     new Persona { Nombre = "Ana", Ciudad = "Madrid" },
+        ///     new Persona { Nombre = "Luis", Ciudad = "Barcelona" },
+        ///     new Persona { Nombre = "Carlos", Ciudad = "Madrid" }
+        /// };
+        ///
+        /// // Excluir las personas cuya Ciudad sea "Madrid"
+        /// var filtradas = personas.ExcludeByPropertyValue("Ciudad", "Madrid");
+        ///
+        /// foreach (var p in filtradas)
+        /// {
+        ///     Console.WriteLine(p.Nombre);
+        /// }
+        /// // Salida:
+        /// // Luis
+        /// </code>
+        /// </example>
+        public static List<T> ExcludeByPropertyValue<T>(this IEnumerable<T> list, string nameProperty, string value)
+        {
+            var filteredCollection = new List<T>();
+            foreach (var item in list)
             {
-                var permiso = permisos.FirstOrDefault(r => r.PantallaId == item.PantallaId);
-                if (permiso.IsNotNull())
-                {
-                    permiso.Ver = item.Ver;
-                    permiso.Editar = item.Editar;
-                    permiso.Eliminar = item.Eliminar;
 
-                    if (!permiso.Ver)
-                    {
-                        _genericRepository.Remove(permiso);
-                    }
+                var propertyInfo =
+                    item.GetType()
+                        .GetProperty(nameProperty);
+                if (propertyInfo == null)
+                    return list.ToList();
+
+                var propertyValue = propertyInfo.GetValue(item, null);
+                if (propertyValue.ToString() != value)
+                {
+                    filteredCollection.Add(item);
                 }
-                else
-                {
-                    var nuevoPermiso = new Permisos
-                    {
-                        Editar = item.Editar,
-                        Eliminar = item.Eliminar,
-                        PantallaId = item.PantallaId,
-                        RolId = item.RolId,
-                        Ver = item.Ver,
-                    };
-                    _genericRepository.Add(nuevoPermiso);
-                }
-
-
-                TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarUsuario");
-                _genericRepository.UnitOfWork.Commit(transactionInfo);
             }
-            return new RolDTO { };
+
+            return filteredCollection;
         }
 
-        public UsuarioDTO CrearUsuario(EdicionUsuarioRequest request)
+        /// <summary>
+        /// Devuelve una colección con elementos distintos de acuerdo a una clave especificada.
+        /// </summary>
+        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
+        /// <typeparam name="TKey">El tipo de la clave usada para determinar la unicidad.</typeparam>
+        /// <param name="enumerable">La colección de la cual se obtendrán los elementos únicos.</param>
+        /// <param name="keySelector">
+        /// Función que selecciona la clave de cada elemento para evaluar su unicidad.
+        /// </param>
+        /// <returns>
+        /// Una colección de <typeparamref name="T"/> que contiene solo el primer elemento de cada grupo
+        /// definido por la clave.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// var personas = new List<Persona>
+        /// {
+        ///     new Persona { Nombre = "Ana", Ciudad = "Madrid" },
+        ///     new Persona { Nombre = "Luis", Ciudad = "Barcelona" },
+        ///     new Persona { Nombre = "Carlos", Ciudad = "Madrid" }
+        /// };
+        ///
+        /// // Obtener personas distintas por Ciudad
+        /// var distintasPorCiudad = personas.DistinctBy(p => p.Ciudad);
+        ///
+        /// foreach (var p in distintasPorCiudad)
+        /// {
+        ///     Console.WriteLine($"{p.Nombre} - {p.Ciudad}");
+        /// }
+        /// // Salida posible:
+        /// // Ana - Madrid
+        /// // Luis - Barcelona
+        /// </code>
+        /// </example>
+        public static IEnumerable<T> DistinctBy<T, TKey>(this IEnumerable<T> enumerable, Func<T, TKey> keySelector)
         {
-            string mensajeValidacion = request.Usuario.ValidarCampos();
-
-            if (mensajeValidacion.HasValue())
-            {
-                return new UsuarioDTO
-                {
-                    Message = mensajeValidacion,
-                };
-            }
-
-            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
-
-            if (usuarioExiste.IsNotNull())
-            {
-                return new UsuarioDTO
-                {
-                    Message = "Usuario ya esta registrado"
-                };
-            }
-
-            var usuario = new Usuario
-            {
-                Apellido = request.Usuario.Apellido.ValueOrEmpty(),
-                Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena),
-                Nombre = request.Usuario.Nombre.ValueOrEmpty(),
-                RolId = request.Usuario.RolId.ValueOrEmpty(),
-                UsuarioId = request.Usuario.UsuarioId.ValueOrEmpty(),
-                Activo = request.Usuario.Activo
-            };
-
-            _genericRepository.Add(usuario);
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarUsuario");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return _mapper.Map<UsuarioDTO>(usuario);
+            return enumerable.GroupBy(keySelector).Select(s => s.First());
         }
 
-        public UsuarioDTO IniciarSesion(UserRequest request)
+        /// <summary>
+        /// Ejecuta de manera asíncrona una función sobre cada elemento de la colección.
+        /// </summary>
+        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
+        /// <param name="enumerable">La colección cuyos elementos se recorrerán.</param>
+        /// <param name="funcAsync">
+        /// Función asíncrona que se aplicará a cada elemento de la colección.
+        /// </param>
+        /// <returns>
+        /// Una tarea que representa la operación asíncrona de recorrer y ejecutar la función sobre todos los elementos.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// var numeros = new List<int> { 1, 2, 3 };
+        ///
+        /// await numeros.ForEachAsync(async n =>
+        /// {
+        ///     await Task.Delay(500); // Simula trabajo asíncrono
+        ///     Console.WriteLine($"Procesado: {n}");
+        /// });
+        ///
+        /// // Salida (con retraso de 500ms entre cada elemento):
+        /// // Procesado: 1
+        /// // Procesado: 2
+        /// // Procesado: 3
+        /// </code>
+        /// </example>
+        public static async Task ForEachAsync<T>(this IEnumerable<T> enumerable, Func<T, Task> funcAsync)
         {
-            List<string> includes = new List<string> { "Rol", "Rol.Permisos" };
-
-            Usuario usuario = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.UsuarioId, includes);
-
-            if (usuario.IsNotNull() && PasswordEncryptor.VerifyPassword(request?.Password, usuario.Contrasena))
+            foreach (T item in enumerable)
             {
-                if (!usuario.Activo)
-                {
-                    return new UsuarioDTO { Message = $"Usuario {usuario.UsuarioId} esta desactivado" };
-                }
-                var newAccessToken = _tokenService.Generate(usuario);
-                var newRefreshToken = _tokenService.GenerateRefreshToken();
-
-                usuario.RefreshToken = newRefreshToken;
-                usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationInDays);
-
-                if (request.RequestUserInfo != null)
-                {
-                    request.RequestUserInfo.UsuarioId = usuario.UsuarioId;
-                }
-
-                TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("IniciarSesion")
-                    ?? new TransactionInfo { GenerateTransaction = false };
-                _genericRepository.UnitOfWork.Commit(transactionInfo);
-
-                return new UsuarioDTO
-                {
-                    Apellido = usuario.Apellido,
-                    Nombre = usuario.Nombre,
-                    RolId = usuario.RolId,
-                    Token = newAccessToken,
-                    RefreshToken = newRefreshToken,
-                    UsuarioAutenticado = true,
-                    UsuarioId = usuario.UsuarioId,
-                    Permisos = MapPermisosDto(usuario.Rol?.Permisos)
-                };
+                await funcAsync(item);
             }
-
-            return new UsuarioDTO
-            {
-                Message = "Usuario o Contraseña no valido",
-                UsuarioAutenticado = false
-            };
         }
 
-        public UsuarioDTO RefreshToken(TokenRequest request)
+        /// <summary>
+        /// Obtiene una lista de valores únicos en formato <see cref="string"/> 
+        /// a partir de una propiedad especificada de los elementos de la colección.
+        /// </summary>
+        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
+        /// <param name="collection">La colección de la cual se extraerán los valores.</param>
+        /// <param name="propertyName">El nombre de la propiedad cuyos valores se desean obtener.</param>
+        /// <returns>
+        /// Una lista de cadenas que representan los valores distintos de la propiedad indicada.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// public class Persona
+        /// {
+        ///     public string Nombre { get; set; }
+        ///     public string Ciudad { get; set; }
+        /// }
+        ///
+        /// var personas = new List<Persona>
+        /// {
+        ///     new Persona { Nombre = "Ana", Ciudad = "Madrid" },
+        ///     new Persona { Nombre = "Luis", Ciudad = "Barcelona" },
+        ///     new Persona { Nombre = "Carlos", Ciudad = "Madrid" }
+        /// };
+        ///
+        /// // Obtener lista de ciudades distintas
+        /// var ciudades = personas.GetStringListOf("Ciudad");
+        ///
+        /// foreach (var ciudad in ciudades)
+        /// {
+        ///     Console.WriteLine(ciudad);
+        /// }
+        /// // Salida:
+        /// // Madrid
+        /// // Barcelona
+        /// </code>
+        /// </example>
+        public static List<string> GetStringListOf<T>(this IEnumerable<T> collection, string propertyName)
         {
-            if (request == null || string.IsNullOrWhiteSpace(request.AccessToken) || string.IsNullOrWhiteSpace(request.RefreshToken))
-            {
-                return new UsuarioDTO { Message = "Solicitud de token inválida", UsuarioAutenticado = false };
-            }
-
-            ClaimsPrincipal principal;
-            try
-            {
-                principal = _tokenService.GetPrincipalFromExpiredToken(request.AccessToken);
-            }
-            catch (SecurityTokenException)
-            {
-                return new UsuarioDTO { Message = "Token de acceso inválido", UsuarioAutenticado = false };
-            }
-
-            string? userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrWhiteSpace(userId))
-            {
-                return new UsuarioDTO { Message = "Token de acceso inválido", UsuarioAutenticado = false };
-            }
-
-            var usuario = _genericRepository.GetSingle<Usuario>(u => u.UsuarioId == userId && u.RefreshToken == request.RefreshToken, new List<string> { "Rol", "Rol.Permisos" });
-
-            if (usuario == null || usuario.RefreshTokenExpiryTime <= DateTime.UtcNow)
-            {
-                return new UsuarioDTO { Message = "Token de refresco inválido o expirado", UsuarioAutenticado = false };
-            }
-
-            var newAccessToken = _tokenService.Generate(usuario);
-            var newRefreshToken = _tokenService.GenerateRefreshToken();
-
-            usuario.RefreshToken = newRefreshToken;
-            usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationInDays);
-
-            TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("RefreshToken")
-                ?? new TransactionInfo { GenerateTransaction = false };
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-
-            return new UsuarioDTO
-            {
-                Apellido = usuario.Apellido,
-                Nombre = usuario.Nombre,
-                RolId = usuario.RolId,
-                Token = newAccessToken,
-                RefreshToken = newRefreshToken,
-                UsuarioAutenticado = true,
-                UsuarioId = usuario.UsuarioId,
-                Permisos = MapPermisosDto(usuario.Rol?.Permisos)
-            };
+            var result = collection.Select(s => s.GetType().GetProperty(propertyName).GetValue(s, null).ToString());
+            return result.Distinct().ToList();
         }
 
-        public SearchResult<UsuarioDTO> ObtenerUsuario(GetUserRequest request)
+        /// <summary>
+        /// Concatena los elementos de una colección en una sola cadena,
+        /// separados por el delimitador especificado.
+        /// </summary>
+        /// <typeparam name="T">El tipo de elementos contenidos en la colección.</typeparam>
+        /// <param name="collection">La colección cuyos elementos se unirán en una cadena.</param>
+        /// <param name="separator">El separador que se usará entre los elementos.</param>
+        /// <returns>
+        /// Una cadena que contiene los elementos de la colección separados por <paramref name="separator"/>.
+        /// Si la colección es nula o está vacía, devuelve una cadena vacía.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// var nombres = new List<string> { "Ana", "Luis", "Carlos" };
+        ///
+        /// string resultado = nombres.GetStringFromList(", ");
+        /// Console.WriteLine(resultado);
+        ///
+        /// // Salida:
+        /// // Ana, Luis, Carlos
+        /// </code>
+        /// </example>
+        public static string GetStringFromList<T>(this IEnumerable<T> collection, string separator)
         {
-            var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(request.QueryInfo);
-            var usuarios = _genericRepository.GetPagedAndFiltered<Usuario>(dynamicFilter);
-
-            return new SearchResult<UsuarioDTO>
+            if (collection.HasItems())
             {
-                PageCount = usuarios.PageCount,
-                ItemCount = usuarios.ItemCount,
-                TotalItems = usuarios.TotalItems,
-                PageIndex = usuarios.PageIndex,
-                Items = (from qry in usuarios.Items as IEnumerable<Usuario> select MapUsuarioDto(qry)).ToList(),
-            };
-        }
-
-        public RolDTO CrearRol(EdicionRolRequest request)
-        {
-            var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
-            if (rol.IsNotNull())
-            {
-                return new RolDTO
-                {
-                    Message = $"El rol {request.Rol.RolId} ya existe"
-                };
+                return string.Join(separator, collection).Trim();
             }
-
-            var nuevoRol = new Rol
-            {
-                Descripcion = request.Rol.Descripcion,
-                RolId = request.Rol.RolId
-            };
-
-            _genericRepository.Add(nuevoRol);
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarRol");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-
-            return new RolDTO();
-        }
-
-        public RolDTO EditarRol(EdicionRolRequest request)
-        {
-            var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
-
-            if (rol.IsNull())
-            {
-                return new RolDTO
-                {
-                    Message = $"El Rol {request.Rol.RolId} no existe"
-                };
-            }
-
-            rol.Descripcion = request.Rol.Descripcion;
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarRol");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return new RolDTO();
-        }
-
-        public List<RolDTO> ObtenerRoles()
-        {
-            var includes = new List<string> { "Permisos" };
-            var roles = _genericRepository.GetAll<Rol>(includes);
-
-            return roles.Select(qry =>
-            new RolDTO
-            {
-                Descripcion = qry.Descripcion,
-                RolId = qry.RolId,
-                Permisos = MapPermisosDto(qry?.Permisos),
-            }).ToList();
-        }
-
-        private static List<PermisosDTO> MapPermisosDto(List<Permisos>? permisos)
-        {
-            return permisos.Select(r => new PermisosDTO
-            {
-                Editar = r.Editar,
-                Eliminar = r.Eliminar,
-                PantallaId = r.PantallaId,
-                RolId = r.RolId,
-                Ver = r.Ver,
-            }).ToList();
-        }
-
-        private static UsuarioDTO MapUsuarioDto(Usuario qry)
-        {
-            return new UsuarioDTO
-            {
-                Apellido = qry.Apellido,
-                Contrasena = qry.Contrasena,
-                Nombre = qry.Nombre,
-                RolId = qry.RolId,
-                UsuarioId = qry.UsuarioId,
-                FechaTransaccion = qry.FechaTransaccion,
-                Activo = qry.Activo
-            };
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                if (_genericRepository.IsNotNull()) _genericRepository.Dispose();
-
-            }
-
-            base.Dispose(disposing);
+            return string.Empty;
         }
     }
 }
@@ -10742,63 +11116,6 @@ namespace Infraestructura.Context.Mapping.Seguridad
 </Project>
 ````
 
-## File: WebServices/Extensions/DependencyInjectionRepository.cs
-````csharp
-using Aplicacion.Core;
-using Aplicacion.Services.ConfiguracionesApp;
-using Aplicacion.Services.Seguridad;
-using CrossCutting.Configuration;
-using Infraestructura.Context;
-using Infraestructura.Core.Jwtoken;
-using Infraestructura.Core.RestClient;
-using Microsoft.EntityFrameworkCore;
-
-namespace WebServices.Extensions
-{
-    public static class DependencyInjectionRepository
-    {
-        public static IServiceCollection AddPersistenceInfrastructure(this IServiceCollection services, IConfiguration configuration)
-        {
-            string connectionString = configuration.GetConnectionString("conectionDataBase");
-
-            // Inicialización única de configuraciones
-            AppSettingsManager.Initialize(connectionString);
-
-            services.AddDbContext<MyContext>(dbContextOption =>
-                dbContextOption.UseSqlServer(connectionString)
-            );
-
-            services.AddScoped<IDataContext, MyContext>();
-            services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
-
-            return services;
-        }
-
-        public static IServiceCollection AddApplicationServices(this IServiceCollection services)
-        {
-            // Servicios de Aplicación
-            services.AddScoped<ISecurityApplicationService, SecurityAplicationService>();
-            services.AddScoped<IConfiguracionesApplicationService, ConfiguracionesApplicationService>();
-
-            return services;
-        }
-
-        public static IServiceCollection AddExternalAndSecurityServices(this IServiceCollection services)
-        {
-            // JWT
-            services.AddTransient<ITokenService, JwtTokenService>();
-
-            // Rest Client
-            RestClientFactory.SetCurrent(new HttpRestClientFactory());
-            //services.AddTransient<IRestClient, HttpRestClient>();
-            //services.AddTransient<IRestClientFactory, HttpRestClientFactory>();
-
-            return services;
-        }
-    }
-}
-````
-
 ## File: Aplicacion/DTOs/Seguridad/UserRequest.cs
 ````csharp
 namespace Aplicacion.DTOs.Seguridad
@@ -10857,43 +11174,63 @@ namespace Dominio.Context.Entidades.Seguridad
 }
 ````
 
-## File: WebServices/WebServices.csproj
-````
-<Project Sdk="Microsoft.NET.Sdk.Web">
+## File: WebServices/Extensions/DependencyInjectionRepository.cs
+````csharp
+using Aplicacion.Core;
+using System;
+using Aplicacion.Services.ConfiguracionesApp;
+using Aplicacion.Services.Seguridad;
+using CrossCutting.Configuration;
+using Infraestructura.Context;
+using Infraestructura.Core.Jwtoken;
+using Infraestructura.Core.RestClient;
+using Microsoft.EntityFrameworkCore;
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <InvariantGlobalization>false</InvariantGlobalization>
-  </PropertyGroup>
+namespace WebServices.Extensions
+{
+    public static class DependencyInjectionRepository
+    {
+        public static IServiceCollection AddPersistenceInfrastructure(this IServiceCollection services, IConfiguration configuration)
+        {
+            string connectionString = configuration.GetConnectionString("conectionDataBase")
+                ?? throw new InvalidOperationException("Connection string 'conectionDataBase' not found in configuration.");
 
-  <ItemGroup>
-    <PackageReference Include="AutoMapper" Version="16.1.1" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.4">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Identity.Client" Version="4.84.1" />
-    <PackageReference Include="Azure.Identity" Version="1.21.0" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.0" />
-    <PackageReference Include="EntityFramework" Version="6.4.4" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.4" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="8.0.4" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.4" />
-    <PackageReference Include="Scalar.AspNetCore" Version="2.14.14" />
-  </ItemGroup>
+            // Inicialización única de configuraciones
+            AppSettingsManager.Initialize(connectionString);
 
-  <ItemGroup>
-    <ProjectReference Include="..\Aplicacion\Aplicacion.csproj" />
-    <ProjectReference Include="..\CrossCutting\CrossCutting.csproj" />
-    <ProjectReference Include="..\Dominio\Dominio.csproj" />
-    <ProjectReference Include="..\Infraestructura\Infraestructura.csproj" />
-  </ItemGroup>
+            services.AddDbContext<MyContext>(dbContextOption =>
+                dbContextOption.UseSqlServer(connectionString)
+            );
 
-</Project>
+            services.AddScoped<IDataContext, MyContext>();
+            services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+
+            return services;
+        }
+
+        public static IServiceCollection AddApplicationServices(this IServiceCollection services)
+        {
+            // Servicios de Aplicación
+            services.AddScoped<ISecurityApplicationService, SecurityAplicationService>();
+            services.AddScoped<IConfiguracionesApplicationService, ConfiguracionesApplicationService>();
+
+            return services;
+        }
+
+        public static IServiceCollection AddExternalAndSecurityServices(this IServiceCollection services)
+        {
+            // JWT
+            services.AddTransient<ITokenService, JwtTokenService>();
+
+            // Rest Client
+            RestClientFactory.SetCurrent(new HttpRestClientFactory());
+            //services.AddTransient<IRestClient, HttpRestClient>();
+            //services.AddTransient<IRestClientFactory, HttpRestClientFactory>();
+
+            return services;
+        }
+    }
+}
 ````
 
 ## File: Aplicacion/DTOs/Seguridad/UsuarioDTO.cs
@@ -10943,6 +11280,417 @@ namespace Aplicacion.DTOs.Seguridad
             }
 
             return mensajeValidacion.ToString();
+        }
+    }
+}
+````
+
+## File: WebServices/WebServices.csproj
+````
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoMapper" Version="16.1.1" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.4">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.84.1" />
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.0" />
+    <PackageReference Include="EntityFramework" Version="6.4.4" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="8.0.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.4" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.14.14" />
+    <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Aplicacion\Aplicacion.csproj" />
+    <ProjectReference Include="..\CrossCutting\CrossCutting.csproj" />
+    <ProjectReference Include="..\Dominio\Dominio.csproj" />
+    <ProjectReference Include="..\Infraestructura\Infraestructura.csproj" />
+  </ItemGroup>
+
+</Project>
+````
+
+## File: Aplicacion/Services/Seguridad/SecurityAplicationService.cs
+````csharp
+using Aplicacion.Core;
+using Aplicacion.DTOs;
+using Aplicacion.DTOs.Seguridad;
+using System.Threading.Tasks;
+using Aplicacion.Helpers;
+using AutoMapper;
+using Dominio.Context.Entidades;
+using Dominio.Context.Entidades.Seguridad;
+using Dominio.Core;
+using Dominio.Core.Extensions;
+using Dominio.Core.Jwtoken;
+using Dominio.Core.Result;
+using Infraestructura.Context;
+using Infraestructura.Core.Jwtoken;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
+
+namespace Aplicacion.Services.Seguridad
+{
+    public class SecurityAplicationService : BaseDisposable, ISecurityApplicationService
+    {
+        private readonly IGenericRepository<IDataContext> _genericRepository;
+        private readonly ITokenService _tokenService;
+        private readonly IMapper _mapper;
+        private readonly JwtSettings _jwtSettings;
+        public SecurityAplicationService(IGenericRepository<IDataContext> genericRepository, ITokenService tokenService, IMapper mapper, IOptions<JwtSettings> jwtSettings)
+        {
+            _genericRepository = genericRepository;
+            _tokenService = tokenService;
+            _mapper = mapper;
+            _jwtSettings = jwtSettings.Value;
+        }
+
+        public Task<Result<UsuarioDTO>> EditarUsuario(EdicionUsuarioRequest request)
+        {
+            if (request.IsNull() || request.Usuario.IsNull())
+            { 
+                return Task.FromResult(Result<UsuarioDTO>.Failure("Usuario es obligatorio", "NULL_USUARIO"));
+            }
+
+            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
+
+            if (usuarioExiste.IsNull())
+            { 
+                return Task.FromResult(Result<UsuarioDTO>.Failure("El usuario no existe", "USER_NOT_FOUND"));
+            }
+
+            if (request.Usuario.EditarContrasena)
+            {
+                usuarioExiste.Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena);
+            } 
+
+            usuarioExiste.Nombre = request.Usuario.Nombre.ValueOrEmpty();
+            usuarioExiste.Apellido = request.Usuario.Apellido.ValueOrEmpty();
+            usuarioExiste.RolId = request.Usuario.RolId.ValueOrEmpty();
+            usuarioExiste.Activo = request.Usuario.Activo;
+
+            TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("EditarUsuario")
+                ?? new TransactionInfo { GenerateTransaction = false }; 
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+
+            return Task.FromResult(Result<UsuarioDTO>.Success(_mapper.Map<UsuarioDTO>(usuarioExiste), "Usuario actualizado exitosamente"));
+        }
+
+        public Task<Result<List<PantallaDTO>>> ObtenerPantallas()
+        {
+            var pantallas = _genericRepository.GetAll<Pantalla>();
+            var lista = pantallas.Select(r => new PantallaDTO { Descripcion = r.Descripcion, PantallaId = r.PantallaId }).ToList(); 
+            return Task.FromResult(Result<List<PantallaDTO>>.Success(lista));
+        }
+
+        public Task<Result<RolDTO>> EdicionPermisos(EdicionPermisosRequest request)
+        {
+            var permisos = _genericRepository.GetFiltered<Permisos>(r => r.RolId == request.RolId);
+
+            foreach (var item in request.Permisos) 
+            {
+                var permiso = permisos.FirstOrDefault(r => r.PantallaId == item.PantallaId);
+                if (permiso.IsNotNull())
+                {
+                    permiso.Ver = item.Ver;
+                    permiso.Editar = item.Editar;
+                    permiso.Eliminar = item.Eliminar;
+
+                    if (!permiso.Ver)
+                    {
+                        _genericRepository.Remove(permiso);
+                    }
+                }
+                else
+                {
+                    var nuevoPermiso = new Permisos 
+                    {
+                        Editar = item.Editar,
+                        Eliminar = item.Eliminar,
+                        PantallaId = item.PantallaId,
+                        RolId = item.RolId,
+                        Ver = item.Ver,
+                    };
+                    _genericRepository.Add(nuevoPermiso); 
+                }
+            }
+            
+            TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("AgregarUsuario")
+                ?? new TransactionInfo { GenerateTransaction = false };
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+            return Task.FromResult(Result<RolDTO>.Success(new RolDTO())); 
+        }
+
+        public Task<Result<UsuarioDTO>> CrearUsuario(EdicionUsuarioRequest request)
+        {
+            if (request.IsNull() || request.Usuario.IsNull())
+            { 
+                return Task.FromResult(Result<UsuarioDTO>.Failure("Usuario es obligatorio", "NULL_USUARIO"));
+            }
+
+            var usuarioRequest = request.Usuario;
+
+            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == usuarioRequest.UsuarioId);
+
+            if (usuarioExiste.IsNotNull())
+            { 
+                return Task.FromResult(Result<UsuarioDTO>.Failure("Usuario ya esta registrado", "USER_EXISTS"));
+            }
+
+            var usuario = new Usuario
+            {
+                Apellido = usuarioRequest.Apellido.ValueOrEmpty(),
+                Contrasena = PasswordEncryptor.HashPassword(usuarioRequest.Contrasena), 
+                Nombre = usuarioRequest.Nombre.ValueOrEmpty(),
+                RolId = usuarioRequest.RolId.ValueOrEmpty(),
+                UsuarioId = usuarioRequest.UsuarioId.ValueOrEmpty(),
+                Activo = usuarioRequest.Activo
+            };
+
+            _genericRepository.Add(usuario);
+            TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("AgregarUsuario")
+                ?? new TransactionInfo { GenerateTransaction = false };
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+            return Task.FromResult(Result<UsuarioDTO>.Success(_mapper.Map<UsuarioDTO>(usuario), "Usuario creado exitosamente"));
+        }
+
+        public Task<Result<UsuarioDTO>> IniciarSesion(UserRequest request)
+        {
+            var includes = new List<string> { "Rol", "Rol.Permisos" };
+
+            if (string.IsNullOrWhiteSpace(request?.Password) || string.IsNullOrWhiteSpace(request?.UsuarioId))
+            { 
+                return Task.FromResult(Result<UsuarioDTO>.Failure("Usuario o Contraseña no valido", "INVALID_CREDENTIALS"));
+            }
+
+            Usuario usuario = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.UsuarioId, includes);
+
+            if (usuario.IsNotNull() && PasswordEncryptor.VerifyPassword(request.Password, usuario.Contrasena))
+            {
+                if (!usuario.Activo)
+                { 
+                    return Task.FromResult(Result<UsuarioDTO>.Failure($"Usuario {usuario.UsuarioId} esta desactivado", "USER_INACTIVE"));
+                }
+
+                var newAccessToken = _tokenService.Generate(usuario);
+                var newRefreshToken = _tokenService.GenerateRefreshToken();
+
+                usuario.RefreshToken = newRefreshToken;
+                usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationInDays);
+
+                if (request.RequestUserInfo != null)
+                {
+                    request.RequestUserInfo.UsuarioId = usuario.UsuarioId;
+                }
+
+                TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("IniciarSesion")
+                    ?? new TransactionInfo { GenerateTransaction = false };
+                _genericRepository.UnitOfWork.Commit(transactionInfo);
+
+                var resultDto = new UsuarioDTO
+                {
+                    Apellido = usuario.Apellido,
+                    Nombre = usuario.Nombre,
+                    RolId = usuario.RolId,
+                    Token = newAccessToken,
+                    RefreshToken = newRefreshToken,
+                    UsuarioAutenticado = true,
+                    UsuarioId = usuario.UsuarioId,
+                    Permisos = MapPermisosDto(usuario.Rol?.Permisos)
+                };
+
+                return Task.FromResult(Result<UsuarioDTO>.Success(resultDto, "Inicio de sesión exitoso"));
+            }
+
+            return Task.FromResult(Result<UsuarioDTO>.Failure("Usuario o Contraseña no valido", "INVALID_CREDENTIALS"));
+        }
+
+        public Task<Result<UsuarioDTO>> RefreshToken(TokenRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.AccessToken) || string.IsNullOrWhiteSpace(request.RefreshToken))
+            { 
+                return Task.FromResult(Result<UsuarioDTO>.Failure("Solicitud de token inválida", "INVALID_TOKEN_REQUEST"));
+            }
+
+            ClaimsPrincipal principal;
+            try
+            {
+                principal = _tokenService.GetPrincipalFromExpiredToken(request.AccessToken);
+            } 
+            catch (SecurityTokenException)
+            {
+                return Task.FromResult(Result<UsuarioDTO>.Failure("Token de acceso inválido", "INVALID_ACCESS_TOKEN"));
+            }
+
+            string? userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(userId))
+            { 
+                return Task.FromResult(Result<UsuarioDTO>.Failure("Token de acceso inválido", "INVALID_ACCESS_TOKEN"));
+            }
+
+            var usuario = _genericRepository.GetSingle<Usuario>(u => u.UsuarioId == userId && u.RefreshToken == request.RefreshToken, new List<string> { "Rol", "Rol.Permisos" });
+
+            if (usuario == null || usuario.RefreshTokenExpiryTime <= DateTime.UtcNow)
+            { 
+                return Task.FromResult(Result<UsuarioDTO>.Failure("Token de refresco inválido o expirado", "INVALID_REFRESH_TOKEN"));
+            }
+
+            var newAccessToken = _tokenService.Generate(usuario);
+            var newRefreshToken = _tokenService.GenerateRefreshToken();
+
+            usuario.RefreshToken = newRefreshToken;
+            usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationInDays);
+
+            TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("RefreshToken")
+                ?? new TransactionInfo { GenerateTransaction = false };
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+
+            var resultDto = new UsuarioDTO 
+            {
+                Apellido = usuario.Apellido,
+                Nombre = usuario.Nombre,
+                RolId = usuario.RolId,
+                Token = newAccessToken,
+                RefreshToken = newRefreshToken,
+                UsuarioAutenticado = true,
+                UsuarioId = usuario.UsuarioId,
+                Permisos = MapPermisosDto(usuario.Rol?.Permisos)
+            };
+
+            return Task.FromResult(Result<UsuarioDTO>.Success(resultDto, "Token renovado correctamente"));
+        }
+
+        public Task<Result<SearchResult<UsuarioDTO>>> ObtenerUsuario(GetUserRequest request)
+        {
+            var queryInfo = request.QueryInfo ?? new QueryInfo();
+            var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(queryInfo);
+            var usuarios = _genericRepository.GetPagedAndFiltered<Usuario>(dynamicFilter);
+            var result = new SearchResult<UsuarioDTO>
+            {
+                PageCount = usuarios.PageCount,
+                ItemCount = usuarios.ItemCount,
+                TotalItems = usuarios.TotalItems,
+                PageIndex = usuarios.PageIndex,
+                Items = (from qry in usuarios.Items as IEnumerable<Usuario> select MapUsuarioDto(qry)).ToList(),
+            };
+
+            return Task.FromResult(Result<SearchResult<UsuarioDTO>>.Success(result));
+        }
+
+        public Task<Result<RolDTO>> CrearRol(EdicionRolRequest request)
+        {
+            if (request.Rol is null)
+            {
+                return Task.FromResult(Result<RolDTO>.Failure("El rol es obligatorio", "NULL_ROLE"));
+            }
+
+            var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
+            if (rol.IsNotNull())
+            {
+                return Task.FromResult(Result<RolDTO>.Failure($"El rol {request.Rol.RolId} ya existe", "ROLE_EXISTS"));
+            }
+
+            var nuevoRol = new Rol
+            {
+                Descripcion = request.Rol.Descripcion,
+                RolId = request.Rol.RolId
+            };
+
+            _genericRepository.Add(nuevoRol);
+            TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("AgregarRol")
+                ?? new TransactionInfo { GenerateTransaction = false };
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+
+            return Task.FromResult(Result<RolDTO>.Success(new RolDTO()));
+        }
+
+        public Task<Result<RolDTO>> EditarRol(EdicionRolRequest request)
+        {
+            if (request.Rol is null)
+            {
+                return Task.FromResult(Result<RolDTO>.Failure("El rol es obligatorio", "NULL_ROLE"));
+            }
+
+            var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
+
+            if (rol.IsNull())
+            {
+                return Task.FromResult(Result<RolDTO>.Failure($"El Rol {request.Rol.RolId} no existe", "ROLE_NOT_FOUND"));
+            }
+
+            rol.Descripcion = request.Rol.Descripcion;
+            TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("EditarRol")
+                ?? new TransactionInfo { GenerateTransaction = false };
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+            return Task.FromResult(Result<RolDTO>.Success(new RolDTO()));
+        }
+
+        public Task<Result<List<RolDTO>>> ObtenerRoles()
+        {
+            var includes = new List<string> { "Permisos" };
+            var roles = _genericRepository.GetAll<Rol>(includes);
+            var lista = roles.Select(qry =>
+            new RolDTO
+            {
+                Descripcion = qry.Descripcion,
+                RolId = qry.RolId,
+                Permisos = MapPermisosDto(qry?.Permisos),
+            }).ToList();
+
+            return Task.FromResult(Result<List<RolDTO>>.Success(lista));
+        }
+
+        private static List<PermisosDTO> MapPermisosDto(List<Permisos>? permisos)
+        {
+            return permisos?.Select(r => new PermisosDTO
+            {
+                Editar = r.Editar,
+                Eliminar = r.Eliminar,
+                PantallaId = r.PantallaId,
+                RolId = r.RolId,
+                Ver = r.Ver,
+            }).ToList() ?? new List<PermisosDTO>();
+        }
+
+        private static UsuarioDTO MapUsuarioDto(Usuario qry)
+        {
+            return new UsuarioDTO
+            {
+                Apellido = qry.Apellido,
+                Contrasena = qry.Contrasena,
+                Nombre = qry.Nombre,
+                RolId = qry.RolId,
+                UsuarioId = qry.UsuarioId,
+                FechaTransaccion = qry.FechaTransaccion,
+                Activo = qry.Activo
+            };
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                if (_genericRepository.IsNotNull()) _genericRepository.Dispose();
+
+            }
+
+            base.Dispose(disposing);
         }
     }
 }
@@ -11177,6 +11925,7 @@ This project is licensed under the **MIT License** — free to use, modify, and 
 using Aplicacion.DTOs;
 using Aplicacion.DTOs.Seguridad;
 using Aplicacion.Services.Seguridad;
+using Dominio.Core.Result;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11195,84 +11944,100 @@ namespace WebServices.Controllers
         [AllowAnonymous]
         [Route("login")]
         [HttpPost]
-        public UsuarioDTO Login([FromBody] UserRequest request)
+        public async Task<IActionResult> Login([FromBody] UserRequest request)
         {
-            UsuarioDTO usuario = _securityAppService.IniciarSesion(request);
-
-            return usuario;
+            var usuario = await _securityAppService.IniciarSesion(request);
+            return MapResult(usuario);
         }
 
         [AllowAnonymous]
         [HttpPost("refresh-token")]
-        public UsuarioDTO RefreshToken([FromBody] TokenRequest request)
+        public async Task<IActionResult> RefreshToken([FromBody] TokenRequest request)
         {
-            UsuarioDTO usuario = _securityAppService.RefreshToken(request);
-            return usuario;
+            var usuario = await _securityAppService.RefreshToken(request);
+            return MapResult(usuario);
         }
 
         [Authorize]
         [HttpPost("crear-usuario")]
-        public UsuarioDTO CreateUser(EdicionUsuarioRequest request)
+        public async Task<IActionResult> CreateUser(EdicionUsuarioRequest request)
         {
-            UsuarioDTO usuario = _securityAppService.CrearUsuario(request);
-
-            return usuario;
+            var usuario = await _securityAppService.CrearUsuario(request);
+            return MapResult(usuario);
         }
 
         [Authorize]
         [HttpPost("editar-usuario")]
-        public UsuarioDTO EditarUsuario(EdicionUsuarioRequest request)
+        public async Task<IActionResult> EditarUsuario(EdicionUsuarioRequest request)
         {
-            UsuarioDTO usuario = _securityAppService.EditarUsuario(request);
-            return usuario;
+            var usuario = await _securityAppService.EditarUsuario(request);
+            return MapResult(usuario);
         }
 
         [Authorize]
         [HttpPost("obtener-usuarios")]
-        public SearchResult<UsuarioDTO> ObtenerUsuarios(GetUserRequest request)
+        public async Task<IActionResult> ObtenerUsuarios(GetUserRequest request)
         {
-            var usuarios = _securityAppService.ObtenerUsuario(request);
-            return usuarios;
+            var usuarios = await _securityAppService.ObtenerUsuario(request);
+            return MapResult(usuarios);
         }
 
         [Authorize]
         [HttpGet("obtener-roles")]
-        public List<RolDTO> ObtenerRoles()
+        public async Task<IActionResult> ObtenerRoles()
         {
-            var roles = _securityAppService.ObtenerRoles();
-            return roles;
+            var roles = await _securityAppService.ObtenerRoles();
+            return MapResult(roles);
         }
 
         [Authorize]
         [HttpPost("crear-rol")]
-        public RolDTO CrearRol(EdicionRolRequest request)
+        public async Task<IActionResult> CrearRol(EdicionRolRequest request)
         {
-            var rol = _securityAppService.CrearRol(request);
-            return rol;
+            var rol = await _securityAppService.CrearRol(request);
+            return MapResult(rol);
         }
 
         [Authorize]
         [HttpPost("editar-rol")]
-        public RolDTO EditarRol(EdicionRolRequest request)
+        public async Task<IActionResult> EditarRol(EdicionRolRequest request)
         {
-            var rol = _securityAppService.EditarRol(request);
-            return rol;
+            var rol = await _securityAppService.EditarRol(request);
+            return MapResult(rol);
         }
 
         [Authorize]
         [HttpGet("obtener-pantalla")]
-        public List<PantallaDTO> ObtenerPantalla()
+        public async Task<IActionResult> ObtenerPantalla()
         {
-            var pantallas = _securityAppService.ObtenerPantallas();
-            return pantallas;
+            var pantallas = await _securityAppService.ObtenerPantallas();
+            return MapResult(pantallas);
         }
 
         [Authorize]
         [HttpPost("edicion-permisos")]
-        public RolDTO EdicionPermisos(EdicionPermisosRequest request)
+        public async Task<IActionResult> EdicionPermisos(EdicionPermisosRequest request)
         {
-            var rol = _securityAppService.EdicionPermisos(request);
-            return rol;
+            var rol = await _securityAppService.EdicionPermisos(request);
+            return MapResult(rol);
+        }
+
+        private IActionResult MapResult<T>(Result<T> result)
+        {
+            if (result == null) return StatusCode(500);
+
+            if (result.IsSuccess)
+            {
+                return Ok(result.Data);
+            }
+
+            return result.Status switch
+            {
+                ResultStatus.ValidationError => BadRequest(result),
+                ResultStatus.ApplicationError => Conflict(result),
+                ResultStatus.Exception => StatusCode(500, result),
+                _ => BadRequest(result),
+            };
         }
     }
 }
@@ -11286,6 +12051,8 @@ using Scalar.AspNetCore;
 using WebServices.Extensions;
 using WebServices.Jwtoken;
 using WebServices.Middleware;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11297,6 +12064,10 @@ builder.Services.AddOpenApi();
 builder.ConfigureJwt();
 
 builder.Services.AddAutoMapper(cfg => cfg.AddMaps(typeof(AutoMapperProfile).Assembly));
+
+// FluentValidation: register automatic validation and scan for validators in Aplicacion assembly
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssembly(typeof(Aplicacion.Services.Seguridad.Validators.UsuarioDTOValidator).Assembly);
 
 const string AllowAllOriginsPolicy = "AllowAllOriginsPolicy";
 const string AllowSpecificOriginsPolicy = "AllowSpecificOriginsPolicy";

@@ -21,7 +21,7 @@ A production-ready, clean architecture **ASP.NET Core** backend template built w
 | 📋 **Audit Log** | Full transaction logging for all entity changes |
 | 🗺️ **AutoMapper 16** | Modern object mapping configuration |
 | 📖 **Scalar API Docs** | Modern OpenAPI 3.1 UI (replaces Swagger) |
-| ⚡ **DataSeeder** | Automatic seeding of default roles, users, and permissions |
+| ⚡ **DataSeeder** | Automatic seeding of default roles and permissions |
 | 🌐 **CORS** | Pre-configured for frontend integration |
 | 🛡️ **Global Exception Middleware** | Centralized error handling |
 
@@ -94,11 +94,11 @@ dotnet ef database update --context MyContext --project Infraestructura --startu
 ```
 
 ### Default Seed Data
-On first run, the `DataSeeder` automatically creates:
+On first run, the `DataSeeder` automatically creates base security data. The admin user is only created when `Seed:AdminPassword` is configured.
 
 | Type | Value |
 |---|---|
-| **Default Admin User** | `admin` / `admin123*` |
+| **Optional Admin User** | `admin` with password from `Seed:AdminPassword` |
 | **Roles** | `Admin`, `User` |
 | **Screen** | `Seguridad` |
 | **Permission** | Admin → Seguridad (Ver, Editar, Eliminar) |

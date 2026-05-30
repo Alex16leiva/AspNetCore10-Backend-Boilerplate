@@ -39,18 +39,22 @@ builder.Services.AddCors(options =>
             .GetSection("Cors:AllowedOrigins")
             .Get<string[]>() ?? new string[0];
 
-        if (allowedOrigins.Length > 0)
+        if (allowedOrigins.Length == 0)
         {
-            policy.WithOrigins(allowedOrigins)
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
-        }
-        else
-        {
+            if (!builder.Environment.IsDevelopment())
+            {
+                throw new InvalidOperationException("Cors:AllowedOrigins must be configured outside Development.");
+            }
+
             policy.AllowAnyOrigin()
                   .AllowAnyHeader()
                   .AllowAnyMethod();
+            return;
         }
+
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod();
     });
 });
 
@@ -67,8 +71,8 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<MyContext>();
 
-    // Inserta datos iniciales solo si no existen
-    DataSeeder.Seed(context);
+    // Inserta datos iniciales solo si no existen. El usuario admin requiere contraseña configurada.
+    DataSeeder.Seed(context, app.Configuration["Seed:AdminPassword"]);
 }
 
 

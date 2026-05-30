@@ -344,7 +344,6 @@ namespace Aplicacion.Services.Seguridad
             return new UsuarioDTO
             {
                 Apellido = qry.Apellido,
-                Contrasena = qry.Contrasena,
                 Nombre = qry.Nombre,
                 RolId = qry.RolId,
                 UsuarioId = qry.UsuarioId,

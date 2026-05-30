@@ -1,4 +1,4 @@
-﻿using Dominio.Core.Extensions;
+using Dominio.Core.Extensions;
 
 namespace Aplicacion.DTOs
 {
@@ -26,6 +26,7 @@ namespace Aplicacion.DTOs
                 ValidationErrorMessage = $"{ValidationErrorMessage}, {message}";
                 return;
             }
+
             ValidationErrorMessage = message;
         }
     }

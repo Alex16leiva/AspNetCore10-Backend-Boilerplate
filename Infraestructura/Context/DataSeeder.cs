@@ -5,7 +5,7 @@ namespace Infraestructura.Context
 {
     public static class DataSeeder
     {
-        public static void Seed(MyContext context)
+        public static void Seed(MyContext context, string? adminPassword = null)
         {
             var ahora = DateTime.Now;
             var modificadoPor = "System";
@@ -39,7 +39,7 @@ namespace Infraestructura.Context
                 );
             }
 
-            if (!context.Usuarios.Any())
+            if (!context.Usuarios.Any() && !string.IsNullOrWhiteSpace(adminPassword))
             {
                 context.Usuarios.Add(
                     new Usuario 
@@ -47,7 +47,7 @@ namespace Infraestructura.Context
                         UsuarioId = "admin", 
                         Nombre = "Administrador", 
                         Apellido = "Sistema",
-                        Contrasena = PasswordEncryptor.HashPassword("admin123*"), 
+                        Contrasena = PasswordEncryptor.HashPassword(adminPassword), 
                         RolId = "Admin",
                         Activo = true,
                         DescripcionTransaccion = descripcionTransaccion, 

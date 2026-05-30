@@ -400,24 +400,30 @@ namespace Infraestructura.Context
 
         public async Task<bool> IsRunningJobsAsync(string jobName)
         {
-            string connectionString = _configuration.GetConnectionString("conectionDataBase");
+            if (string.IsNullOrWhiteSpace(jobName))
+            {
+                return false;
+            }
+
+            string connectionString = _configuration.GetConnectionString("conectionDataBase")
+                ?? throw new InvalidOperationException("Connection string 'conectionDataBase' not found in configuration.");
             bool result = false;
 
             try
             {
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
-                    connection.Open();
+                    await connection.OpenAsync();
 
-                    // Consulta para verificar si el trabajo está siendo ejecutado actualmente
-                    string query = $"SELECT COUNT(*) FROM msdb.dbo.sysjobs j " +
-                        $"INNER JOIN msdb.dbo.sysjobactivity a " +
-                        $"  ON j.job_id = a.job_id " +
-                        $"WHERE j.name = '{jobName}' AND a.run_requested_date IS NOT NULL AND a.stop_execution_date IS NULL";
+                    string query = "SELECT COUNT(*) FROM msdb.dbo.sysjobs j " +
+                        "INNER JOIN msdb.dbo.sysjobactivity a " +
+                        "  ON j.job_id = a.job_id " +
+                        "WHERE j.name = @jobName AND a.run_requested_date IS NOT NULL AND a.stop_execution_date IS NULL";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
-                        int runningJobCount = (int)command.ExecuteScalar();
+                        command.Parameters.Add(new SqlParameter("@jobName", jobName));
+                        int runningJobCount = (int)(await command.ExecuteScalarAsync() ?? 0);
 
                         if (runningJobCount > 0)
                         {

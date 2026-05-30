@@ -1,9 +1,10 @@
-﻿using Aplicacion.DTOs;
+using Aplicacion.DTOs;
 using Aplicacion.DTOs.ConfiguracionesDTO;
 using Aplicacion.Helpers;
 using Dominio.Context.Entidades.ConfiguracionesAgg;
 using Dominio.Core;
 using Dominio.Core.Extensions;
+using Dominio.Core.Result;
 using Infraestructura.Context;
 
 namespace Aplicacion.Services.ConfiguracionesApp
@@ -17,101 +18,164 @@ namespace Aplicacion.Services.ConfiguracionesApp
             _genericRepository = genericRepository;
         }
 
-        public async Task<ConfiguracionesDTO> CrearConfiguracion(ConfiguracionesRequest request)
+        public async Task<Result<ConfiguracionesDTO>> CrearConfiguracion(ConfiguracionesRequest request)
         {
-            var existingConfiguracion = await _genericRepository.GetSingleAsync<Configuraciones>(x => x.ConfiguracionId == request.Configuraciones.ConfiguracionId);
-            if (existingConfiguracion.IsNotNull()) {
-                return new ConfiguracionesDTO
-                {
-                    ConfiguracionId = existingConfiguracion.ConfiguracionId,
-                    Descripcion = existingConfiguracion.Descripcion,
-                    Message = $"Ya existe una configuración con el ID {existingConfiguracion.ConfiguracionId}" 
-                };
+            var validationResult = ValidateConfiguracionRequest(request);
+            if (validationResult is not null)
+            {
+                return validationResult;
+            }
+
+            var configuracionRequest = request.Configuraciones!;
+            var existingConfiguracion = await _genericRepository.GetSingleAsync<Configuraciones>(x => x.ConfiguracionId == configuracionRequest.ConfiguracionId);
+            if (existingConfiguracion.IsNotNull())
+            {
+                return Result<ConfiguracionesDTO>.Failure($"Ya existe una configuracion con el ID {existingConfiguracion.ConfiguracionId}", "CONFIGURATION_EXISTS");
             }
 
             var configuracion = new Configuraciones
             {
-                ConfiguracionId = request.Configuraciones.ConfiguracionId,
-                Descripcion = request.Configuraciones.Descripcion
+                ConfiguracionId = configuracionRequest.ConfiguracionId,
+                Descripcion = configuracionRequest.Descripcion
             };
+
             await _genericRepository.AddAsync(configuracion);
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("CrearConfiguracion");
+            TransactionInfo transactionInfo = request.RequestUserInfo!.CrearTransactionInfo("CrearConfiguracion");
             _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return mapConfiguracionesDTO(configuracion);
+
+            return Result<ConfiguracionesDTO>.Success(MapConfiguracionesDTO(configuracion), "Configuracion creada exitosamente");
         }
 
-        public async Task<ConfiguracionesDetalleDTO> EditarConfiguracionesDetalle(ConfiguracionesRequest request)
+        public async Task<Result<ConfiguracionesDetalleDTO>> EditarConfiguracionesDetalle(ConfiguracionesRequest request)
         {
-            var existingConfiguracionDetalle = await _genericRepository.GetSingleAsync<ConfiguracionesDetalle>(x => x.ConfiguracionId == request.ConfiguracionesDetalle.ConfiguracionId && x.Atributo == request.ConfiguracionesDetalle.Atributo);
+            var validationResult = ValidateConfiguracionDetalleRequest(request);
+            if (validationResult is not null)
+            {
+                return validationResult;
+            }
+
+            var detalleRequest = request.ConfiguracionesDetalle!;
+            var existingConfiguracionDetalle = await _genericRepository.GetSingleAsync<ConfiguracionesDetalle>(x => x.ConfiguracionId == detalleRequest.ConfiguracionId && x.Atributo == detalleRequest.Atributo);
             if (existingConfiguracionDetalle.IsNull())
             {
-                return new ConfiguracionesDetalleDTO
-                {
-                    ConfiguracionId = request.ConfiguracionesDetalle.ConfiguracionId,
-                    Atributo = request.ConfiguracionesDetalle.Atributo,
-                    Descripcion = request.ConfiguracionesDetalle.Descripcion,
-                    Valor = request.ConfiguracionesDetalle.Valor,
-                    Message = $"No existe un detalle de configuración con el ID {request.ConfiguracionesDetalle.ConfiguracionId} y el atributo {request.ConfiguracionesDetalle.Atributo}"
-                };
+                return Result<ConfiguracionesDetalleDTO>.Failure($"No existe un detalle de configuracion con el ID {detalleRequest.ConfiguracionId} y el atributo {detalleRequest.Atributo}", "CONFIGURATION_DETAIL_NOT_FOUND");
             }
-            existingConfiguracionDetalle.Descripcion = request.ConfiguracionesDetalle.Descripcion;
-            existingConfiguracionDetalle.Valor = request.ConfiguracionesDetalle.Valor;
 
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarConfiguracionDetalle");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return mapConfiguracionesDetalleDTO(existingConfiguracionDetalle);
-        }
+            existingConfiguracionDetalle.Descripcion = detalleRequest.Descripcion;
+            existingConfiguracionDetalle.Valor = detalleRequest.Valor;
 
-        public async Task<ConfiguracionesDTO> EditarConfiguracion(ConfiguracionesRequest request)
-        {
-            var existingConfiguracion = await _genericRepository.GetSingleAsync<Configuraciones>(x => x.ConfiguracionId == request.Configuraciones.ConfiguracionId);
-            if (existingConfiguracion.IsNull())
-            {
-                return new ConfiguracionesDTO
-                {
-                    ConfiguracionId = request.Configuraciones.ConfiguracionId,
-                    Descripcion = request.Configuraciones.Descripcion,
-                    Message = $"No existe una configuración con el ID {request.Configuraciones.ConfiguracionId}"
-                };
-            }
-            existingConfiguracion.Descripcion = request.Configuraciones.Descripcion;
-
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarConfiguracion");
+            TransactionInfo transactionInfo = request.RequestUserInfo!.CrearTransactionInfo("EditarConfiguracionDetalle");
             _genericRepository.UnitOfWork.Commit(transactionInfo);
 
-            return mapConfiguracionesDTO(existingConfiguracion);
+            return Result<ConfiguracionesDetalleDTO>.Success(MapConfiguracionesDetalleDTO(existingConfiguracionDetalle), "Detalle de configuracion actualizado exitosamente");
         }
 
-        public async Task<ConfiguracionesDetalleDTO> CrearConfiguracionDetalle(ConfiguracionesRequest request)
+        public async Task<Result<ConfiguracionesDTO>> EditarConfiguracion(ConfiguracionesRequest request)
         {
-            var existingConfiguracion = await _genericRepository.GetSingleAsync<Configuraciones>(x => x.ConfiguracionId == request.ConfiguracionesDetalle.ConfiguracionId);
+            var validationResult = ValidateConfiguracionRequest(request);
+            if (validationResult is not null)
+            {
+                return validationResult;
+            }
+
+            var configuracionRequest = request.Configuraciones!;
+            var existingConfiguracion = await _genericRepository.GetSingleAsync<Configuraciones>(x => x.ConfiguracionId == configuracionRequest.ConfiguracionId);
             if (existingConfiguracion.IsNull())
             {
-                return new ConfiguracionesDetalleDTO
-                {
-                    ConfiguracionId = request.ConfiguracionesDetalle.ConfiguracionId,
-                    Descripcion = request.ConfiguracionesDetalle.Descripcion,
-                    Message = $"La configuración con el ID {request.ConfiguracionesDetalle.ConfiguracionId} no existe"
-                };
+                return Result<ConfiguracionesDTO>.Failure($"No existe una configuracion con el ID {configuracionRequest.ConfiguracionId}", "CONFIGURATION_NOT_FOUND");
+            }
+
+            existingConfiguracion.Descripcion = configuracionRequest.Descripcion;
+
+            TransactionInfo transactionInfo = request.RequestUserInfo!.CrearTransactionInfo("EditarConfiguracion");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+
+            return Result<ConfiguracionesDTO>.Success(MapConfiguracionesDTO(existingConfiguracion), "Configuracion actualizada exitosamente");
+        }
+
+        public async Task<Result<ConfiguracionesDetalleDTO>> CrearConfiguracionDetalle(ConfiguracionesRequest request)
+        {
+            var validationResult = ValidateConfiguracionDetalleRequest(request);
+            if (validationResult is not null)
+            {
+                return validationResult;
+            }
+
+            var detalleRequest = request.ConfiguracionesDetalle!;
+            var existingConfiguracion = await _genericRepository.GetSingleAsync<Configuraciones>(x => x.ConfiguracionId == detalleRequest.ConfiguracionId);
+            if (existingConfiguracion.IsNull())
+            {
+                return Result<ConfiguracionesDetalleDTO>.Failure($"La configuracion con el ID {detalleRequest.ConfiguracionId} no existe", "CONFIGURATION_NOT_FOUND");
             }
 
             var configuracionesDetalle = new ConfiguracionesDetalle
             {
-                ConfiguracionId = request.ConfiguracionesDetalle.ConfiguracionId,
-                Atributo = request.ConfiguracionesDetalle.Atributo,
-                Descripcion = request.ConfiguracionesDetalle.Descripcion,
-                Valor = request.ConfiguracionesDetalle.Valor,
+                ConfiguracionId = detalleRequest.ConfiguracionId,
+                Atributo = detalleRequest.Atributo,
+                Descripcion = detalleRequest.Descripcion,
+                Valor = detalleRequest.Valor,
             };
 
             await _genericRepository.AddAsync(configuracionesDetalle);
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("CrearConfiguracionDetalle");
+            TransactionInfo transactionInfo = request.RequestUserInfo!.CrearTransactionInfo("CrearConfiguracionDetalle");
             _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return mapConfiguracionesDetalleDTO(configuracionesDetalle);
+
+            return Result<ConfiguracionesDetalleDTO>.Success(MapConfiguracionesDetalleDTO(configuracionesDetalle), "Detalle de configuracion creado exitosamente");
         }
 
-        private static ConfiguracionesDetalleDTO mapConfiguracionesDetalleDTO(ConfiguracionesDetalle configuracionesDetalle)
+        public async Task<Result<SearchResult<ConfiguracionesDTO>>> ObtenerConfiguracionesPaginado(ConfiguracionesRequest request)
         {
-            if (configuracionesDetalle.IsNull()) return null;
+            if (request is null)
+            {
+                return Result<SearchResult<ConfiguracionesDTO>>.Failure("Solicitud es obligatoria", "NULL_REQUEST", ResultStatus.ValidationError);
+            }
+
+            var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(request.QueryInfo);
+            var configuraciones = await _genericRepository.GetPagedAndFilteredAsync<Configuraciones>(dynamicFilter);
+            var result = new SearchResult<ConfiguracionesDTO>
+            {
+                ItemCount = configuraciones.ItemCount,
+                PageCount = configuraciones.PageCount,
+                PageIndex = configuraciones.PageIndex,
+                TotalItems = configuraciones.TotalItems,
+                Items = (from query in configuraciones.Items as IEnumerable<Configuraciones> select MapConfiguracionesDTO(query)).ToList()
+            };
+
+            return Result<SearchResult<ConfiguracionesDTO>>.Success(result);
+        }
+
+        private static Result<ConfiguracionesDTO>? ValidateConfiguracionRequest(ConfiguracionesRequest request)
+        {
+            if (request is null || request.Configuraciones is null)
+            {
+                return Result<ConfiguracionesDTO>.Failure("Configuracion es obligatoria", "NULL_CONFIGURACION", ResultStatus.ValidationError);
+            }
+
+            if (request.RequestUserInfo is null)
+            {
+                return Result<ConfiguracionesDTO>.Failure("Informacion de usuario es obligatoria", "NULL_REQUEST_USER_INFO", ResultStatus.ValidationError);
+            }
+
+            return null;
+        }
+
+        private static Result<ConfiguracionesDetalleDTO>? ValidateConfiguracionDetalleRequest(ConfiguracionesRequest request)
+        {
+            if (request is null || request.ConfiguracionesDetalle is null)
+            {
+                return Result<ConfiguracionesDetalleDTO>.Failure("Detalle de configuracion es obligatorio", "NULL_CONFIGURACION_DETALLE", ResultStatus.ValidationError);
+            }
+
+            if (request.RequestUserInfo is null)
+            {
+                return Result<ConfiguracionesDetalleDTO>.Failure("Informacion de usuario es obligatoria", "NULL_REQUEST_USER_INFO", ResultStatus.ValidationError);
+            }
+
+            return null;
+        }
+
+        private static ConfiguracionesDetalleDTO MapConfiguracionesDetalleDTO(ConfiguracionesDetalle configuracionesDetalle)
+        {
             return new ConfiguracionesDetalleDTO
             {
                 ConfiguracionId = configuracionesDetalle.ConfiguracionId,
@@ -121,29 +185,14 @@ namespace Aplicacion.Services.ConfiguracionesApp
             };
         }
 
-        public async Task<SearchResult<ConfiguracionesDTO>> ObtenerConfiguracionesPaginado(ConfiguracionesRequest request)
+        private static ConfiguracionesDTO MapConfiguracionesDTO(Configuraciones query)
         {
-            var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(request.QueryInfo);
-            var configuraciones = await _genericRepository.GetPagedAndFilteredAsync<Configuraciones>(dynamicFilter);
-            return new SearchResult<ConfiguracionesDTO>
-            {
-                ItemCount = configuraciones.ItemCount,
-                PageCount = configuraciones.PageCount,
-                PageIndex = configuraciones.PageIndex,
-                TotalItems = configuraciones.TotalItems,
-                Items = (from query in configuraciones.Items as IEnumerable<Configuraciones> select mapConfiguracionesDTO(query) ).ToList()
-            };
-        }
-
-        private static ConfiguracionesDTO mapConfiguracionesDTO(Configuraciones query)
-        {
-            if (query.IsNull()) return null;
             return new ConfiguracionesDTO
             {
                 ConfiguracionId = query.ConfiguracionId,
                 Descripcion = query.Descripcion,
                 ConfiguracionesDetalle = query.ConfiguracionesDetalle?
-                    .Select(detalle => mapConfiguracionesDetalleDTO(detalle))
+                    .Select(detalle => MapConfiguracionesDetalleDTO(detalle))
                     .ToList() ?? new List<ConfiguracionesDetalleDTO>()
             };
         }
