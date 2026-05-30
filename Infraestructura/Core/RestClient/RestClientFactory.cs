@@ -16,7 +16,7 @@
         /// <summary>
         /// Create a new 
         /// <paramref>
-        ///     <name>CaracolKnits.NETFramework.Core.Infrastructure.Crosscutting.RestClient.IRestClient</name>
+        /// <name>Crosscutting.RestClient.IRestClient</name>
         /// </paramref>
         /// </summary>
         /// <param name="baseAddress">The API base address to connect to.</param>
