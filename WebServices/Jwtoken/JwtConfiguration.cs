@@ -1,6 +1,7 @@
 ﻿using Dominio.Core.Jwtoken;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using System;
 using System.Configuration;
 using System.Text;
 
@@ -17,7 +18,11 @@ namespace WebServices.Jwtoken
 
         private static void AddAuthenticationJwt(IServiceCollection services, IConfiguration configuration)
         {
-            var settings = configuration.GetSection("JwtSettings").Get<JwtSettings>();
+            var settings = configuration.GetSection("JwtSettings").Get<JwtSettings>()
+                ?? throw new InvalidOperationException("JwtSettings section is missing.");
+
+            var secret = settings.Secret ?? throw new InvalidOperationException("JwtSettings:Secret must be configured.");
+            var key = Encoding.UTF8.GetBytes(secret);
 
             services.AddAuthentication(options =>
             {
@@ -31,8 +36,9 @@ namespace WebServices.Jwtoken
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(settings.Secret)),
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
                     ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero,
                     ValidateIssuer = true,
                     ValidIssuer = settings.Issuer,
                     ValidateAudience = true,

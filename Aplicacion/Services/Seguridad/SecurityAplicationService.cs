@@ -7,8 +7,12 @@ using Dominio.Context.Entidades;
 using Dominio.Context.Entidades.Seguridad;
 using Dominio.Core;
 using Dominio.Core.Extensions;
+using Dominio.Core.Jwtoken;
 using Infraestructura.Context;
 using Infraestructura.Core.Jwtoken;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
 
 namespace Aplicacion.Services.Seguridad
 {
@@ -17,11 +21,13 @@ namespace Aplicacion.Services.Seguridad
         private readonly IGenericRepository<IDataContext> _genericRepository;
         private readonly ITokenService _tokenService;
         private readonly IMapper _mapper;
-        public SecurityAplicationService(IGenericRepository<IDataContext> genericRepository, ITokenService tokenService, IMapper mapper)
+        private readonly JwtSettings _jwtSettings;
+        public SecurityAplicationService(IGenericRepository<IDataContext> genericRepository, ITokenService tokenService, IMapper mapper, IOptions<JwtSettings> jwtSettings)
         {
             _genericRepository = genericRepository;
             _tokenService = tokenService;
             _mapper = mapper;
+            _jwtSettings = jwtSettings.Value;
         }
 
         public UsuarioDTO EditarUsuario(EdicionUsuarioRequest request)
@@ -145,7 +151,7 @@ namespace Aplicacion.Services.Seguridad
 
         public UsuarioDTO IniciarSesion(UserRequest request)
         {
-            List<string> includes = ["Rol", "Rol.Permisos"];
+            List<string> includes = new List<string> { "Rol", "Rol.Permisos" };
 
             Usuario usuario = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.UsuarioId, includes);
 
@@ -159,11 +165,15 @@ namespace Aplicacion.Services.Seguridad
                 var newRefreshToken = _tokenService.GenerateRefreshToken();
 
                 usuario.RefreshToken = newRefreshToken;
-                usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+                usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationInDays);
 
-                request.RequestUserInfo.UsuarioId = usuario.UsuarioId;
+                if (request.RequestUserInfo != null)
+                {
+                    request.RequestUserInfo.UsuarioId = usuario.UsuarioId;
+                }
 
-                TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("IniciarSesion");
+                TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("IniciarSesion")
+                    ?? new TransactionInfo { GenerateTransaction = false };
                 _genericRepository.UnitOfWork.Commit(transactionInfo);
 
                 return new UsuarioDTO
@@ -192,10 +202,26 @@ namespace Aplicacion.Services.Seguridad
             {
                 return new UsuarioDTO { Message = "Solicitud de token inválida", UsuarioAutenticado = false };
             }
-            
-            var usuario = _genericRepository.GetSingle<Usuario>(u => u.RefreshToken == request.RefreshToken, ["Rol", "Rol.Permisos"]);
 
-            if (usuario == null || usuario.RefreshToken != request.RefreshToken || usuario.RefreshTokenExpiryTime <= DateTime.UtcNow)
+            ClaimsPrincipal principal;
+            try
+            {
+                principal = _tokenService.GetPrincipalFromExpiredToken(request.AccessToken);
+            }
+            catch (SecurityTokenException)
+            {
+                return new UsuarioDTO { Message = "Token de acceso inválido", UsuarioAutenticado = false };
+            }
+
+            string? userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return new UsuarioDTO { Message = "Token de acceso inválido", UsuarioAutenticado = false };
+            }
+
+            var usuario = _genericRepository.GetSingle<Usuario>(u => u.UsuarioId == userId && u.RefreshToken == request.RefreshToken, new List<string> { "Rol", "Rol.Permisos" });
+
+            if (usuario == null || usuario.RefreshTokenExpiryTime <= DateTime.UtcNow)
             {
                 return new UsuarioDTO { Message = "Token de refresco inválido o expirado", UsuarioAutenticado = false };
             }
@@ -204,9 +230,10 @@ namespace Aplicacion.Services.Seguridad
             var newRefreshToken = _tokenService.GenerateRefreshToken();
 
             usuario.RefreshToken = newRefreshToken;
-            usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+            usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationInDays);
 
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("RefreshToken");
+            TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("RefreshToken")
+                ?? new TransactionInfo { GenerateTransaction = false };
             _genericRepository.UnitOfWork.Commit(transactionInfo);
 
             return new UsuarioDTO

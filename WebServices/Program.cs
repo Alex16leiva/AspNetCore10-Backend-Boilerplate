@@ -17,6 +17,7 @@ builder.ConfigureJwt();
 builder.Services.AddAutoMapper(cfg => cfg.AddMaps(typeof(AutoMapperProfile).Assembly));
 
 const string AllowAllOriginsPolicy = "AllowAllOriginsPolicy";
+const string AllowSpecificOriginsPolicy = "AllowSpecificOriginsPolicy";
 
 builder.Services.AddCors(options =>
 {
@@ -25,6 +26,26 @@ builder.Services.AddCors(options =>
         {
             x.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
         });
+
+    options.AddPolicy(AllowSpecificOriginsPolicy, policy =>
+    {
+        var allowedOrigins = builder.Configuration
+            .GetSection("Cors:AllowedOrigins")
+            .Get<string[]>() ?? new string[0];
+
+        if (allowedOrigins.Length > 0)
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        }
+        else
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        }
+    });
 });
 
 builder.Services.AddPersistenceInfrastructure(builder.Configuration);
@@ -52,7 +73,7 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
-app.UseCors(policy => policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+app.UseCors(app.Environment.IsDevelopment() ? AllowAllOriginsPolicy : AllowSpecificOriginsPolicy);
 
 
 app.UseHttpsRedirection();

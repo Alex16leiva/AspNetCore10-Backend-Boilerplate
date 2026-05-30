@@ -19,7 +19,7 @@ namespace WebServices.Controllers
         [AllowAnonymous]
         [Route("login")]
         [HttpPost]
-        public UsuarioDTO Login([FromForm] UserRequest request)
+        public UsuarioDTO Login([FromBody] UserRequest request)
         {
             UsuarioDTO usuario = _securityAppService.IniciarSesion(request);
 

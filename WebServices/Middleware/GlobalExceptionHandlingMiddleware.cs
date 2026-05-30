@@ -23,7 +23,7 @@ namespace WebServices.Middleware
             catch (Exception e)
             {
 
-                _logger.LogError(e, e.Message);
+                _logger.LogError(e, "Unhandled exception");
 
                 context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
 
@@ -31,9 +31,8 @@ namespace WebServices.Middleware
                 {
                     Status = (int)HttpStatusCode.InternalServerError,
                     Type = "Server Error",
-                    Title = "Server Error",
-                    Detail = e.Message.HasValue() ? e.Message : "An internal server has occurred",
-                    Instance = e.StackTrace?.ValueOrEmpty()
+                    Title = "An internal server error occurred.",
+                    Detail = "An internal server error occurred.",
                 };
 
                 string json = JsonSerializer.Serialize(problem);

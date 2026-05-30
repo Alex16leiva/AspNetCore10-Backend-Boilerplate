@@ -19,12 +19,11 @@ namespace WebServices.Extensions
             AppSettingsManager.Initialize(connectionString);
 
             services.AddDbContext<MyContext>(dbContextOption =>
-                dbContextOption.UseSqlServer(connectionString),
-                ServiceLifetime.Transient
+                dbContextOption.UseSqlServer(connectionString)
             );
 
-            services.AddTransient<IDataContext, MyContext>();
-            services.AddTransient(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+            services.AddScoped<IDataContext, MyContext>();
+            services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 
             return services;
         }
@@ -34,9 +33,6 @@ namespace WebServices.Extensions
             // Servicios de Aplicación
             services.AddScoped<SecurityAplicationService>();
             services.AddScoped<IConfiguracionesApplicationService, ConfiguracionesApplicationService>();
-
-            // AutoMapper
-            services.AddAutoMapper(cfg => cfg.AddMaps(typeof(AutoMapperProfile).Assembly));
 
             return services;
         }

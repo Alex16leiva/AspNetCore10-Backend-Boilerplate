@@ -1,9 +1,11 @@
 ﻿using Aplicacion.DTOs.ConfiguracionesDTO;
 using Aplicacion.Services.ConfiguracionesApp;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace WebServices.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class ConfiguracionesController : ControllerBase
