@@ -4,6 +4,8 @@ using Scalar.AspNetCore;
 using WebServices.Extensions;
 using WebServices.Jwtoken;
 using WebServices.Middleware;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +17,10 @@ builder.Services.AddOpenApi();
 builder.ConfigureJwt();
 
 builder.Services.AddAutoMapper(cfg => cfg.AddMaps(typeof(AutoMapperProfile).Assembly));
+
+// FluentValidation: register automatic validation and scan for validators in Aplicacion assembly
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssembly(typeof(Aplicacion.Services.Seguridad.Validators.UsuarioDTOValidator).Assembly);
 
 const string AllowAllOriginsPolicy = "AllowAllOriginsPolicy";
 const string AllowSpecificOriginsPolicy = "AllowSpecificOriginsPolicy";

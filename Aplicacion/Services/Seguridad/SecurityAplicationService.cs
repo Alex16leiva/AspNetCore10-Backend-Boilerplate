@@ -16,7 +16,7 @@ using System.Security.Claims;
 
 namespace Aplicacion.Services.Seguridad
 {
-    public class SecurityAplicationService : BaseDisposable
+    public class SecurityAplicationService : BaseDisposable, ISecurityApplicationService
     {
         private readonly IGenericRepository<IDataContext> _genericRepository;
         private readonly ITokenService _tokenService;
@@ -32,15 +32,7 @@ namespace Aplicacion.Services.Seguridad
 
         public UsuarioDTO EditarUsuario(EdicionUsuarioRequest request)
         {
-            string mensajeValidacion = request.Usuario.ValidarCampos();
-
-            if (mensajeValidacion.HasValue())
-            {
-                return new UsuarioDTO
-                {
-                    Message = mensajeValidacion,
-                };
-            }
+            // DTO validation is handled by FluentValidation at the API layer
 
             Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
 
@@ -103,25 +95,16 @@ namespace Aplicacion.Services.Seguridad
                     };
                     _genericRepository.Add(nuevoPermiso);
                 }
-
-
-                TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarUsuario");
-                _genericRepository.UnitOfWork.Commit(transactionInfo);
             }
+            
+            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarUsuario");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
             return new RolDTO { };
         }
 
         public UsuarioDTO CrearUsuario(EdicionUsuarioRequest request)
         {
-            string mensajeValidacion = request.Usuario.ValidarCampos();
-
-            if (mensajeValidacion.HasValue())
-            {
-                return new UsuarioDTO
-                {
-                    Message = mensajeValidacion,
-                };
-            }
+            // DTO validation is handled by FluentValidation at the API layer
 
             Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
 
