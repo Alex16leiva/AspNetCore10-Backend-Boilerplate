@@ -729,18 +729,6 @@ namespace Aplicacion.DTOs.Seguridad
 }
 ````
 
-## File: Aplicacion/DTOs/Seguridad/TokenRequest.cs
-````csharp
-namespace Aplicacion.DTOs.Seguridad
-{
-    public class TokenRequest
-    {
-        public string? AccessToken { get; set; }
-        public string? RefreshToken { get; set; }
-    }
-}
-````
-
 ## File: Aplicacion/Helpers/TransactionInfoExtensions.cs
 ````csharp
 using Aplicacion.DTOs;
@@ -6323,102 +6311,6 @@ Accept: application/json
 ###
 ````
 
-## File: Aplicacion/DTOs/QueryInfo.cs
-````csharp
-using System.Text;
-
-namespace Aplicacion.DTOs
-{
-    public sealed class QueryInfo
-    {
-        public QueryInfo()
-        {
-            PageIndex = 0;
-            PageSize = 10;
-            SortFields = new List<string>();
-            CustomFilters = new Dictionary<string, object>();
-        }
-
-        /// <summary>
-        /// The page index define in the query.
-        /// </summary>
-        public int PageIndex { get; set; }
-
-        /// <summary>
-        /// The page size define for the query.
-        /// </summary>
-        public int PageSize { get; set; }
-
-        /// <summary>
-        /// The list of fields to be sorted in the query.
-        /// </summary>
-        public List<string>? SortFields { get; set; }
-
-        /// <summary>
-        /// Indicates if the query will sort the result in ascending order.
-        /// </summary>
-        public bool Ascending { get; set; }
-
-        /// <summary>
-        /// A custom filter to apply to the query.
-        /// </summary>
-        public string? Predicate { get; set; }
-
-        /// <summary>
-        /// The parameters that will be applied to the query.
-        /// </summary>
-        public object[] ParamValues { get; set; }
-
-        /// <summary>
-        /// The names of tables to be included in the query, this is used to eagerly load those tables and avoid to scan the table.
-        /// </summary>
-        public List<string>? Includes { get; set; }
-
-        /// <summary>
-        /// The Custom Query Operation to Perform.
-        /// </summary>
-        public string? CustomQueryOperation { get; set; }
-
-        public Dictionary<string, object> CustomFilters { get; set; }
-
-        /// <summary>
-        /// Gets the Uniform Resource Name that identifies resources.
-        /// </summary>
-        /// <returns>The Uniform Resource Name for the query request.</returns>
-        public string GetUrn()
-        {
-            var sortFields = string.Join("|", SortFields.ToArray());
-            string paramValues = GetParamValues(ParamValues);
-
-            var urn = string.Format("{0}-{1}-{2}-{3}-{4}-{5}", Predicate,
-                                    paramValues, PageIndex, PageSize,
-                                    Ascending, sortFields);
-
-            return urn;
-        }
-
-        private string GetParamValues(object[] paramValues)
-        {
-            if (paramValues != null)
-            {
-                var valuesStringBuild = new StringBuilder();
-
-                foreach (var paramValue in paramValues)
-                {
-                    valuesStringBuild.Append(paramValue);
-                }
-
-                return valuesStringBuild.ToString();
-            }
-
-            return string.Empty;
-        }
-
-
-    }
-}
-````
-
 ## File: Aplicacion/DTOs/RequestBase.cs
 ````csharp
 namespace Aplicacion.DTOs
@@ -6478,6 +6370,18 @@ namespace Aplicacion.DTOs
 }
 ````
 
+## File: Aplicacion/DTOs/Seguridad/TokenRequest.cs
+````csharp
+namespace Aplicacion.DTOs.Seguridad
+{
+    public class TokenRequest : RequestBase
+    {
+        public string? AccessToken { get; set; }
+        public string? RefreshToken { get; set; }
+    }
+}
+````
+
 ## File: Aplicacion/Helpers/DynamicFilterFactory.cs
 ````csharp
 using Aplicacion.DTOs;
@@ -6515,354 +6419,6 @@ namespace Aplicacion.Helpers
             }
 
             return param;
-        }
-    }
-}
-````
-
-## File: Aplicacion/Services/Seguridad/SecurityAplicationService.cs
-````csharp
-using Aplicacion.Core;
-using Aplicacion.DTOs;
-using Aplicacion.DTOs.Seguridad;
-using Aplicacion.Helpers;
-using AutoMapper;
-using Dominio.Context.Entidades;
-using Dominio.Context.Entidades.Seguridad;
-using Dominio.Core;
-using Dominio.Core.Extensions;
-using Infraestructura.Context;
-using Infraestructura.Core.Jwtoken;
-
-namespace Aplicacion.Services.Seguridad
-{
-    public class SecurityAplicationService : BaseDisposable
-    {
-        private readonly IGenericRepository<IDataContext> _genericRepository;
-        private readonly ITokenService _tokenService;
-        private readonly IMapper _mapper;
-        public SecurityAplicationService(IGenericRepository<IDataContext> genericRepository, ITokenService tokenService, IMapper mapper)
-        {
-            _genericRepository = genericRepository;
-            _tokenService = tokenService;
-            _mapper = mapper;
-        }
-
-        public UsuarioDTO EditarUsuario(EdicionUsuarioRequest request)
-        {
-            string mensajeValidacion = request.Usuario.ValidarCampos();
-
-            if (mensajeValidacion.HasValue())
-            {
-                return new UsuarioDTO
-                {
-                    Message = mensajeValidacion,
-                };
-            }
-
-            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
-
-            if (usuarioExiste.IsNull())
-            {
-                return new UsuarioDTO
-                {
-                    Message = "El usuario no existe"
-                };
-            }
-
-            if (request.Usuario.EditarContrasena)
-            {
-                usuarioExiste.Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena);
-            }
-
-            usuarioExiste.Nombre = request.Usuario.Nombre.ValueOrEmpty();
-            usuarioExiste.Apellido = request.Usuario.Apellido.ValueOrEmpty();
-            usuarioExiste.RolId = request.Usuario.RolId.ValueOrEmpty();
-            usuarioExiste.Activo = request.Usuario.Activo;
-
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarUsuario");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return new UsuarioDTO();
-        }
-
-        public List<PantallaDTO> ObtenerPantallas()
-        {
-            var pantallas = _genericRepository.GetAll<Pantalla>();
-            return pantallas.Select(r => new PantallaDTO { Descripcion = r.Descripcion, PantallaId = r.PantallaId }).ToList();
-        }
-
-        public RolDTO EdicionPermisos(EdicionPermisosRequest request)
-        {
-            var permisos = _genericRepository.GetFiltered<Permisos>(r => r.RolId == request.RolId);
-
-            foreach (var item in request.Permisos)
-            {
-                var permiso = permisos.FirstOrDefault(r => r.PantallaId == item.PantallaId);
-                if (permiso.IsNotNull())
-                {
-                    permiso.Ver = item.Ver;
-                    permiso.Editar = item.Editar;
-                    permiso.Eliminar = item.Eliminar;
-
-                    if (!permiso.Ver)
-                    {
-                        _genericRepository.Remove(permiso);
-                    }
-                }
-                else
-                {
-                    var nuevoPermiso = new Permisos
-                    {
-                        Editar = item.Editar,
-                        Eliminar = item.Eliminar,
-                        PantallaId = item.PantallaId,
-                        RolId = item.RolId,
-                        Ver = item.Ver,
-                    };
-                    _genericRepository.Add(nuevoPermiso);
-                }
-
-
-                TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarUsuario");
-                _genericRepository.UnitOfWork.Commit(transactionInfo);
-            }
-            return new RolDTO { };
-        }
-
-        public UsuarioDTO CrearUsuario(EdicionUsuarioRequest request)
-        {
-            string mensajeValidacion = request.Usuario.ValidarCampos();
-
-            if (mensajeValidacion.HasValue())
-            {
-                return new UsuarioDTO
-                {
-                    Message = mensajeValidacion,
-                };
-            }
-
-            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
-
-            if (usuarioExiste.IsNotNull())
-            {
-                return new UsuarioDTO
-                {
-                    Message = "Usuario ya esta registrado"
-                };
-            }
-
-            var usuario = new Usuario
-            {
-                Apellido = request.Usuario.Apellido.ValueOrEmpty(),
-                Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena),
-                Nombre = request.Usuario.Nombre.ValueOrEmpty(),
-                RolId = request.Usuario.RolId.ValueOrEmpty(),
-                UsuarioId = request.Usuario.UsuarioId.ValueOrEmpty(),
-                Activo = request.Usuario.Activo
-            };
-
-            _genericRepository.Add(usuario);
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarUsuario");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return _mapper.Map<UsuarioDTO>(usuario);
-        }
-
-        public UsuarioDTO IniciarSesion(UserRequest request)
-        {
-            List<string> includes = ["Rol", "Rol.Permisos"];
-
-            Usuario usuario = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.UsuarioId, includes);
-
-            if (usuario.IsNotNull() && PasswordEncryptor.VerifyPassword(request?.Password, usuario.Contrasena))
-            {
-                if (!usuario.Activo)
-                {
-                    return new UsuarioDTO { Message = $"Usuario {usuario.UsuarioId} esta desactivado" };
-                }
-                var newAccessToken = _tokenService.Generate(usuario);
-                var newRefreshToken = _tokenService.GenerateRefreshToken();
-
-                usuario.RefreshToken = newRefreshToken;
-                usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7); 
-                
-                var tInfo = new TransactionInfo {
-                    TransaccionUId = Guid.NewGuid(),
-                    TipoTransaccion = "IniciarSesion",
-                    FechaTransaccion = DateTime.Now,
-                    ModificadoPor = usuario.UsuarioId,
-                    DescripcionTransaccion = "Refresh Token update"
-                };
-                _genericRepository.UnitOfWork.Commit(tInfo);
-
-                return new UsuarioDTO
-                {
-                    Apellido = usuario.Apellido,
-                    Nombre = usuario.Nombre,
-                    RolId = usuario.RolId,
-                    Token = newAccessToken,
-                    RefreshToken = newRefreshToken,
-                    UsuarioAutenticado = true,
-                    UsuarioId = usuario.UsuarioId,
-                    Permisos = MapPermisosDto(usuario.Rol?.Permisos)
-                };
-            }
-
-            return new UsuarioDTO
-            {
-                Message = "Usuario o Contraseña no valido",
-                UsuarioAutenticado = false
-            };
-        }
-
-        public UsuarioDTO RefreshToken(TokenRequest request)
-        {
-            if (request == null || string.IsNullOrWhiteSpace(request.AccessToken) || string.IsNullOrWhiteSpace(request.RefreshToken))
-            {
-                return new UsuarioDTO { Message = "Solicitud de token inválida", UsuarioAutenticado = false };
-            }
-            
-            var usuario = _genericRepository.GetSingle<Usuario>(u => u.RefreshToken == request.RefreshToken, ["Rol", "Rol.Permisos"]);
-
-            if (usuario == null || usuario.RefreshToken != request.RefreshToken || usuario.RefreshTokenExpiryTime <= DateTime.UtcNow)
-            {
-                return new UsuarioDTO { Message = "Token de refresco inválido o expirado", UsuarioAutenticado = false };
-            }
-
-            var newAccessToken = _tokenService.Generate(usuario);
-            var newRefreshToken = _tokenService.GenerateRefreshToken();
-
-            usuario.RefreshToken = newRefreshToken;
-            usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
-
-            var tInfo = new TransactionInfo {
-                TransaccionUId = Guid.NewGuid(),
-                TipoTransaccion = "RefreshToken",
-                FechaTransaccion = DateTime.Now,
-                ModificadoPor = usuario.UsuarioId,
-                DescripcionTransaccion = "Refresh Token issue"
-            };
-            _genericRepository.UnitOfWork.Commit(tInfo);
-
-            return new UsuarioDTO
-            {
-                Apellido = usuario.Apellido,
-                Nombre = usuario.Nombre,
-                RolId = usuario.RolId,
-                Token = newAccessToken,
-                RefreshToken = newRefreshToken,
-                UsuarioAutenticado = true,
-                UsuarioId = usuario.UsuarioId,
-                Permisos = MapPermisosDto(usuario.Rol?.Permisos)
-            };
-        }
-
-        public SearchResult<UsuarioDTO> ObtenerUsuario(GetUserRequest request)
-        {
-            var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(request.QueryInfo);
-            var usuarios = _genericRepository.GetPagedAndFiltered<Usuario>(dynamicFilter);
-
-            return new SearchResult<UsuarioDTO>
-            {
-                PageCount = usuarios.PageCount,
-                ItemCount = usuarios.ItemCount,
-                TotalItems = usuarios.TotalItems,
-                PageIndex = usuarios.PageIndex,
-                Items = (from qry in usuarios.Items as IEnumerable<Usuario> select MapUsuarioDto(qry)).ToList(),
-            };
-
-        }
-
-        public RolDTO CrearRol(EdicionRolRequest request)
-        {
-            var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
-            if (rol.IsNotNull())
-            {
-                return new RolDTO
-                {
-                    Message = $"El rol {request.Rol.RolId} ya existe"
-                };
-            }
-
-            var nuevoRol = new Rol
-            {
-                Descripcion = request.Rol.Descripcion,
-                RolId = request.Rol.RolId
-            };
-
-            _genericRepository.Add(nuevoRol);
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarRol");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-
-            return new RolDTO();
-        }
-
-        public RolDTO EditarRol(EdicionRolRequest request)
-        {
-            var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
-
-            if (rol.IsNull())
-            {
-                return new RolDTO
-                {
-                    Message = $"El Rol {request.Rol.RolId} no existe"
-                };
-            }
-
-            rol.Descripcion = request.Rol.Descripcion;
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarRol");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return new RolDTO();
-        }
-
-        public List<RolDTO> ObtenerRoles()
-        {
-            var includes = new List<string> { "Permisos" };
-            var roles = _genericRepository.GetAll<Rol>(includes);
-
-            return roles.Select(qry =>
-            new RolDTO
-            {
-                Descripcion = qry.Descripcion,
-                RolId = qry.RolId,
-                Permisos = MapPermisosDto(qry?.Permisos),
-            }).ToList();
-        }
-
-        private static List<PermisosDTO> MapPermisosDto(List<Permisos>? permisos)
-        {
-            return permisos.Select(r => new PermisosDTO
-            {
-                Editar = r.Editar,
-                Eliminar = r.Eliminar,
-                PantallaId = r.PantallaId,
-                RolId = r.RolId,
-                Ver = r.Ver,
-            }).ToList();
-        }
-
-        private static UsuarioDTO MapUsuarioDto(Usuario qry)
-        {
-            return new UsuarioDTO
-            {
-                Apellido = qry.Apellido,
-                Contrasena = qry.Contrasena,
-                Nombre = qry.Nombre,
-                RolId = qry.RolId,
-                UsuarioId = qry.UsuarioId,
-                FechaTransaccion = qry.FechaTransaccion,
-                Activo = qry.Activo
-            };
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                if (_genericRepository.IsNotNull()) _genericRepository.Dispose();
-
-            }
-
-            base.Dispose(disposing);
         }
     }
 }
@@ -7456,64 +7012,6 @@ namespace Dominio.Core.Extensions
     public interface IEqualityKey
     {
         string GetEqualityKey();
-    }
-}
-````
-
-## File: Dominio/Core/Extensions/EntidadExtension.cs
-````csharp
-using System.Runtime.Serialization;
-
-namespace Dominio.Core.Extensions
-{
-    public static class EntidadExtension
-    {
-        /// <summary>
-        /// Crea una copia profunda de un objeto utilizando <see cref="DataContractSerializer"/>.
-        /// </summary>
-        /// <typeparam name="T">El tipo del objeto a copiar. Debe ser serializable mediante DataContract.</typeparam>
-        /// <param name="theSource">El objeto fuente que se desea clonar.</param>
-        /// <returns>
-        /// Una nueva instancia de <typeparamref name="T"/> que representa una copia profunda del objeto original.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// [DataContract]
-        /// public class Persona
-        /// {
-        ///     [DataMember]
-        ///     public string Nombre { get; set; }
-        ///
-        ///     [DataMember]
-        ///     public int Edad { get; set; }
-        /// }
-        ///
-        /// Persona original = new Persona { Nombre = "Ana", Edad = 30 };
-        /// Persona copia = original.DeepCopy();
-        ///
-        /// Console.WriteLine($"Original: {original.Nombre}, {original.Edad}");
-        /// Console.WriteLine($"Copia: {copia.Nombre}, {copia.Edad}");
-        /// // Salida: 
-        /// // Original: Ana, 30
-        /// // Copia: Ana, 30
-        /// </code>
-        /// </example>
-        public static T DeepCopy<T>(this T theSource)
-        {
-            T theCopy;
-
-            var theDataContactSerializer = new DataContractSerializer(typeof(T));
-
-            using (var memStream = new MemoryStream())
-            {
-                theDataContactSerializer.WriteObject(memStream, theSource);
-                memStream.Position = 0;
-                theCopy = (T)theDataContactSerializer.ReadObject(memStream);
-            }
-
-            return theCopy;
-        }
     }
 }
 ````
@@ -8951,486 +8449,6 @@ namespace Infraestructura.Context.Mapping.Seguridad
 }
 ````
 
-## File: Infraestructura/Core/BCUnitOfWork.cs
-````csharp
-using Dominio.Core;
-using Infraestructura.Context;
-using Infraestructura.Core.Identity;
-using Infraestructura.Core.Logging;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
-using System.Reflection;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Transactions;
-
-namespace Infraestructura.Core
-{
-    public class BCUnitOfWork : DbContext
-    {
-        private string Transact { get; set; }
-        public BCUnitOfWork(DbContextOptions<MyContext>? context)
-            : base(context)
-        {
-            Database.SetCommandTimeout((int)TimeSpan.FromSeconds(1).TotalSeconds);
-        }
-
-        public virtual void Commit()
-        {
-            base.SaveChanges();
-        }
-
-        public virtual void Commit(TransactionInfo? transactionInfo)
-        {
-            Logging.Transaction transaction = BuildTransactionInfo(transactionInfo);
-            Commit(transaction, transactionInfo.GenerateTransaction);
-        }
-
-        private void Commit(Logging.Transaction transaction, bool generateTransaction)
-        {
-            try
-            {
-                base.Database.OpenConnection();
-                //Reseteando el detalle de las transacciones.
-                transaction.TransactionDetail = new List<Logging.TransactionDetail>();
-
-                using (var scope = TransactionScopeFactory.GetTransactionScope())
-                {
-                    var changedEntities = new List<ModifiedEntityEntry>();
-                    var tableMapping = new List<EntityMapping>();
-                    var sqlCommandInfos = new List<SqlCommandInfo>();
-
-                    IEnumerable<EntityEntry> changeDbEntityEntries = GetChangedDbEntityEntries();
-
-                    foreach (EntityEntry entry in changeDbEntityEntries)
-                    {
-                        ApplyTransactionInfo(transaction, entry);
-
-                        if (!generateTransaction)
-                        {
-                            // Get the deleted records info first
-                            if (entry.State == EntityState.Deleted)
-                            {
-                                EntityMapping entityMapping = GetEntityMappingConfiguration(tableMapping, entry);
-                                SqlCommandInfo sqlCommandInfo = GetSqlCommandInfo(transaction, entry, entityMapping);
-                                if (sqlCommandInfo != null) sqlCommandInfos.Add(sqlCommandInfo);
-
-                                transaction.AddDetail(entityMapping.TableName, entry.State.ToString(), transaction.TransactionType);
-                            }
-                            else
-                            {
-                                changedEntities.Add(new ModifiedEntityEntry(entry, entry.State.ToString()));
-                            }
-                        }
-
-                    }
-                    base.SaveChanges();
-
-                    if (!generateTransaction)
-                    {
-                        // Get the Added and Mdified records after changes, that way we will be able to get the generated .
-                        foreach (ModifiedEntityEntry entry in changedEntities)
-                        {
-                            EntityMapping entityMapping = GetEntityMappingConfiguration(tableMapping, entry.EntityEntry);
-                            SqlCommandInfo sqlCommandInfo = GetSqlCommandInfo(transaction, entry.EntityEntry, entityMapping);
-                            if (sqlCommandInfo != null) sqlCommandInfos.Add(sqlCommandInfo);
-                            
-                            transaction.AddDetail(entityMapping.TableName, entry.State, transaction.TransactionType);
-                        }
-
-                        // Adding Audit Detail Transaction CommandInfo.
-                        sqlCommandInfos.AddRange(GetAuditRecords(transaction));
-
-                        // Insert Transaction and audit records.
-                        foreach (SqlCommandInfo sqlCommandInfo in sqlCommandInfos)
-                        {
-                            Database.ExecuteSqlRaw(sqlCommandInfo.Sql, sqlCommandInfo.Parameters);
-                        }
-
-                    }
-
-                    scope.Complete();
-                }
-            }
-            finally
-            {
-
-                base.Database.CloseConnection();    
-            }
-        }
-
-        private IEnumerable<SqlCommandInfo> GetAuditRecords(Logging.Transaction transaction)
-        {
-            var auditCommands = new List<SqlCommandInfo>();
-
-            // Adding Audit Header Transaction CommandInfo.
-            auditCommands.Add(GetAuditHeaderCommandInfo(transaction));
-
-            // Adding Audit Detail Transaction CommandInfo
-            foreach (var transactionDetail in transaction.TransactionDetail)
-            {
-                auditCommands.Add(GetAuditDetailCommandInfo(transactionDetail));
-            }
-
-            return auditCommands;
-        }
-
-        private SqlCommandInfo GetAuditDetailCommandInfo(TransactionDetail transactionDetail)
-        {
-            const string sqlInsert =
-                "insert into  Comunes.LogTransaccionesDetalle(TransaccionUId,TipoTransaccion, EntidadDominio, DescripcionTransaccion) " +
-                                       "values({0}, {1}, {2},{3})";
-
-            var param = new object[]
-                                 {
-                                     transactionDetail.TransactionId,transactionDetail.TransactionType, transactionDetail.TableName, transactionDetail.CrudOperation
-                                 };
-
-            return new SqlCommandInfo(sqlInsert, param);
-        }
-
-        private SqlCommandInfo GetAuditHeaderCommandInfo(Logging.Transaction transaction)
-        {
-            const string sqlInsert =
-                "insert into  Comunes.LogTransacciones(TransaccionUId, TipoTransaccion, FechaTransaccion, ModificadoPor, OrigenTransaccion) " +
-                "values({0}, {1}, {2}, {3}, {4} )";
-
-            var param = new object[]
-                                 {
-                                     transaction.TransactionId, transaction.TransactionType, transaction.TransactionDate,
-                                     transaction.ModifiedBy, transaction.TransactionOrigen
-                                 };
-
-            return new SqlCommandInfo(sqlInsert, param);
-        }
-
-        private SqlCommandInfo GetSqlCommandInfo(Logging.Transaction transaction, EntityEntry entry, EntityMapping entityMapping)
-        {
-            if (entityMapping.TableName.Contains("_Transacciones"))
-            {
-                return null;
-            }
-
-            string sqlInsert;
-            object[] param;
-            CreateTransactionInsertStatement(entityMapping, entry, transaction, out sqlInsert, out param);
-
-            var sqlCommandInfo = new SqlCommandInfo(sqlInsert, param);
-            return sqlCommandInfo;
-        }
-
-        private void CreateTransactionInsertStatement(EntityMapping entityMapping, EntityEntry entry,
-                                                      Logging.Transaction transaction, out string sqlInsert, out object[] objects)
-        {
-            var insert = new StringBuilder();
-            var fields = new StringBuilder();
-            var paramNames = new StringBuilder();
-            var values = new List<Object>();
-
-            insert.AppendLine(string.Format("Insert Into {0} ", entityMapping.TransactionTableName));
-
-            int index = 0;
-            IEnumerable<string> propertyNames = entry.State == EntityState.Deleted
-                                                    ? GetPropertiesEntity(entry, entry.OriginalValues)
-                                                    : GetPropertiesEntity(entry, entry.CurrentValues);
-
-            foreach (string property in propertyNames)
-            {
-                string prop = property;
-                if (prop != "RowVersion")
-                {
-                    if (fields.Length == 0)
-                    {
-                        fields.Append(string.Format(" ({0}", prop));
-                        paramNames.Append(string.Format(" values ({0}{1}{2}", "{", index, "}"));
-                    }
-                    else
-                    {
-                        fields.Append(string.Format(", {0}", prop));
-                        paramNames.Append(string.Format(", {0}{1}{2}", "{", index, "}"));
-                    }
-
-                    values.Add(GetEntityPropertyValue(entry, prop, transaction));
-                    index++;
-                }
-            }
-
-            fields.Append(string.Format(") "));
-            paramNames.Append(string.Format(") "));
-
-            insert.AppendLine(fields.ToString());
-            insert.AppendLine(paramNames.ToString());
-
-            sqlInsert = insert.ToString();
-            objects = values.ToArray();
-        }
-
-        private object GetEntityPropertyValue(EntityEntry? entry, string? prop, Logging.Transaction? transaction)
-        {
-            object value;
-            TryGeTransactionInfo(prop, transaction, out value);
-            if (value != null)
-            {
-                return value;
-            }
-
-            if (entry.State == EntityState.Deleted || entry.State == EntityState.Detached)
-            {
-                return prop == "DescripcionTransaccion"
-                           ? EntityState.Deleted.ToString()
-                           : entry.Property(prop).OriginalValue;
-            }
-            return entry.Property(prop).CurrentValue;
-        }
-
-        private void TryGeTransactionInfo(string property, Logging.Transaction transaction, out object value)
-        {
-            switch (property)
-            {
-                case "TransaccionUId":
-                    value = transaction.TransactionId;
-                    break;
-
-                case "TipoTransaccion":
-                    value = transaction.TransactionType;
-                    break;
-
-                case "FechaTransaccion":
-                    value = transaction.TransactionDate;
-                    break;
-
-                case "ModificadoPor":
-                    value = transaction.ModifiedBy;
-                    break;
-
-                default:
-                    value = null;
-                    break;
-            }
-        }
-
-        private List<string> GetPropertiesEntity(EntityEntry? entry, PropertyValues? originalValues)
-        {
-            List<string> propertyNames = new();
-            var entity = entry.Entity;
-            var entityType =  entity.GetType();
-
-            var properties = entry.OriginalValues.Properties;
-
-            foreach (var prop in properties)
-            {
-                if (entityType.GetProperty(prop.Name) == null)
-                    continue;
-                var pp = entityType.GetProperty(prop.Name);
-                if (pp.GetValue(entity) == null)
-                    continue;
-                propertyNames.Add(prop.Name);
-            }
-
-            return propertyNames;
-        }
-
-        private EntityMapping GetEntityMappingConfiguration(List<EntityMapping> tableMapping, EntityEntry entry)
-        {
-            var type = GetDomainEntityType(entry);
-
-            var name = entry.Metadata.GetTableName();
-            var schema = entry.Metadata.GetSchema();
-
-            var nameTable = string.Format("{0}.{1}", schema, name);
-
-            EntityMapping entityMapping = tableMapping.FirstOrDefault(m => m.EntityType == type);
-            if (entityMapping == null)
-            {
-                entityMapping = CreateTableMapping(type, nameTable);
-                tableMapping.Add(entityMapping);
-            }
-            return entityMapping;
-        }
-
-        private EntityMapping CreateTableMapping(Type type, string tname)
-        {
-            return new EntityMapping { EntityType = type, TableName = tname, TransactionTableName = GetTransactionTableName(tname) };
-        }
-
-        private string GetTransactionTableName(string tname)
-        {
-            if (tname.Contains("_Transacciones"))
-            {
-                return tname;
-            }
-
-
-            string result = string.Format("{0}_Transacciones", tname);
-            return result;
-        }
-
-        private Type GetDomainEntityType(EntityEntry entry)
-        {
-            Type type = entry.Entity.GetType();
-            if (type.FullName != null)
-            {
-                if (type.FullName.Contains("Dominio"))
-                {
-                    return type;
-                }
-                if (type.BaseType != null)
-                {
-                    return type.BaseType;
-                }
-            }
-
-            return null;
-        }
-
-        private void ApplyTransactionInfo(Logging.Transaction transaction, EntityEntry entry)
-        {
-            ((Entity)entry.Entity).FechaTransaccion = transaction.TransactionDate;
-            ((Entity)entry.Entity).DescripcionTransaccion = entry.State.ToString();
-            ((Entity)entry.Entity).ModificadoPor = transaction.ModifiedBy;
-
-            AplicarInformacionTransaccion(entry, "TipoTransaccion", transaction.TransactionType);
-            AplicarInformacionTransaccion(entry, "TransaccionUId", transaction.TransactionId);
-        }
-
-        private void AplicarInformacionTransaccion(EntityEntry item, string nombrePropiedad, object valorPropiedad)
-        {
-            if (item != null && item.Entity != null)
-            {
-                PropertyInfo propInfoEntity = item.Entity.GetType().GetProperty(nombrePropiedad);
-                if (propInfoEntity != null)
-                {
-                    propInfoEntity.SetValue(item.Entity, valorPropiedad, null);
-                }
-            }
-        }
-
-        private IEnumerable<EntityEntry> GetChangedDbEntityEntries()
-        {
-            return ChangeTracker.Entries().Where(
-                e =>
-                (e.Entity is Entity) &&
-                (e.State == EntityState.Modified || e.State == EntityState.Added || e.State == EntityState.Deleted));
-        }
-
-        private Logging.Transaction BuildTransactionInfo(TransactionInfo transactionInfo)
-        {
-            var transaccionId = NewSequentialTransactionIdentity();
-
-            return new Logging.Transaction
-            {
-                TransactionId = transaccionId.TransactionId,
-                TransactionDate = transaccionId.TransactionDate,
-                TransactionOrigen = transactionInfo.TipoTransaccion,
-                TransactionType = transactionInfo.TipoTransaccion,
-                ModifiedBy = transactionInfo.ModificadoPor
-            };
-        }
-
-        public TransactionIdentity NewSequentialTransactionIdentity()
-        {
-            return new TransactionIdentity
-            {
-                TransactionId = NewSequentialGuid(),
-                TransactionDate = DateTime.Now,
-                TransactionUtcDate = DateTime.UtcNow
-            };
-        }
-
-        public static Guid NewSequentialGuid()
-        {
-            byte[] uid = Guid.NewGuid().ToByteArray();
-            byte[] binDate = BitConverter.GetBytes(DateTime.UtcNow.Ticks);
-
-            var secuentialGuid = new byte[uid.Length];
-
-            secuentialGuid[0] = uid[0];
-            secuentialGuid[1] = uid[1];
-            secuentialGuid[2] = uid[2];
-            secuentialGuid[3] = uid[3];
-            secuentialGuid[4] = uid[4];
-            secuentialGuid[5] = uid[5];
-            secuentialGuid[6] = uid[6];
-            // set the first part of the 8th byte to '1100' so
-            // later we'll be able to validate it was generated by us
-
-            secuentialGuid[7] = (byte)(0xc0 | (0xf & uid[7]));
-
-            // the last 8 bytes are sequential,
-            // it minimizes index fragmentation
-            // to a degree as long as there are not a large
-            // number of Secuential-Guids generated per millisecond
-
-            secuentialGuid[9] = binDate[0];
-            secuentialGuid[8] = binDate[1];
-            secuentialGuid[15] = binDate[2];
-            secuentialGuid[14] = binDate[3];
-            secuentialGuid[13] = binDate[4];
-            secuentialGuid[12] = binDate[5];
-            secuentialGuid[11] = binDate[6];
-            secuentialGuid[10] = binDate[7];
-
-            return new Guid(secuentialGuid);
-        }
-
-        public void RollbackChanges()
-        {
-            //Set all entities in change tracker
-            //as 'unchanged state'
-            ChangeTracker.Entries()
-                .ToList().ForEach(e => e.State = EntityState.Unchanged);
-        }
-
-        public int ExecuteCommand(string sqlCommand, params object[] parameters)
-        {
-            return Database.ExecuteSqlRaw(sqlCommand, parameters);
-        }
-
-        public IEnumerable<TEntity> ExecuteQuery<TEntity>(string sqlCommand, params object[] parameters) 
-        {
-            //return Set<TEntity>().FromSqlRaw(sqlCommand, parameters).ToList();
-
-            return Database.SqlQueryRaw<TEntity>(sqlCommand, parameters);
-        }
-
-        public TType ExecuteScalarFunction<TType>(string scalarFunction, params object[] parameters)
-        {
-            var returnValue = Database.SqlQueryRaw<TType>(scalarFunction, parameters);
-
-            return returnValue.FirstOrDefault();
-        }
-
-        public async Task<IEnumerable<TEntity>> ExecuteQueryAsync<TEntity>(string sqlCommand, params object[] parameters) where TEntity: class
-        {
-            return await Set<TEntity>().FromSqlRaw(sqlCommand, parameters).ToListAsync();
-        }
-
-        public DbSet<TEntity> CreateSet<TEntity>() where TEntity : class
-        {
-            return Set<TEntity>();
-        }
-
-        public void Attach<TEntity>(TEntity item) where TEntity : class
-        {
-            //Attach and set as unchanged
-            Entry(item).State = EntityState.Unchanged;
-        }
-
-        public void SetModified<TEntity>(TEntity item) where TEntity : class
-        {
-            //This operation also attach item in object state manager
-            Entry(item).State = EntityState.Modified;
-        }
-
-        public void ApplyCurrentValues<TEntity>(TEntity original, TEntity current) where TEntity : class
-        {
-            Entry(original).CurrentValues.SetValues(current);
-        }
-    }
-}
-````
-
 ## File: Infraestructura/Core/Jwtoken/ITokenService.cs
 ````csharp
 using Dominio.Context.Entidades.Seguridad;
@@ -9977,6 +8995,439 @@ namespace WebServices.Extensions
 </Project>
 ````
 
+## File: Aplicacion/DTOs/QueryInfo.cs
+````csharp
+using System.Text;
+
+namespace Aplicacion.DTOs
+{
+    public sealed class QueryInfo
+    {
+        public QueryInfo()
+        {
+            PageIndex = 0;
+            PageSize = 10;
+            SortFields = [];
+            CustomFilters = [];
+        }
+
+        /// <summary>
+        /// The page index define in the query.
+        /// </summary>
+        public int PageIndex { get; set; }
+
+        /// <summary>
+        /// The page size define for the query.
+        /// </summary>
+        public int PageSize { get; set; }
+
+        /// <summary>
+        /// The list of fields to be sorted in the query.
+        /// </summary>
+        public List<string>? SortFields { get; set; }
+
+        /// <summary>
+        /// Indicates if the query will sort the result in ascending order.
+        /// </summary>
+        public bool Ascending { get; set; }
+
+        /// <summary>
+        /// A custom filter to apply to the query.
+        /// </summary>
+        public string? Predicate { get; set; }
+
+        /// <summary>
+        /// The parameters that will be applied to the query.
+        /// </summary>
+        public object[] ParamValues { get; set; }
+
+        /// <summary>
+        /// The names of tables to be included in the query, this is used to eagerly load those tables and avoid to scan the table.
+        /// </summary>
+        public List<string>? Includes { get; set; }
+
+        /// <summary>
+        /// The Custom Query Operation to Perform.
+        /// </summary>
+        public string? CustomQueryOperation { get; set; }
+
+        public Dictionary<string, object> CustomFilters { get; set; }
+
+        /// <summary>
+        /// Gets the Uniform Resource Name that identifies resources.
+        /// </summary>
+        /// <returns>The Uniform Resource Name for the query request.</returns>
+        public string GetUrn()
+        {
+            var sortFields = string.Join("|", SortFields.ToArray());
+            string paramValues = GetParamValues(ParamValues);
+
+            var urn = string.Format("{0}-{1}-{2}-{3}-{4}-{5}", Predicate,
+                                    paramValues, PageIndex, PageSize,
+                                    Ascending, sortFields);
+
+            return urn;
+        }
+
+        private string GetParamValues(object[] paramValues)
+        {
+            if (paramValues != null)
+            {
+                var valuesStringBuild = new StringBuilder();
+
+                foreach (var paramValue in paramValues)
+                {
+                    valuesStringBuild.Append(paramValue);
+                }
+
+                return valuesStringBuild.ToString();
+            }
+
+            return string.Empty;
+        }
+
+
+    }
+}
+````
+
+## File: Aplicacion/Services/Seguridad/SecurityAplicationService.cs
+````csharp
+using Aplicacion.Core;
+using Aplicacion.DTOs;
+using Aplicacion.DTOs.Seguridad;
+using Aplicacion.Helpers;
+using AutoMapper;
+using Dominio.Context.Entidades;
+using Dominio.Context.Entidades.Seguridad;
+using Dominio.Core;
+using Dominio.Core.Extensions;
+using Infraestructura.Context;
+using Infraestructura.Core.Jwtoken;
+
+namespace Aplicacion.Services.Seguridad
+{
+    public class SecurityAplicationService : BaseDisposable
+    {
+        private readonly IGenericRepository<IDataContext> _genericRepository;
+        private readonly ITokenService _tokenService;
+        private readonly IMapper _mapper;
+        public SecurityAplicationService(IGenericRepository<IDataContext> genericRepository, ITokenService tokenService, IMapper mapper)
+        {
+            _genericRepository = genericRepository;
+            _tokenService = tokenService;
+            _mapper = mapper;
+        }
+
+        public UsuarioDTO EditarUsuario(EdicionUsuarioRequest request)
+        {
+            string mensajeValidacion = request.Usuario.ValidarCampos();
+
+            if (mensajeValidacion.HasValue())
+            {
+                return new UsuarioDTO
+                {
+                    Message = mensajeValidacion,
+                };
+            }
+
+            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
+
+            if (usuarioExiste.IsNull())
+            {
+                return new UsuarioDTO
+                {
+                    Message = "El usuario no existe"
+                };
+            }
+
+            if (request.Usuario.EditarContrasena)
+            {
+                usuarioExiste.Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena);
+            }
+
+            usuarioExiste.Nombre = request.Usuario.Nombre.ValueOrEmpty();
+            usuarioExiste.Apellido = request.Usuario.Apellido.ValueOrEmpty();
+            usuarioExiste.RolId = request.Usuario.RolId.ValueOrEmpty();
+            usuarioExiste.Activo = request.Usuario.Activo;
+
+            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarUsuario");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+            return new UsuarioDTO();
+        }
+
+        public List<PantallaDTO> ObtenerPantallas()
+        {
+            var pantallas = _genericRepository.GetAll<Pantalla>();
+            return pantallas.Select(r => new PantallaDTO { Descripcion = r.Descripcion, PantallaId = r.PantallaId }).ToList();
+        }
+
+        public RolDTO EdicionPermisos(EdicionPermisosRequest request)
+        {
+            var permisos = _genericRepository.GetFiltered<Permisos>(r => r.RolId == request.RolId);
+
+            foreach (var item in request.Permisos)
+            {
+                var permiso = permisos.FirstOrDefault(r => r.PantallaId == item.PantallaId);
+                if (permiso.IsNotNull())
+                {
+                    permiso.Ver = item.Ver;
+                    permiso.Editar = item.Editar;
+                    permiso.Eliminar = item.Eliminar;
+
+                    if (!permiso.Ver)
+                    {
+                        _genericRepository.Remove(permiso);
+                    }
+                }
+                else
+                {
+                    var nuevoPermiso = new Permisos
+                    {
+                        Editar = item.Editar,
+                        Eliminar = item.Eliminar,
+                        PantallaId = item.PantallaId,
+                        RolId = item.RolId,
+                        Ver = item.Ver,
+                    };
+                    _genericRepository.Add(nuevoPermiso);
+                }
+
+
+                TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarUsuario");
+                _genericRepository.UnitOfWork.Commit(transactionInfo);
+            }
+            return new RolDTO { };
+        }
+
+        public UsuarioDTO CrearUsuario(EdicionUsuarioRequest request)
+        {
+            string mensajeValidacion = request.Usuario.ValidarCampos();
+
+            if (mensajeValidacion.HasValue())
+            {
+                return new UsuarioDTO
+                {
+                    Message = mensajeValidacion,
+                };
+            }
+
+            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
+
+            if (usuarioExiste.IsNotNull())
+            {
+                return new UsuarioDTO
+                {
+                    Message = "Usuario ya esta registrado"
+                };
+            }
+
+            var usuario = new Usuario
+            {
+                Apellido = request.Usuario.Apellido.ValueOrEmpty(),
+                Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena),
+                Nombre = request.Usuario.Nombre.ValueOrEmpty(),
+                RolId = request.Usuario.RolId.ValueOrEmpty(),
+                UsuarioId = request.Usuario.UsuarioId.ValueOrEmpty(),
+                Activo = request.Usuario.Activo
+            };
+
+            _genericRepository.Add(usuario);
+            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarUsuario");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+            return _mapper.Map<UsuarioDTO>(usuario);
+        }
+
+        public UsuarioDTO IniciarSesion(UserRequest request)
+        {
+            List<string> includes = ["Rol", "Rol.Permisos"];
+
+            Usuario usuario = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.UsuarioId, includes);
+
+            if (usuario.IsNotNull() && PasswordEncryptor.VerifyPassword(request?.Password, usuario.Contrasena))
+            {
+                if (!usuario.Activo)
+                {
+                    return new UsuarioDTO { Message = $"Usuario {usuario.UsuarioId} esta desactivado" };
+                }
+                var newAccessToken = _tokenService.Generate(usuario);
+                var newRefreshToken = _tokenService.GenerateRefreshToken();
+
+                usuario.RefreshToken = newRefreshToken;
+                usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+
+                request.RequestUserInfo.UsuarioId = usuario.UsuarioId;
+
+                TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("IniciarSesion");
+                _genericRepository.UnitOfWork.Commit(transactionInfo);
+
+                return new UsuarioDTO
+                {
+                    Apellido = usuario.Apellido,
+                    Nombre = usuario.Nombre,
+                    RolId = usuario.RolId,
+                    Token = newAccessToken,
+                    RefreshToken = newRefreshToken,
+                    UsuarioAutenticado = true,
+                    UsuarioId = usuario.UsuarioId,
+                    Permisos = MapPermisosDto(usuario.Rol?.Permisos)
+                };
+            }
+
+            return new UsuarioDTO
+            {
+                Message = "Usuario o Contraseña no valido",
+                UsuarioAutenticado = false
+            };
+        }
+
+        public UsuarioDTO RefreshToken(TokenRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.AccessToken) || string.IsNullOrWhiteSpace(request.RefreshToken))
+            {
+                return new UsuarioDTO { Message = "Solicitud de token inválida", UsuarioAutenticado = false };
+            }
+            
+            var usuario = _genericRepository.GetSingle<Usuario>(u => u.RefreshToken == request.RefreshToken, ["Rol", "Rol.Permisos"]);
+
+            if (usuario == null || usuario.RefreshToken != request.RefreshToken || usuario.RefreshTokenExpiryTime <= DateTime.UtcNow)
+            {
+                return new UsuarioDTO { Message = "Token de refresco inválido o expirado", UsuarioAutenticado = false };
+            }
+
+            var newAccessToken = _tokenService.Generate(usuario);
+            var newRefreshToken = _tokenService.GenerateRefreshToken();
+
+            usuario.RefreshToken = newRefreshToken;
+            usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+
+            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("RefreshToken");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+
+            return new UsuarioDTO
+            {
+                Apellido = usuario.Apellido,
+                Nombre = usuario.Nombre,
+                RolId = usuario.RolId,
+                Token = newAccessToken,
+                RefreshToken = newRefreshToken,
+                UsuarioAutenticado = true,
+                UsuarioId = usuario.UsuarioId,
+                Permisos = MapPermisosDto(usuario.Rol?.Permisos)
+            };
+        }
+
+        public SearchResult<UsuarioDTO> ObtenerUsuario(GetUserRequest request)
+        {
+            var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(request.QueryInfo);
+            var usuarios = _genericRepository.GetPagedAndFiltered<Usuario>(dynamicFilter);
+
+            return new SearchResult<UsuarioDTO>
+            {
+                PageCount = usuarios.PageCount,
+                ItemCount = usuarios.ItemCount,
+                TotalItems = usuarios.TotalItems,
+                PageIndex = usuarios.PageIndex,
+                Items = (from qry in usuarios.Items as IEnumerable<Usuario> select MapUsuarioDto(qry)).ToList(),
+            };
+        }
+
+        public RolDTO CrearRol(EdicionRolRequest request)
+        {
+            var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
+            if (rol.IsNotNull())
+            {
+                return new RolDTO
+                {
+                    Message = $"El rol {request.Rol.RolId} ya existe"
+                };
+            }
+
+            var nuevoRol = new Rol
+            {
+                Descripcion = request.Rol.Descripcion,
+                RolId = request.Rol.RolId
+            };
+
+            _genericRepository.Add(nuevoRol);
+            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarRol");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+
+            return new RolDTO();
+        }
+
+        public RolDTO EditarRol(EdicionRolRequest request)
+        {
+            var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
+
+            if (rol.IsNull())
+            {
+                return new RolDTO
+                {
+                    Message = $"El Rol {request.Rol.RolId} no existe"
+                };
+            }
+
+            rol.Descripcion = request.Rol.Descripcion;
+            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarRol");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+            return new RolDTO();
+        }
+
+        public List<RolDTO> ObtenerRoles()
+        {
+            var includes = new List<string> { "Permisos" };
+            var roles = _genericRepository.GetAll<Rol>(includes);
+
+            return roles.Select(qry =>
+            new RolDTO
+            {
+                Descripcion = qry.Descripcion,
+                RolId = qry.RolId,
+                Permisos = MapPermisosDto(qry?.Permisos),
+            }).ToList();
+        }
+
+        private static List<PermisosDTO> MapPermisosDto(List<Permisos>? permisos)
+        {
+            return permisos.Select(r => new PermisosDTO
+            {
+                Editar = r.Editar,
+                Eliminar = r.Eliminar,
+                PantallaId = r.PantallaId,
+                RolId = r.RolId,
+                Ver = r.Ver,
+            }).ToList();
+        }
+
+        private static UsuarioDTO MapUsuarioDto(Usuario qry)
+        {
+            return new UsuarioDTO
+            {
+                Apellido = qry.Apellido,
+                Contrasena = qry.Contrasena,
+                Nombre = qry.Nombre,
+                RolId = qry.RolId,
+                UsuarioId = qry.UsuarioId,
+                FechaTransaccion = qry.FechaTransaccion,
+                Activo = qry.Activo
+            };
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                if (_genericRepository.IsNotNull()) _genericRepository.Dispose();
+
+            }
+
+            base.Dispose(disposing);
+        }
+    }
+}
+````
+
 ## File: Dominio/Context/Entidades/Seguridad/Rol.cs
 ````csharp
 using Dominio.Core;
@@ -10014,6 +9465,65 @@ namespace Dominio.Core
         public byte[] RowVersion { get; set; }
         public Guid TransaccionUId { get; set; }
         public string TipoTransaccion { get; set; }
+    }
+}
+````
+
+## File: Dominio/Core/Extensions/EntidadExtension.cs
+````csharp
+using System.Runtime.Serialization;
+
+namespace Dominio.Core.Extensions
+{
+    public static class EntidadExtension
+    {
+        /// <summary>
+        /// Crea una copia profunda de un objeto utilizando <see cref="DataContractSerializer"/>.
+        /// </summary>
+        /// <typeparam name="T">El tipo del objeto a copiar. Debe ser serializable mediante DataContract.</typeparam>
+        /// <param name="theSource">El objeto fuente que se desea clonar.</param>
+        /// <returns>
+        /// Una nueva instancia de <typeparamref name="T"/> que representa una copia profunda del objeto original.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// [DataContract]
+        /// public class Persona
+        /// {
+        ///     [DataMember]
+        ///     public string Nombre { get; set; }
+        ///
+        ///     [DataMember]
+        ///     public int Edad { get; set; }
+        /// }
+        ///
+        /// Persona original = new Persona { Nombre = "Ana", Edad = 30 };
+        /// Persona copia = original.DeepCopy();
+        ///
+        /// Console.WriteLine($"Original: {original.Nombre}, {original.Edad}");
+        /// Console.WriteLine($"Copia: {copia.Nombre}, {copia.Edad}");
+        /// // Salida: 
+        /// // Original: Ana, 30
+        /// // Copia: Ana, 30
+        /// </code>
+        /// </example>
+        public static T DeepCopy<T>(this T theSource) 
+            where T : class 
+        {
+            T theCopy;
+
+            var theDataContactSerializer = new DataContractSerializer(typeof(T));
+
+            using (var memStream = new MemoryStream())
+            {
+                theDataContactSerializer.WriteObject(memStream, theSource);
+                memStream.Position = 0;
+                theCopy = (T)theDataContactSerializer.ReadObject(memStream);
+            }
+
+            return theCopy;
+        }
     }
 }
 ````
@@ -10731,32 +10241,483 @@ namespace Infraestructura.Context
 }
 ````
 
-## File: Aplicacion/DTOs/Seguridad/UserRequest.cs
+## File: Infraestructura/Core/BCUnitOfWork.cs
 ````csharp
-namespace Aplicacion.DTOs.Seguridad
+using Dominio.Core;
+using Infraestructura.Context;
+using Infraestructura.Core.Identity;
+using Infraestructura.Core.Logging;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using System.Reflection;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Transactions;
+
+namespace Infraestructura.Core
 {
-    public class UserRequest
+    public class BCUnitOfWork : DbContext
     {
-        public string? UsuarioId { get; set; }
-        public string? Password { get; set; }
-    }
+        private string Transact { get; set; }
+        public BCUnitOfWork(DbContextOptions<MyContext>? context)
+            : base(context)
+        {
+            Database.SetCommandTimeout((int)TimeSpan.FromSeconds(1).TotalSeconds);
+        }
 
-    public class EdicionUsuarioRequest : RequestBase
-    {
-        public UsuarioDTO? Usuario { get; set; }
-    }
+        public virtual void Commit()
+        {
+            base.SaveChanges();
+        }
 
-    public class GetUserRequest : RequestBase { }
+        public virtual void Commit(TransactionInfo? transactionInfo)
+        {
+            Logging.Transaction transaction = BuildTransactionInfo(transactionInfo);
+            Commit(transaction, transactionInfo.GenerateTransaction);
+        }
 
-    public class EdicionRolRequest : RequestBase
-    {
-        public RolDTO? Rol { get; set; }
-    }
+        private void Commit(Logging.Transaction transaction, bool generateTransaction)
+        {
+            try
+            {
+                base.Database.OpenConnection();
+                //Reseteando el detalle de las transacciones.
+                transaction.TransactionDetail = [];
 
-    public class EdicionPermisosRequest : RequestBase
-    {
-        public string? RolId { get; set; }
-        public List<PermisosDTO>? Permisos { get; set; }
+                using (var scope = TransactionScopeFactory.GetTransactionScope())
+                {
+                    var changedEntities = new List<ModifiedEntityEntry>();
+                    var tableMapping = new List<EntityMapping>();
+                    var sqlCommandInfos = new List<SqlCommandInfo>();
+
+                    IEnumerable<EntityEntry> changeDbEntityEntries = GetChangedDbEntityEntries();
+
+                    foreach (EntityEntry entry in changeDbEntityEntries)
+                    {
+                        ApplyTransactionInfo(transaction, entry);
+
+                        if (!generateTransaction)
+                        {
+                            // Get the deleted records info first
+                            if (entry.State == EntityState.Deleted)
+                            {
+                                EntityMapping entityMapping = GetEntityMappingConfiguration(tableMapping, entry);
+                                SqlCommandInfo sqlCommandInfo = GetSqlCommandInfo(transaction, entry, entityMapping);
+                                if (sqlCommandInfo != null) sqlCommandInfos.Add(sqlCommandInfo);
+
+                                transaction.AddDetail(entityMapping.TableName, entry.State.ToString(), transaction.TransactionType);
+                            }
+                            else
+                            {
+                                changedEntities.Add(new ModifiedEntityEntry(entry, entry.State.ToString()));
+                            }
+                        }
+
+                    }
+                    base.SaveChanges();
+
+                    if (!generateTransaction)
+                    {
+                        // Get the Added and Mdified records after changes, that way we will be able to get the generated .
+                        foreach (ModifiedEntityEntry entry in changedEntities)
+                        {
+                            EntityMapping entityMapping = GetEntityMappingConfiguration(tableMapping, entry.EntityEntry);
+                            SqlCommandInfo sqlCommandInfo = GetSqlCommandInfo(transaction, entry.EntityEntry, entityMapping);
+                            if (sqlCommandInfo != null) sqlCommandInfos.Add(sqlCommandInfo);
+                            
+                            transaction.AddDetail(entityMapping.TableName, entry.State, transaction.TransactionType);
+                        }
+
+                        // Adding Audit Detail Transaction CommandInfo.
+                        sqlCommandInfos.AddRange(GetAuditRecords(transaction));
+
+                        // Insert Transaction and audit records.
+                        foreach (SqlCommandInfo sqlCommandInfo in sqlCommandInfos)
+                        {
+                            Database.ExecuteSqlRaw(sqlCommandInfo.Sql, sqlCommandInfo.Parameters);
+                        }
+
+                    }
+
+                    scope.Complete();
+                }
+            }
+            finally
+            {
+
+                base.Database.CloseConnection();    
+            }
+        }
+
+        private IEnumerable<SqlCommandInfo> GetAuditRecords(Logging.Transaction transaction)
+        {
+            var auditCommands = new List<SqlCommandInfo>
+            {
+                // Adding Audit Header Transaction CommandInfo.
+                GetAuditHeaderCommandInfo(transaction)
+            };
+
+            // Adding Audit Detail Transaction CommandInfo
+            foreach (var transactionDetail in transaction.TransactionDetail)
+            {
+                auditCommands.Add(GetAuditDetailCommandInfo(transactionDetail));
+            }
+
+            return auditCommands;
+        }
+
+        private SqlCommandInfo GetAuditDetailCommandInfo(TransactionDetail transactionDetail)
+        {
+            const string sqlInsert =
+                "insert into  Comunes.LogTransaccionesDetalle(TransaccionUId,TipoTransaccion, EntidadDominio, DescripcionTransaccion) " +
+                                       "values({0}, {1}, {2},{3})";
+
+            var param = new object[]
+                                 {
+                                     transactionDetail.TransactionId,transactionDetail.TransactionType, transactionDetail.TableName, transactionDetail.CrudOperation
+                                 };
+
+            return new SqlCommandInfo(sqlInsert, param);
+        }
+
+        private SqlCommandInfo GetAuditHeaderCommandInfo(Logging.Transaction transaction)
+        {
+            const string sqlInsert =
+                "insert into  Comunes.LogTransacciones(TransaccionUId, TipoTransaccion, FechaTransaccion, ModificadoPor, OrigenTransaccion) " +
+                "values({0}, {1}, {2}, {3}, {4} )";
+
+            var param = new object[]
+                                 {
+                                     transaction.TransactionId, transaction.TransactionType, transaction.TransactionDate,
+                                     transaction.ModifiedBy, transaction.TransactionOrigen
+                                 };
+
+            return new SqlCommandInfo(sqlInsert, param);
+        }
+
+        private SqlCommandInfo GetSqlCommandInfo(Logging.Transaction transaction, EntityEntry entry, EntityMapping entityMapping)
+        {
+            if (entityMapping.TableName.Contains("_Transacciones"))
+            {
+                return null;
+            }
+
+            string sqlInsert;
+            object[] param;
+            CreateTransactionInsertStatement(entityMapping, entry, transaction, out sqlInsert, out param);
+
+            var sqlCommandInfo = new SqlCommandInfo(sqlInsert, param);
+            return sqlCommandInfo;
+        }
+
+        private void CreateTransactionInsertStatement(EntityMapping entityMapping, EntityEntry entry,
+                                                      Logging.Transaction transaction, out string sqlInsert, out object[] objects)
+        {
+            var insert = new StringBuilder();
+            var fields = new StringBuilder();
+            var paramNames = new StringBuilder();
+            List<object> values = [];
+
+            insert.AppendLine(string.Format("Insert Into {0} ", entityMapping.TransactionTableName));
+
+            int index = 0;
+            IEnumerable<string> propertyNames = entry.State == EntityState.Deleted
+                                                    ? GetPropertiesEntity(entry, entry.OriginalValues)
+                                                    : GetPropertiesEntity(entry, entry.CurrentValues);
+
+            foreach (string property in propertyNames)
+            {
+                string prop = property;
+                if (prop != "RowVersion")
+                {
+                    if (fields.Length == 0)
+                    {
+                        fields.Append(string.Format(" ({0}", prop));
+                        paramNames.Append(string.Format(" values ({0}{1}{2}", "{", index, "}"));
+                    }
+                    else
+                    {
+                        fields.Append(string.Format(", {0}", prop));
+                        paramNames.Append(string.Format(", {0}{1}{2}", "{", index, "}"));
+                    }
+
+                    values.Add(GetEntityPropertyValue(entry, prop, transaction));
+                    index++;
+                }
+            }
+
+            fields.Append(string.Format(") "));
+            paramNames.Append(string.Format(") "));
+
+            insert.AppendLine(fields.ToString());
+            insert.AppendLine(paramNames.ToString());
+
+            sqlInsert = insert.ToString();
+            objects = values.ToArray();
+        }
+
+        private object GetEntityPropertyValue(EntityEntry? entry, string? prop, Logging.Transaction? transaction)
+        {
+            object value;
+            TryGeTransactionInfo(prop, transaction, out value);
+            if (value != null)
+            {
+                return value;
+            }
+
+            if (entry.State == EntityState.Deleted || entry.State == EntityState.Detached)
+            {
+                return prop == "DescripcionTransaccion"
+                           ? EntityState.Deleted.ToString()
+                           : entry.Property(prop).OriginalValue;
+            }
+            return entry.Property(prop).CurrentValue;
+        }
+
+        private static void TryGeTransactionInfo(string property, Logging.Transaction transaction, out object value)
+        {
+            switch (property)
+            {
+                case "TransaccionUId":
+                    value = transaction.TransactionId;
+                    break;
+
+                case "TipoTransaccion":
+                    value = transaction.TransactionType;
+                    break;
+
+                case "FechaTransaccion":
+                    value = transaction.TransactionDate;
+                    break;
+
+                case "ModificadoPor":
+                    value = transaction.ModifiedBy;
+                    break;
+
+                default:
+                    value = null;
+                    break;
+            }
+        }
+
+        private List<string> GetPropertiesEntity(EntityEntry? entry, PropertyValues? originalValues)
+        {
+            List<string> propertyNames = [];
+            var entity = entry.Entity;
+            var entityType =  entity.GetType();
+
+            var properties = entry.OriginalValues.Properties;
+
+            foreach (var prop in properties)
+            {
+                if (entityType.GetProperty(prop.Name) == null)
+                    continue;
+                var pp = entityType.GetProperty(prop.Name);
+                if (pp.GetValue(entity) == null)
+                    continue;
+                propertyNames.Add(prop.Name);
+            }
+
+            return propertyNames;
+        }
+
+        private static EntityMapping GetEntityMappingConfiguration(List<EntityMapping> tableMapping, EntityEntry entry)
+        {
+            var type = GetDomainEntityType(entry);
+
+            var name = entry.Metadata.GetTableName();
+            var schema = entry.Metadata.GetSchema();
+
+            var nameTable = string.Format("{0}.{1}", schema, name);
+
+            EntityMapping entityMapping = tableMapping.FirstOrDefault(m => m.EntityType == type);
+            if (entityMapping == null)
+            {
+                entityMapping = CreateTableMapping(type, nameTable);
+                tableMapping.Add(entityMapping);
+            }
+            return entityMapping;
+        }
+
+        private static EntityMapping CreateTableMapping(Type type, string tname)
+        {
+            return new EntityMapping { EntityType = type, TableName = tname, TransactionTableName = GetTransactionTableName(tname) };
+        }
+
+        private static string GetTransactionTableName(string tname)
+        {
+            if (tname.Contains("_Transacciones"))
+            {
+                return tname;
+            }
+
+
+            string result = string.Format("{0}_Transacciones", tname);
+            return result;
+        }
+
+        private static Type GetDomainEntityType(EntityEntry entry)
+        {
+            Type type = entry.Entity.GetType();
+            if (type.FullName != null)
+            {
+                if (type.FullName.Contains("Dominio"))
+                {
+                    return type;
+                }
+                if (type.BaseType != null)
+                {
+                    return type.BaseType;
+                }
+            }
+
+            return null;
+        }
+
+        private static void ApplyTransactionInfo(Logging.Transaction transaction, EntityEntry entry)
+        {
+            ((Entity)entry.Entity).FechaTransaccion = transaction.TransactionDate;
+            ((Entity)entry.Entity).DescripcionTransaccion = entry.State.ToString();
+            ((Entity)entry.Entity).ModificadoPor = transaction.ModifiedBy;
+
+            AplicarInformacionTransaccion(entry, "TipoTransaccion", transaction.TransactionType);
+            AplicarInformacionTransaccion(entry, "TransaccionUId", transaction.TransactionId);
+        }
+
+        private static void AplicarInformacionTransaccion(EntityEntry item, string nombrePropiedad, object valorPropiedad)
+        {
+            if (item != null && item.Entity != null)
+            {
+                PropertyInfo propInfoEntity = item.Entity.GetType().GetProperty(nombrePropiedad);
+                if (propInfoEntity != null)
+                {
+                    propInfoEntity.SetValue(item.Entity, valorPropiedad, null);
+                }
+            }
+        }
+
+        private IEnumerable<EntityEntry> GetChangedDbEntityEntries()
+        {
+            return ChangeTracker.Entries().Where(
+                e =>
+                (e.Entity is Entity) &&
+                (e.State == EntityState.Modified || e.State == EntityState.Added || e.State == EntityState.Deleted));
+        }
+
+        private static Logging.Transaction BuildTransactionInfo(TransactionInfo transactionInfo)
+        {
+            var transaccionId = NewSequentialTransactionIdentity();
+
+            return new Logging.Transaction
+            {
+                TransactionId = transaccionId.TransactionId,
+                TransactionDate = transaccionId.TransactionDate,
+                TransactionOrigen = transactionInfo.TipoTransaccion,
+                TransactionType = transactionInfo.TipoTransaccion,
+                ModifiedBy = transactionInfo.ModificadoPor
+            };
+        }
+
+        public static TransactionIdentity NewSequentialTransactionIdentity()
+        {
+            return new TransactionIdentity
+            {
+                TransactionId = NewSequentialGuid(),
+                TransactionDate = DateTime.Now,
+                TransactionUtcDate = DateTime.UtcNow
+            };
+        }
+
+        public static Guid NewSequentialGuid()
+        {
+            byte[] uid = Guid.NewGuid().ToByteArray();
+            byte[] binDate = BitConverter.GetBytes(DateTime.UtcNow.Ticks);
+
+            var secuentialGuid = new byte[uid.Length];
+
+            secuentialGuid[0] = uid[0];
+            secuentialGuid[1] = uid[1];
+            secuentialGuid[2] = uid[2];
+            secuentialGuid[3] = uid[3];
+            secuentialGuid[4] = uid[4];
+            secuentialGuid[5] = uid[5];
+            secuentialGuid[6] = uid[6];
+            // set the first part of the 8th byte to '1100' so
+            // later we'll be able to validate it was generated by us
+
+            secuentialGuid[7] = (byte)(0xc0 | (0xf & uid[7]));
+
+            // the last 8 bytes are sequential,
+            // it minimizes index fragmentation
+            // to a degree as long as there are not a large
+            // number of Secuential-Guids generated per millisecond
+
+            secuentialGuid[9] = binDate[0];
+            secuentialGuid[8] = binDate[1];
+            secuentialGuid[15] = binDate[2];
+            secuentialGuid[14] = binDate[3];
+            secuentialGuid[13] = binDate[4];
+            secuentialGuid[12] = binDate[5];
+            secuentialGuid[11] = binDate[6];
+            secuentialGuid[10] = binDate[7];
+
+            return new Guid(secuentialGuid);
+        }
+
+        public void RollbackChanges()
+        {
+            //Set all entities in change tracker
+            //as 'unchanged state'
+            ChangeTracker.Entries()
+                .ToList().ForEach(e => e.State = EntityState.Unchanged);
+        }
+
+        public int ExecuteCommand(string sqlCommand, params object[] parameters)
+        {
+            return Database.ExecuteSqlRaw(sqlCommand, parameters);
+        }
+
+        public IEnumerable<TEntity> ExecuteQuery<TEntity>(string sqlCommand, params object[] parameters) 
+        {
+            //return Set<TEntity>().FromSqlRaw(sqlCommand, parameters).ToList();
+
+            return Database.SqlQueryRaw<TEntity>(sqlCommand, parameters);
+        }
+
+        public TType ExecuteScalarFunction<TType>(string scalarFunction, params object[] parameters)
+        {
+            var returnValue = Database.SqlQueryRaw<TType>(scalarFunction, parameters);
+
+            return returnValue.FirstOrDefault();
+        }
+
+        public async Task<IEnumerable<TEntity>> ExecuteQueryAsync<TEntity>(string sqlCommand, params object[] parameters) where TEntity: class
+        {
+            return await Set<TEntity>().FromSqlRaw(sqlCommand, parameters).ToListAsync();
+        }
+
+        public DbSet<TEntity> CreateSet<TEntity>() where TEntity : class
+        {
+            return Set<TEntity>();
+        }
+
+        public void Attach<TEntity>(TEntity item) where TEntity : class
+        {
+            //Attach and set as unchanged
+            Entry(item).State = EntityState.Unchanged;
+        }
+
+        public void SetModified<TEntity>(TEntity item) where TEntity : class
+        {
+            //This operation also attach item in object state manager
+            Entry(item).State = EntityState.Modified;
+        }
+
+        public void ApplyCurrentValues<TEntity>(TEntity original, TEntity current) where TEntity : class
+        {
+            Entry(original).CurrentValues.SetValues(current);
+        }
     }
 }
 ````
@@ -10822,6 +10783,36 @@ namespace Infraestructura.Context.Mapping.Seguridad
   </ItemGroup>
 
 </Project>
+````
+
+## File: Aplicacion/DTOs/Seguridad/UserRequest.cs
+````csharp
+namespace Aplicacion.DTOs.Seguridad
+{
+    public class UserRequest : RequestBase
+    {
+        public string? UsuarioId { get; set; }
+        public string? Password { get; set; }
+    }
+
+    public class EdicionUsuarioRequest : RequestBase
+    {
+        public UsuarioDTO? Usuario { get; set; }
+    }
+
+    public class GetUserRequest : RequestBase { }
+
+    public class EdicionRolRequest : RequestBase
+    {
+        public RolDTO? Rol { get; set; }
+    }
+
+    public class EdicionPermisosRequest : RequestBase
+    {
+        public string? RolId { get; set; }
+        public List<PermisosDTO>? Permisos { get; set; }
+    }
+}
 ````
 
 ## File: Dominio/Context/Entidades/Seguridad/Usuario.cs
