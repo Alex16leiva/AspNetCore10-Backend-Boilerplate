@@ -1,4 +1,5 @@
 using Aplicacion.Core;
+using System;
 using Aplicacion.Services.ConfiguracionesApp;
 using Aplicacion.Services.Seguridad;
 using CrossCutting.Configuration;
@@ -13,7 +14,8 @@ namespace WebServices.Extensions
     {
         public static IServiceCollection AddPersistenceInfrastructure(this IServiceCollection services, IConfiguration configuration)
         {
-            string connectionString = configuration.GetConnectionString("conectionDataBase");
+            string connectionString = configuration.GetConnectionString("conectionDataBase")
+                ?? throw new InvalidOperationException("Connection string 'conectionDataBase' not found in configuration.");
 
             // Inicialización única de configuraciones
             AppSettingsManager.Initialize(connectionString);
