@@ -31,7 +31,7 @@ namespace WebServices.Extensions
         public static IServiceCollection AddApplicationServices(this IServiceCollection services)
         {
             // Servicios de Aplicación
-            services.AddScoped<SecurityAplicationService>();
+            services.AddScoped<ISecurityApplicationService, SecurityAplicationService>();
             services.AddScoped<IConfiguracionesApplicationService, ConfiguracionesApplicationService>();
 
             return services;

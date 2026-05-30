@@ -10,8 +10,8 @@ namespace WebServices.Controllers
     [ApiController]
     public class UserController : ControllerBase
     {
-        private readonly SecurityAplicationService _securityAppService;
-        public UserController(SecurityAplicationService securityAppService)
+        private readonly ISecurityApplicationService _securityAppService;
+        public UserController(ISecurityApplicationService securityAppService)
         {
             _securityAppService = securityAppService;
         }
