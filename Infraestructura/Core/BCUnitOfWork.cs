@@ -38,7 +38,7 @@ namespace Infraestructura.Core
             {
                 base.Database.OpenConnection();
                 //Reseteando el detalle de las transacciones.
-                transaction.TransactionDetail = new List<Logging.TransactionDetail>();
+                transaction.TransactionDetail = [];
 
                 using (var scope = TransactionScopeFactory.GetTransactionScope())
                 {
@@ -107,10 +107,11 @@ namespace Infraestructura.Core
 
         private IEnumerable<SqlCommandInfo> GetAuditRecords(Logging.Transaction transaction)
         {
-            var auditCommands = new List<SqlCommandInfo>();
-
-            // Adding Audit Header Transaction CommandInfo.
-            auditCommands.Add(GetAuditHeaderCommandInfo(transaction));
+            var auditCommands = new List<SqlCommandInfo>
+            {
+                // Adding Audit Header Transaction CommandInfo.
+                GetAuditHeaderCommandInfo(transaction)
+            };
 
             // Adding Audit Detail Transaction CommandInfo
             foreach (var transactionDetail in transaction.TransactionDetail)
@@ -171,7 +172,7 @@ namespace Infraestructura.Core
             var insert = new StringBuilder();
             var fields = new StringBuilder();
             var paramNames = new StringBuilder();
-            var values = new List<Object>();
+            List<object> values = [];
 
             insert.AppendLine(string.Format("Insert Into {0} ", entityMapping.TransactionTableName));
 
@@ -229,7 +230,7 @@ namespace Infraestructura.Core
             return entry.Property(prop).CurrentValue;
         }
 
-        private void TryGeTransactionInfo(string property, Logging.Transaction transaction, out object value)
+        private static void TryGeTransactionInfo(string property, Logging.Transaction transaction, out object value)
         {
             switch (property)
             {
@@ -257,7 +258,7 @@ namespace Infraestructura.Core
 
         private List<string> GetPropertiesEntity(EntityEntry? entry, PropertyValues? originalValues)
         {
-            List<string> propertyNames = new();
+            List<string> propertyNames = [];
             var entity = entry.Entity;
             var entityType =  entity.GetType();
 
@@ -276,7 +277,7 @@ namespace Infraestructura.Core
             return propertyNames;
         }
 
-        private EntityMapping GetEntityMappingConfiguration(List<EntityMapping> tableMapping, EntityEntry entry)
+        private static EntityMapping GetEntityMappingConfiguration(List<EntityMapping> tableMapping, EntityEntry entry)
         {
             var type = GetDomainEntityType(entry);
 
@@ -294,12 +295,12 @@ namespace Infraestructura.Core
             return entityMapping;
         }
 
-        private EntityMapping CreateTableMapping(Type type, string tname)
+        private static EntityMapping CreateTableMapping(Type type, string tname)
         {
             return new EntityMapping { EntityType = type, TableName = tname, TransactionTableName = GetTransactionTableName(tname) };
         }
 
-        private string GetTransactionTableName(string tname)
+        private static string GetTransactionTableName(string tname)
         {
             if (tname.Contains("_Transacciones"))
             {
@@ -311,7 +312,7 @@ namespace Infraestructura.Core
             return result;
         }
 
-        private Type GetDomainEntityType(EntityEntry entry)
+        private static Type GetDomainEntityType(EntityEntry entry)
         {
             Type type = entry.Entity.GetType();
             if (type.FullName != null)
@@ -329,7 +330,7 @@ namespace Infraestructura.Core
             return null;
         }
 
-        private void ApplyTransactionInfo(Logging.Transaction transaction, EntityEntry entry)
+        private static void ApplyTransactionInfo(Logging.Transaction transaction, EntityEntry entry)
         {
             ((Entity)entry.Entity).FechaTransaccion = transaction.TransactionDate;
             ((Entity)entry.Entity).DescripcionTransaccion = entry.State.ToString();
@@ -339,7 +340,7 @@ namespace Infraestructura.Core
             AplicarInformacionTransaccion(entry, "TransaccionUId", transaction.TransactionId);
         }
 
-        private void AplicarInformacionTransaccion(EntityEntry item, string nombrePropiedad, object valorPropiedad)
+        private static void AplicarInformacionTransaccion(EntityEntry item, string nombrePropiedad, object valorPropiedad)
         {
             if (item != null && item.Entity != null)
             {
@@ -359,7 +360,7 @@ namespace Infraestructura.Core
                 (e.State == EntityState.Modified || e.State == EntityState.Added || e.State == EntityState.Deleted));
         }
 
-        private Logging.Transaction BuildTransactionInfo(TransactionInfo transactionInfo)
+        private static Logging.Transaction BuildTransactionInfo(TransactionInfo transactionInfo)
         {
             var transaccionId = NewSequentialTransactionIdentity();
 
@@ -373,7 +374,7 @@ namespace Infraestructura.Core
             };
         }
 
-        public TransactionIdentity NewSequentialTransactionIdentity()
+        public static TransactionIdentity NewSequentialTransactionIdentity()
         {
             return new TransactionIdentity
             {

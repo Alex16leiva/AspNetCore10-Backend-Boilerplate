@@ -140,1127 +140,8 @@ WebServices/WebServices.http
 
 # Files
 
-## File: Aplicacion/DTOs/Seguridad/TokenRequest.cs
-```csharp
-namespace Aplicacion.DTOs.Seguridad
-{
-    public class TokenRequest
-    {
-        public string? AccessToken { get; set; }
-        public string? RefreshToken { get; set; }
-    }
-}
-```
-
-## File: Infraestructura/Migrations/20260529013725_AddRefreshToken.cs
-```csharp
-using System;
-using Microsoft.EntityFrameworkCore.Migrations;
-
-#nullable disable
-
-namespace Infraestructura.Migrations
-{
-    /// <inheritdoc />
-    public partial class AddRefreshToken : Migration
-    {
-        /// <inheritdoc />
-        protected override void Up(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.EnsureSchema(
-                name: "comunes");
-
-            migrationBuilder.EnsureSchema(
-                name: "Comunes");
-
-            migrationBuilder.EnsureSchema(
-                name: "Seguridad");
-
-            migrationBuilder.CreateTable(
-                name: "Configuraciones",
-                schema: "comunes",
-                columns: table => new
-                {
-                    ConfiguracionId = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
-                    Descripcion = table.Column<string>(type: "varchar(100)", unicode: false, maxLength: 100, nullable: false),
-                    ModificadoPor = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
-                    FechaTransaccion = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    DescripcionTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "varbinary(max)", nullable: false),
-                    TransaccionUId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    TipoTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Configuraciones", x => x.ConfiguracionId);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Pantalla",
-                schema: "Seguridad",
-                columns: table => new
-                {
-                    PantallaId = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    Descripcion = table.Column<string>(type: "varchar(max)", unicode: false, nullable: false),
-                    ModificadoPor = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
-                    FechaTransaccion = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    DescripcionTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "varbinary(max)", nullable: false),
-                    TransaccionUId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    TipoTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Pantalla", x => x.PantallaId);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Rol",
-                schema: "Seguridad",
-                columns: table => new
-                {
-                    RolId = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
-                    Descripcion = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
-                    ModificadoPor = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
-                    FechaTransaccion = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    DescripcionTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "varbinary(max)", nullable: false),
-                    TransaccionUId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    TipoTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Rol", x => x.RolId);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "ConfiguracionesDetalle",
-                schema: "Comunes",
-                columns: table => new
-                {
-                    ConfiguracionId = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
-                    Atributo = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
-                    Valor = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
-                    Descripcion = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    ModificadoPor = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
-                    FechaTransaccion = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    DescripcionTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "varbinary(max)", nullable: false),
-                    TransaccionUId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    TipoTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ConfiguracionesDetalle", x => new { x.ConfiguracionId, x.Atributo });
-                    table.ForeignKey(
-                        name: "FK_ConfiguracionesDetalle_Configuraciones_ConfiguracionId",
-                        column: x => x.ConfiguracionId,
-                        principalSchema: "comunes",
-                        principalTable: "Configuraciones",
-                        principalColumn: "ConfiguracionId",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Permisos",
-                schema: "Seguridad",
-                columns: table => new
-                {
-                    RolId = table.Column<string>(type: "varchar(25)", nullable: false),
-                    PantallaId = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    Ver = table.Column<bool>(type: "bit", nullable: false),
-                    Editar = table.Column<bool>(type: "bit", nullable: false),
-                    Eliminar = table.Column<bool>(type: "bit", nullable: false),
-                    ModificadoPor = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
-                    FechaTransaccion = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    DescripcionTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "varbinary(max)", nullable: false),
-                    TransaccionUId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    TipoTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Permisos", x => new { x.RolId, x.PantallaId });
-                    table.ForeignKey(
-                        name: "FK_Permisos_Rol_RolId",
-                        column: x => x.RolId,
-                        principalSchema: "Seguridad",
-                        principalTable: "Rol",
-                        principalColumn: "RolId",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Usuario",
-                schema: "Seguridad",
-                columns: table => new
-                {
-                    UsuarioId = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
-                    Contrasena = table.Column<string>(type: "nvarchar(250)", maxLength: 250, nullable: false),
-                    Nombre = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    Apellido = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    Activo = table.Column<bool>(type: "bit", nullable: false),
-                    RolId = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
-                    RefreshToken = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    RefreshTokenExpiryTime = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    ModificadoPor = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
-                    FechaTransaccion = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    DescripcionTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "varbinary(max)", nullable: false),
-                    TransaccionUId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    TipoTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Usuario", x => x.UsuarioId);
-                    table.ForeignKey(
-                        name: "FK_Usuario_Rol_RolId",
-                        column: x => x.RolId,
-                        principalSchema: "Seguridad",
-                        principalTable: "Rol",
-                        principalColumn: "RolId",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Usuario_RolId",
-                schema: "Seguridad",
-                table: "Usuario",
-                column: "RolId");
-        }
-
-        /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.DropTable(
-                name: "ConfiguracionesDetalle",
-                schema: "Comunes");
-
-            migrationBuilder.DropTable(
-                name: "Pantalla",
-                schema: "Seguridad");
-
-            migrationBuilder.DropTable(
-                name: "Permisos",
-                schema: "Seguridad");
-
-            migrationBuilder.DropTable(
-                name: "Usuario",
-                schema: "Seguridad");
-
-            migrationBuilder.DropTable(
-                name: "Configuraciones",
-                schema: "comunes");
-
-            migrationBuilder.DropTable(
-                name: "Rol",
-                schema: "Seguridad");
-        }
-    }
-}
-```
-
-## File: Infraestructura/Migrations/20260529013725_AddRefreshToken.Designer.cs
-```csharp
-// <auto-generated />
-using System;
-using Infraestructura.Context;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Migrations;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-
-#nullable disable
-
-namespace Infraestructura.Migrations
-{
-    [DbContext(typeof(MyContext))]
-    [Migration("20260529013725_AddRefreshToken")]
-    partial class AddRefreshToken
-    {
-        /// <inheritdoc />
-        protected override void BuildTargetModel(ModelBuilder modelBuilder)
-        {
-#pragma warning disable 612, 618
-            modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.4")
-                .HasAnnotation("Relational:MaxIdentifierLength", 128);
-
-            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-
-            modelBuilder.Entity("Dominio.Context.Entidades.ConfiguracionesAgg.Configuraciones", b =>
-                {
-                    b.Property<string>("ConfiguracionId")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("ConfiguracionId");
-
-                    b.Property<string>("Descripcion")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("Descripcion");
-
-                    b.Property<string>("DescripcionTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("DescripcionTransaccion");
-
-                    b.Property<DateTime>("FechaTransaccion")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("FechaTransaccion");
-
-                    b.Property<string>("ModificadoPor")
-                        .IsRequired()
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("ModificadoPor");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("varbinary(max)")
-                        .HasColumnName("RowVersion");
-
-                    b.Property<string>("TipoTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("TipoTransaccion");
-
-                    b.Property<Guid>("TransaccionUId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("TransaccionUId");
-
-                    b.HasKey("ConfiguracionId");
-
-                    b.ToTable("Configuraciones", "comunes");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.ConfiguracionesAgg.ConfiguracionesDetalle", b =>
-                {
-                    b.Property<string>("ConfiguracionId")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("ConfiguracionId");
-
-                    b.Property<string>("Atributo")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("Atributo");
-
-                    b.Property<string>("Descripcion")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("Descripcion");
-
-                    b.Property<string>("DescripcionTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("DescripcionTransaccion");
-
-                    b.Property<DateTime>("FechaTransaccion")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("FechaTransaccion");
-
-                    b.Property<string>("ModificadoPor")
-                        .IsRequired()
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("ModificadoPor");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("varbinary(max)")
-                        .HasColumnName("RowVersion");
-
-                    b.Property<string>("TipoTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("TipoTransaccion");
-
-                    b.Property<Guid>("TransaccionUId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("TransaccionUId");
-
-                    b.Property<string>("Valor")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("Valor");
-
-                    b.HasKey("ConfiguracionId", "Atributo");
-
-                    b.ToTable("ConfiguracionesDetalle", "Comunes");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Pantalla", b =>
-                {
-                    b.Property<string>("PantallaId")
-                        .HasColumnType("nvarchar(450)")
-                        .HasColumnName("PantallaId");
-
-                    b.Property<string>("Descripcion")
-                        .IsRequired()
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(max)")
-                        .HasColumnName("Descripcion");
-
-                    b.Property<string>("DescripcionTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("DescripcionTransaccion");
-
-                    b.Property<DateTime>("FechaTransaccion")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("FechaTransaccion");
-
-                    b.Property<string>("ModificadoPor")
-                        .IsRequired()
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("ModificadoPor");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("varbinary(max)")
-                        .HasColumnName("RowVersion");
-
-                    b.Property<string>("TipoTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("TipoTransaccion");
-
-                    b.Property<Guid>("TransaccionUId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("TransaccionUId");
-
-                    b.HasKey("PantallaId");
-
-                    b.ToTable("Pantalla", "Seguridad");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Permisos", b =>
-                {
-                    b.Property<string>("RolId")
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("RolId");
-
-                    b.Property<string>("PantallaId")
-                        .HasColumnType("nvarchar(450)")
-                        .HasColumnName("PantallaId");
-
-                    b.Property<string>("DescripcionTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("DescripcionTransaccion");
-
-                    b.Property<bool>("Editar")
-                        .HasColumnType("bit")
-                        .HasColumnName("Editar");
-
-                    b.Property<bool>("Eliminar")
-                        .HasColumnType("bit")
-                        .HasColumnName("Eliminar");
-
-                    b.Property<DateTime>("FechaTransaccion")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("FechaTransaccion");
-
-                    b.Property<string>("ModificadoPor")
-                        .IsRequired()
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("ModificadoPor");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("varbinary(max)")
-                        .HasColumnName("RowVersion");
-
-                    b.Property<string>("TipoTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("TipoTransaccion");
-
-                    b.Property<Guid>("TransaccionUId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("TransaccionUId");
-
-                    b.Property<bool>("Ver")
-                        .HasColumnType("bit")
-                        .HasColumnName("Ver");
-
-                    b.HasKey("RolId", "PantallaId");
-
-                    b.ToTable("Permisos", "Seguridad");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Rol", b =>
-                {
-                    b.Property<string>("RolId")
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("RolId");
-
-                    b.Property<string>("Descripcion")
-                        .IsRequired()
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("Descripcion");
-
-                    b.Property<string>("DescripcionTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("DescripcionTransaccion");
-
-                    b.Property<DateTime>("FechaTransaccion")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("FechaTransaccion");
-
-                    b.Property<string>("ModificadoPor")
-                        .IsRequired()
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("ModificadoPor");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("varbinary(max)")
-                        .HasColumnName("RowVersion");
-
-                    b.Property<string>("TipoTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("TipoTransaccion");
-
-                    b.Property<Guid>("TransaccionUId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("TransaccionUId");
-
-                    b.HasKey("RolId");
-
-                    b.ToTable("Rol", "Seguridad");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Usuario", b =>
-                {
-                    b.Property<string>("UsuarioId")
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("UsuarioId");
-
-                    b.Property<bool>("Activo")
-                        .HasColumnType("bit")
-                        .HasColumnName("Activo");
-
-                    b.Property<string>("Apellido")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasColumnName("Apellido");
-
-                    b.Property<string>("Contrasena")
-                        .IsRequired()
-                        .HasMaxLength(250)
-                        .HasColumnType("nvarchar(250)")
-                        .HasColumnName("Contrasena");
-
-                    b.Property<string>("DescripcionTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("DescripcionTransaccion");
-
-                    b.Property<DateTime>("FechaTransaccion")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("FechaTransaccion");
-
-                    b.Property<string>("ModificadoPor")
-                        .IsRequired()
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("ModificadoPor");
-
-                    b.Property<string>("Nombre")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasColumnName("Nombre");
-
-                    b.Property<string>("RefreshToken")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("RefreshTokenExpiryTime")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("RolId")
-                        .IsRequired()
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("RolId");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("varbinary(max)")
-                        .HasColumnName("RowVersion");
-
-                    b.Property<string>("TipoTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("TipoTransaccion");
-
-                    b.Property<Guid>("TransaccionUId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("TransaccionUId");
-
-                    b.HasKey("UsuarioId");
-
-                    b.HasIndex("RolId");
-
-                    b.ToTable("Usuario", "Seguridad");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.ConfiguracionesAgg.ConfiguracionesDetalle", b =>
-                {
-                    b.HasOne("Dominio.Context.Entidades.ConfiguracionesAgg.Configuraciones", "Configuraciones")
-                        .WithMany("ConfiguracionesDetalle")
-                        .HasForeignKey("ConfiguracionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Configuraciones");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Permisos", b =>
-                {
-                    b.HasOne("Dominio.Context.Entidades.Seguridad.Rol", "Rol")
-                        .WithMany("Permisos")
-                        .HasForeignKey("RolId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Rol");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Usuario", b =>
-                {
-                    b.HasOne("Dominio.Context.Entidades.Seguridad.Rol", "Rol")
-                        .WithMany("Usuarios")
-                        .HasForeignKey("RolId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Rol");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.ConfiguracionesAgg.Configuraciones", b =>
-                {
-                    b.Navigation("ConfiguracionesDetalle");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Rol", b =>
-                {
-                    b.Navigation("Permisos");
-
-                    b.Navigation("Usuarios");
-                });
-#pragma warning restore 612, 618
-        }
-    }
-}
-```
-
-## File: Infraestructura/Migrations/MyContextModelSnapshot.cs
-```csharp
-// <auto-generated />
-using System;
-using Infraestructura.Context;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-
-#nullable disable
-
-namespace Infraestructura.Migrations
-{
-    [DbContext(typeof(MyContext))]
-    partial class MyContextModelSnapshot : ModelSnapshot
-    {
-        protected override void BuildModel(ModelBuilder modelBuilder)
-        {
-#pragma warning disable 612, 618
-            modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.4")
-                .HasAnnotation("Relational:MaxIdentifierLength", 128);
-
-            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-
-            modelBuilder.Entity("Dominio.Context.Entidades.ConfiguracionesAgg.Configuraciones", b =>
-                {
-                    b.Property<string>("ConfiguracionId")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("ConfiguracionId");
-
-                    b.Property<string>("Descripcion")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("Descripcion");
-
-                    b.Property<string>("DescripcionTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("DescripcionTransaccion");
-
-                    b.Property<DateTime>("FechaTransaccion")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("FechaTransaccion");
-
-                    b.Property<string>("ModificadoPor")
-                        .IsRequired()
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("ModificadoPor");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("varbinary(max)")
-                        .HasColumnName("RowVersion");
-
-                    b.Property<string>("TipoTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("TipoTransaccion");
-
-                    b.Property<Guid>("TransaccionUId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("TransaccionUId");
-
-                    b.HasKey("ConfiguracionId");
-
-                    b.ToTable("Configuraciones", "comunes");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.ConfiguracionesAgg.ConfiguracionesDetalle", b =>
-                {
-                    b.Property<string>("ConfiguracionId")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("ConfiguracionId");
-
-                    b.Property<string>("Atributo")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("Atributo");
-
-                    b.Property<string>("Descripcion")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("Descripcion");
-
-                    b.Property<string>("DescripcionTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("DescripcionTransaccion");
-
-                    b.Property<DateTime>("FechaTransaccion")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("FechaTransaccion");
-
-                    b.Property<string>("ModificadoPor")
-                        .IsRequired()
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("ModificadoPor");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("varbinary(max)")
-                        .HasColumnName("RowVersion");
-
-                    b.Property<string>("TipoTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("TipoTransaccion");
-
-                    b.Property<Guid>("TransaccionUId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("TransaccionUId");
-
-                    b.Property<string>("Valor")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("Valor");
-
-                    b.HasKey("ConfiguracionId", "Atributo");
-
-                    b.ToTable("ConfiguracionesDetalle", "Comunes");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Pantalla", b =>
-                {
-                    b.Property<string>("PantallaId")
-                        .HasColumnType("nvarchar(450)")
-                        .HasColumnName("PantallaId");
-
-                    b.Property<string>("Descripcion")
-                        .IsRequired()
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(max)")
-                        .HasColumnName("Descripcion");
-
-                    b.Property<string>("DescripcionTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("DescripcionTransaccion");
-
-                    b.Property<DateTime>("FechaTransaccion")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("FechaTransaccion");
-
-                    b.Property<string>("ModificadoPor")
-                        .IsRequired()
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("ModificadoPor");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("varbinary(max)")
-                        .HasColumnName("RowVersion");
-
-                    b.Property<string>("TipoTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("TipoTransaccion");
-
-                    b.Property<Guid>("TransaccionUId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("TransaccionUId");
-
-                    b.HasKey("PantallaId");
-
-                    b.ToTable("Pantalla", "Seguridad");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Permisos", b =>
-                {
-                    b.Property<string>("RolId")
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("RolId");
-
-                    b.Property<string>("PantallaId")
-                        .HasColumnType("nvarchar(450)")
-                        .HasColumnName("PantallaId");
-
-                    b.Property<string>("DescripcionTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("DescripcionTransaccion");
-
-                    b.Property<bool>("Editar")
-                        .HasColumnType("bit")
-                        .HasColumnName("Editar");
-
-                    b.Property<bool>("Eliminar")
-                        .HasColumnType("bit")
-                        .HasColumnName("Eliminar");
-
-                    b.Property<DateTime>("FechaTransaccion")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("FechaTransaccion");
-
-                    b.Property<string>("ModificadoPor")
-                        .IsRequired()
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("ModificadoPor");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("varbinary(max)")
-                        .HasColumnName("RowVersion");
-
-                    b.Property<string>("TipoTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("TipoTransaccion");
-
-                    b.Property<Guid>("TransaccionUId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("TransaccionUId");
-
-                    b.Property<bool>("Ver")
-                        .HasColumnType("bit")
-                        .HasColumnName("Ver");
-
-                    b.HasKey("RolId", "PantallaId");
-
-                    b.ToTable("Permisos", "Seguridad");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Rol", b =>
-                {
-                    b.Property<string>("RolId")
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("RolId");
-
-                    b.Property<string>("Descripcion")
-                        .IsRequired()
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("Descripcion");
-
-                    b.Property<string>("DescripcionTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("DescripcionTransaccion");
-
-                    b.Property<DateTime>("FechaTransaccion")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("FechaTransaccion");
-
-                    b.Property<string>("ModificadoPor")
-                        .IsRequired()
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("ModificadoPor");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("varbinary(max)")
-                        .HasColumnName("RowVersion");
-
-                    b.Property<string>("TipoTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("TipoTransaccion");
-
-                    b.Property<Guid>("TransaccionUId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("TransaccionUId");
-
-                    b.HasKey("RolId");
-
-                    b.ToTable("Rol", "Seguridad");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Usuario", b =>
-                {
-                    b.Property<string>("UsuarioId")
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("UsuarioId");
-
-                    b.Property<bool>("Activo")
-                        .HasColumnType("bit")
-                        .HasColumnName("Activo");
-
-                    b.Property<string>("Apellido")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasColumnName("Apellido");
-
-                    b.Property<string>("Contrasena")
-                        .IsRequired()
-                        .HasMaxLength(250)
-                        .HasColumnType("nvarchar(250)")
-                        .HasColumnName("Contrasena");
-
-                    b.Property<string>("DescripcionTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("DescripcionTransaccion");
-
-                    b.Property<DateTime>("FechaTransaccion")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("FechaTransaccion");
-
-                    b.Property<string>("ModificadoPor")
-                        .IsRequired()
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("ModificadoPor");
-
-                    b.Property<string>("Nombre")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasColumnName("Nombre");
-
-                    b.Property<string>("RefreshToken")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("RefreshTokenExpiryTime")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("RolId")
-                        .IsRequired()
-                        .HasMaxLength(25)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(25)")
-                        .HasColumnName("RolId");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("varbinary(max)")
-                        .HasColumnName("RowVersion");
-
-                    b.Property<string>("TipoTransaccion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("TipoTransaccion");
-
-                    b.Property<Guid>("TransaccionUId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("TransaccionUId");
-
-                    b.HasKey("UsuarioId");
-
-                    b.HasIndex("RolId");
-
-                    b.ToTable("Usuario", "Seguridad");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.ConfiguracionesAgg.ConfiguracionesDetalle", b =>
-                {
-                    b.HasOne("Dominio.Context.Entidades.ConfiguracionesAgg.Configuraciones", "Configuraciones")
-                        .WithMany("ConfiguracionesDetalle")
-                        .HasForeignKey("ConfiguracionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Configuraciones");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Permisos", b =>
-                {
-                    b.HasOne("Dominio.Context.Entidades.Seguridad.Rol", "Rol")
-                        .WithMany("Permisos")
-                        .HasForeignKey("RolId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Rol");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Usuario", b =>
-                {
-                    b.HasOne("Dominio.Context.Entidades.Seguridad.Rol", "Rol")
-                        .WithMany("Usuarios")
-                        .HasForeignKey("RolId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Rol");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.ConfiguracionesAgg.Configuraciones", b =>
-                {
-                    b.Navigation("ConfiguracionesDetalle");
-                });
-
-            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Rol", b =>
-                {
-                    b.Navigation("Permisos");
-
-                    b.Navigation("Usuarios");
-                });
-#pragma warning restore 612, 618
-        }
-    }
-}
-```
-
 ## File: .gitattributes
-```
+````
 ###############################################################################
 # Set default behavior to automatically normalize line endings.
 ###############################################################################
@@ -1324,10 +205,10 @@ namespace Infraestructura.Migrations
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
-```
+````
 
 ## File: .gitignore
-```
+````
 ## Ignore Visual Studio temporary files, build results, and
 ## files generated by popular Visual Studio add-ons.
 ##
@@ -1691,10 +572,10 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-```
+````
 
 ## File: Aplicacion/Core/AutoMapperProfile.cs
-```csharp
+````csharp
 using Aplicacion.DTOs.Seguridad;
 using AutoMapper;
 using Dominio.Context.Entidades.Seguridad;
@@ -1709,10 +590,10 @@ namespace Aplicacion.Core
         }
     }
 }
-```
+````
 
 ## File: Aplicacion/Core/BaseDisposable.cs
-```csharp
+````csharp
 namespace Aplicacion.Core
 {
     public class BaseDisposable : IDisposable
@@ -1739,10 +620,10 @@ namespace Aplicacion.Core
         }
     }
 }
-```
+````
 
 ## File: Aplicacion/DTOs/ConfiguracionesDTO/ConfiguracionesDetalleDTO.cs
-```csharp
+````csharp
 namespace Aplicacion.DTOs.ConfiguracionesDTO
 {
     public class ConfiguracionesDetalleDTO : ResponseBase
@@ -1753,10 +634,10 @@ namespace Aplicacion.DTOs.ConfiguracionesDTO
         public string? Descripcion { get; set; }
     }
 }
-```
+````
 
 ## File: Aplicacion/DTOs/ConfiguracionesDTO/ConfiguracionesDTO.cs
-```csharp
+````csharp
 namespace Aplicacion.DTOs.ConfiguracionesDTO
 {
     public class ConfiguracionesDTO : ResponseBase
@@ -1766,10 +647,10 @@ namespace Aplicacion.DTOs.ConfiguracionesDTO
         public List<ConfiguracionesDetalleDTO> ConfiguracionesDetalle { get; set; }
     }
 }
-```
+````
 
 ## File: Aplicacion/DTOs/ConfiguracionesDTO/ConfiguracionesRequest.cs
-```csharp
+````csharp
 namespace Aplicacion.DTOs.ConfiguracionesDTO
 {
     public class ConfiguracionesRequest : RequestBase
@@ -1778,10 +659,10 @@ namespace Aplicacion.DTOs.ConfiguracionesDTO
         public ConfiguracionesDetalleDTO? ConfiguracionesDetalle { get; set; }
     }
 }
-```
+````
 
 ## File: Aplicacion/DTOs/SearchResult.cs
-```csharp
+````csharp
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1806,10 +687,10 @@ namespace Aplicacion.DTOs
         public string? ValidationErrorMessage { get; set; }
     }
 }
-```
+````
 
 ## File: Aplicacion/DTOs/Seguridad/PantallaDTO.cs
-```csharp
+````csharp
 namespace Aplicacion.DTOs.Seguridad
 {
     public class PantallaDTO : ResponseBase
@@ -1818,10 +699,10 @@ namespace Aplicacion.DTOs.Seguridad
         public string? Descripcion { get; set; }
     }
 }
-```
+````
 
 ## File: Aplicacion/DTOs/Seguridad/PermisosDTO.cs
-```csharp
+````csharp
 namespace Aplicacion.DTOs.Seguridad
 {
     public class PermisosDTO : ResponseBase
@@ -1833,10 +714,10 @@ namespace Aplicacion.DTOs.Seguridad
         public bool Eliminar { get; set; }
     }
 }
-```
+````
 
 ## File: Aplicacion/DTOs/Seguridad/RolDTO.cs
-```csharp
+````csharp
 namespace Aplicacion.DTOs.Seguridad
 {
     public class RolDTO : ResponseBase
@@ -1846,10 +727,22 @@ namespace Aplicacion.DTOs.Seguridad
         public List<PermisosDTO>? Permisos { get; set; }
     }
 }
-```
+````
+
+## File: Aplicacion/DTOs/Seguridad/TokenRequest.cs
+````csharp
+namespace Aplicacion.DTOs.Seguridad
+{
+    public class TokenRequest
+    {
+        public string? AccessToken { get; set; }
+        public string? RefreshToken { get; set; }
+    }
+}
+````
 
 ## File: Aplicacion/Helpers/TransactionInfoExtensions.cs
-```csharp
+````csharp
 using Aplicacion.DTOs;
 using Dominio.Core;
 
@@ -1868,10 +761,10 @@ namespace Aplicacion.Helpers
         }
     }
 }
-```
+````
 
 ## File: Aplicacion/Helpers/TransactionInfoHelper.cs
-```csharp
+````csharp
 using Aplicacion.DTOs;
 using Dominio.Core;
 using Infraestructura.Core.Identity;
@@ -1972,10 +865,10 @@ namespace Aplicacion.Helpers
         }
     }
 }
-```
+````
 
 ## File: Aplicacion/Services/ConfiguracionesApp/ConfiguracionesApplicationService.cs
-```csharp
+````csharp
 using Aplicacion.DTOs;
 using Aplicacion.DTOs.ConfiguracionesDTO;
 using Aplicacion.Helpers;
@@ -2127,10 +1020,10 @@ namespace Aplicacion.Services.ConfiguracionesApp
         }
     }
 }
-```
+````
 
 ## File: Aplicacion/Services/ConfiguracionesApp/IConfiguracionesApplicationService.cs
-```csharp
+````csharp
 using Aplicacion.DTOs;
 using Aplicacion.DTOs.ConfiguracionesDTO;
 
@@ -2146,358 +1039,10 @@ namespace Aplicacion.Services.ConfiguracionesApp
 
     }
 }
-```
-
-## File: Aplicacion/Services/Seguridad/SecurityAplicationService.cs
-```csharp
-using Aplicacion.Core;
-using Aplicacion.DTOs;
-using Aplicacion.DTOs.Seguridad;
-using Aplicacion.Helpers;
-using AutoMapper;
-using Dominio.Context.Entidades;
-using Dominio.Context.Entidades.Seguridad;
-using Dominio.Core;
-using Dominio.Core.Extensions;
-using Infraestructura.Context;
-using Infraestructura.Core.Jwtoken;
-
-namespace Aplicacion.Services.Seguridad
-{
-    public class SecurityAplicationService : BaseDisposable
-    {
-        private readonly IGenericRepository<IDataContext> _genericRepository;
-        private readonly ITokenService _tokenService;
-        private readonly IMapper _mapper;
-        public SecurityAplicationService(IGenericRepository<IDataContext> genericRepository, ITokenService tokenService, IMapper mapper)
-        {
-            _genericRepository = genericRepository;
-            _tokenService = tokenService;
-            _mapper = mapper;
-        }
-
-        public UsuarioDTO EditarUsuario(EdicionUsuarioRequest request)
-        {
-            string mensajeValidacion = request.Usuario.ValidarCampos();
-
-            if (mensajeValidacion.HasValue())
-            {
-                return new UsuarioDTO
-                {
-                    Message = mensajeValidacion,
-                };
-            }
-
-            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
-
-            if (usuarioExiste.IsNull())
-            {
-                return new UsuarioDTO
-                {
-                    Message = "El usuario no existe"
-                };
-            }
-
-            if (request.Usuario.EditarContrasena)
-            {
-                usuarioExiste.Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena);
-            }
-
-            usuarioExiste.Nombre = request.Usuario.Nombre.ValueOrEmpty();
-            usuarioExiste.Apellido = request.Usuario.Apellido.ValueOrEmpty();
-            usuarioExiste.RolId = request.Usuario.RolId.ValueOrEmpty();
-            usuarioExiste.Activo = request.Usuario.Activo;
-
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarUsuario");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return new UsuarioDTO();
-        }
-
-        public List<PantallaDTO> ObtenerPantallas()
-        {
-            var pantallas = _genericRepository.GetAll<Pantalla>();
-            return pantallas.Select(r => new PantallaDTO { Descripcion = r.Descripcion, PantallaId = r.PantallaId }).ToList();
-        }
-
-        public RolDTO EdicionPermisos(EdicionPermisosRequest request)
-        {
-            var permisos = _genericRepository.GetFiltered<Permisos>(r => r.RolId == request.RolId);
-
-            foreach (var item in request.Permisos)
-            {
-                var permiso = permisos.FirstOrDefault(r => r.PantallaId == item.PantallaId);
-                if (permiso.IsNotNull())
-                {
-                    permiso.Ver = item.Ver;
-                    permiso.Editar = item.Editar;
-                    permiso.Eliminar = item.Eliminar;
-
-                    if (!permiso.Ver)
-                    {
-                        _genericRepository.Remove(permiso);
-                    }
-                }
-                else
-                {
-                    var nuevoPermiso = new Permisos
-                    {
-                        Editar = item.Editar,
-                        Eliminar = item.Eliminar,
-                        PantallaId = item.PantallaId,
-                        RolId = item.RolId,
-                        Ver = item.Ver,
-                    };
-                    _genericRepository.Add(nuevoPermiso);
-                }
-
-
-                TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarUsuario");
-                _genericRepository.UnitOfWork.Commit(transactionInfo);
-            }
-            return new RolDTO { };
-        }
-
-        public UsuarioDTO CrearUsuario(EdicionUsuarioRequest request)
-        {
-            string mensajeValidacion = request.Usuario.ValidarCampos();
-
-            if (mensajeValidacion.HasValue())
-            {
-                return new UsuarioDTO
-                {
-                    Message = mensajeValidacion,
-                };
-            }
-
-            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
-
-            if (usuarioExiste.IsNotNull())
-            {
-                return new UsuarioDTO
-                {
-                    Message = "Usuario ya esta registrado"
-                };
-            }
-
-            var usuario = new Usuario
-            {
-                Apellido = request.Usuario.Apellido.ValueOrEmpty(),
-                Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena),
-                Nombre = request.Usuario.Nombre.ValueOrEmpty(),
-                RolId = request.Usuario.RolId.ValueOrEmpty(),
-                UsuarioId = request.Usuario.UsuarioId.ValueOrEmpty(),
-                Activo = request.Usuario.Activo
-            };
-
-            _genericRepository.Add(usuario);
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarUsuario");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return _mapper.Map<UsuarioDTO>(usuario);
-        }
-
-        public UsuarioDTO IniciarSesion(UserRequest request)
-        {
-            List<string> includes = ["Rol", "Rol.Permisos"];
-
-            Usuario usuario = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.UsuarioId, includes);
-
-            if (usuario.IsNotNull() && PasswordEncryptor.VerifyPassword(request?.Password, usuario.Contrasena))
-            {
-                if (!usuario.Activo)
-                {
-                    return new UsuarioDTO { Message = $"Usuario {usuario.UsuarioId} esta desactivado" };
-                }
-                var newAccessToken = _tokenService.Generate(usuario);
-                var newRefreshToken = _tokenService.GenerateRefreshToken();
-
-                usuario.RefreshToken = newRefreshToken;
-                usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7); 
-                
-                var tInfo = new TransactionInfo {
-                    TransaccionUId = Guid.NewGuid(),
-                    TipoTransaccion = "IniciarSesion",
-                    FechaTransaccion = DateTime.Now,
-                    ModificadoPor = usuario.UsuarioId,
-                    DescripcionTransaccion = "Refresh Token update"
-                };
-                _genericRepository.UnitOfWork.Commit(tInfo);
-
-                return new UsuarioDTO
-                {
-                    Apellido = usuario.Apellido,
-                    Nombre = usuario.Nombre,
-                    RolId = usuario.RolId,
-                    Token = newAccessToken,
-                    RefreshToken = newRefreshToken,
-                    UsuarioAutenticado = true,
-                    UsuarioId = usuario.UsuarioId,
-                    Permisos = MapPermisosDto(usuario.Rol?.Permisos)
-                };
-            }
-
-            return new UsuarioDTO
-            {
-                Message = "Usuario o Contraseña no valido",
-                UsuarioAutenticado = false
-            };
-        }
-
-        public UsuarioDTO RefreshToken(TokenRequest request)
-        {
-            if (request == null || string.IsNullOrWhiteSpace(request.AccessToken) || string.IsNullOrWhiteSpace(request.RefreshToken))
-            {
-                return new UsuarioDTO { Message = "Solicitud de token inválida", UsuarioAutenticado = false };
-            }
-            
-            var usuario = _genericRepository.GetSingle<Usuario>(u => u.RefreshToken == request.RefreshToken, ["Rol", "Rol.Permisos"]);
-
-            if (usuario == null || usuario.RefreshToken != request.RefreshToken || usuario.RefreshTokenExpiryTime <= DateTime.UtcNow)
-            {
-                return new UsuarioDTO { Message = "Token de refresco inválido o expirado", UsuarioAutenticado = false };
-            }
-
-            var newAccessToken = _tokenService.Generate(usuario);
-            var newRefreshToken = _tokenService.GenerateRefreshToken();
-
-            usuario.RefreshToken = newRefreshToken;
-            usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
-
-            var tInfo = new TransactionInfo {
-                TransaccionUId = Guid.NewGuid(),
-                TipoTransaccion = "RefreshToken",
-                FechaTransaccion = DateTime.Now,
-                ModificadoPor = usuario.UsuarioId,
-                DescripcionTransaccion = "Refresh Token issue"
-            };
-            _genericRepository.UnitOfWork.Commit(tInfo);
-
-            return new UsuarioDTO
-            {
-                Apellido = usuario.Apellido,
-                Nombre = usuario.Nombre,
-                RolId = usuario.RolId,
-                Token = newAccessToken,
-                RefreshToken = newRefreshToken,
-                UsuarioAutenticado = true,
-                UsuarioId = usuario.UsuarioId,
-                Permisos = MapPermisosDto(usuario.Rol?.Permisos)
-            };
-        }
-
-        public SearchResult<UsuarioDTO> ObtenerUsuario(GetUserRequest request)
-        {
-            var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(request.QueryInfo);
-            var usuarios = _genericRepository.GetPagedAndFiltered<Usuario>(dynamicFilter);
-
-            return new SearchResult<UsuarioDTO>
-            {
-                PageCount = usuarios.PageCount,
-                ItemCount = usuarios.ItemCount,
-                TotalItems = usuarios.TotalItems,
-                PageIndex = usuarios.PageIndex,
-                Items = (from qry in usuarios.Items as IEnumerable<Usuario> select MapUsuarioDto(qry)).ToList(),
-            };
-
-        }
-
-        public RolDTO CrearRol(EdicionRolRequest request)
-        {
-            var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
-            if (rol.IsNotNull())
-            {
-                return new RolDTO
-                {
-                    Message = $"El rol {request.Rol.RolId} ya existe"
-                };
-            }
-
-            var nuevoRol = new Rol
-            {
-                Descripcion = request.Rol.Descripcion,
-                RolId = request.Rol.RolId
-            };
-
-            _genericRepository.Add(nuevoRol);
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarRol");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-
-            return new RolDTO();
-        }
-
-        public RolDTO EditarRol(EdicionRolRequest request)
-        {
-            var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
-
-            if (rol.IsNull())
-            {
-                return new RolDTO
-                {
-                    Message = $"El Rol {request.Rol.RolId} no existe"
-                };
-            }
-
-            rol.Descripcion = request.Rol.Descripcion;
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarRol");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return new RolDTO();
-        }
-
-        public List<RolDTO> ObtenerRoles()
-        {
-            var includes = new List<string> { "Permisos" };
-            var roles = _genericRepository.GetAll<Rol>(includes);
-
-            return roles.Select(qry =>
-            new RolDTO
-            {
-                Descripcion = qry.Descripcion,
-                RolId = qry.RolId,
-                Permisos = MapPermisosDto(qry?.Permisos),
-            }).ToList();
-        }
-
-        private static List<PermisosDTO> MapPermisosDto(List<Permisos>? permisos)
-        {
-            return permisos.Select(r => new PermisosDTO
-            {
-                Editar = r.Editar,
-                Eliminar = r.Eliminar,
-                PantallaId = r.PantallaId,
-                RolId = r.RolId,
-                Ver = r.Ver,
-            }).ToList();
-        }
-
-        private static UsuarioDTO MapUsuarioDto(Usuario qry)
-        {
-            return new UsuarioDTO
-            {
-                Apellido = qry.Apellido,
-                Contrasena = qry.Contrasena,
-                Nombre = qry.Nombre,
-                RolId = qry.RolId,
-                UsuarioId = qry.UsuarioId,
-                FechaTransaccion = qry.FechaTransaccion,
-                Activo = qry.Activo
-            };
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                if (_genericRepository.IsNotNull()) _genericRepository.Dispose();
-
-            }
-
-            base.Dispose(disposing);
-        }
-    }
-}
-```
+````
 
 ## File: CrossCutting/Configuration/AppSettingsException.cs
-```csharp
+````csharp
 namespace CrossCutting.Configuration
 {
     /// <summary>
@@ -2510,31 +1055,10 @@ namespace CrossCutting.Configuration
         public AppSettingsException(string message, Exception inner) : base(message, inner) { }
     }
 }
-```
-
-## File: CrossCutting/CrossCutting.csproj
-```
-<Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Dominio\Dominio.csproj" />
-  </ItemGroup>
-
-</Project>
-```
+````
 
 ## File: Dominio/Context/Entidades/ConfiguracionesAgg/Configuraciones.cs
-```csharp
+````csharp
 using Dominio.Core;
 
 namespace Dominio.Context.Entidades.ConfiguracionesAgg
@@ -2546,10 +1070,10 @@ namespace Dominio.Context.Entidades.ConfiguracionesAgg
         public virtual ICollection<ConfiguracionesDetalle>? ConfiguracionesDetalle { get; set; }
     }
 }
-```
+````
 
 ## File: Dominio/Context/Entidades/ConfiguracionesAgg/ConfiguracionesDetalle.cs
-```csharp
+````csharp
 using Dominio.Core;
 
 namespace Dominio.Context.Entidades.ConfiguracionesAgg
@@ -2563,31 +1087,10 @@ namespace Dominio.Context.Entidades.ConfiguracionesAgg
         public virtual Configuraciones? Configuraciones { get; set; }
     }
 }
-```
-
-## File: Dominio/Context/Entidades/PasswordEncryptor.cs
-```csharp
-namespace Dominio.Context.Entidades
-{
-    public static class PasswordEncryptor
-    {
-        public static string HashPassword(string password)
-        {
-            if (string.IsNullOrEmpty(password)) return string.Empty;
-            return BCrypt.Net.BCrypt.HashPassword(password);
-        }
-
-        public static bool VerifyPassword(string password, string hash)
-        {
-            if (string.IsNullOrEmpty(password) || string.IsNullOrEmpty(hash)) return false;
-            return BCrypt.Net.BCrypt.Verify(password, hash);
-        }
-    }
-}
-```
+````
 
 ## File: Dominio/Context/Entidades/Seguridad/Pantalla.cs
-```csharp
+````csharp
 using Dominio.Core;
 
 namespace Dominio.Context.Entidades.Seguridad
@@ -2598,10 +1101,10 @@ namespace Dominio.Context.Entidades.Seguridad
         public required string Descripcion { get; set; }
     }
 }
-```
+````
 
 ## File: Dominio/Context/Entidades/Seguridad/Permisos.cs
-```csharp
+````csharp
 using Dominio.Core;
 
 namespace Dominio.Context.Entidades.Seguridad
@@ -2617,10 +1120,10 @@ namespace Dominio.Context.Entidades.Seguridad
         public virtual Rol? Rol { get; set; }
     }
 }
-```
+````
 
 ## File: Dominio/Core/DynamicFilter.cs
-```csharp
+````csharp
 namespace Dominio.Core
 {
     public class DynamicFilter
@@ -2650,25 +1153,10 @@ namespace Dominio.Core
         public List<string> Includes { get; set; }
     }
 }
-```
-
-## File: Dominio/Core/Jwtoken/JwtSettings.cs
-```csharp
-namespace Dominio.Core.Jwtoken
-{
-    public class JwtSettings
-    {
-        public string Secret { get; set; }
-        public int ExpirationInMinutes { get; set; }
-        public string Issuer { get; set; }
-        public string Audience { get; set; }
-        public int RefreshTokenExpirationInDays { get; set; }
-    }
-}
-```
+````
 
 ## File: Dominio/Core/PagedCollection.cs
-```csharp
+````csharp
 using System.Collections;
 
 namespace Dominio.Core
@@ -2701,10 +1189,10 @@ namespace Dominio.Core
         public int ItemCount { get; private set; }
     }
 }
-```
+````
 
 ## File: Dominio/Core/TransactionInfo.cs
-```csharp
+````csharp
 namespace Dominio.Core
 {
     public class TransactionInfo : Entity
@@ -2712,130 +1200,10 @@ namespace Dominio.Core
         public bool GenerateTransaction { get; set; }
     }
 }
-```
-
-## File: Dominio/Dominio.csproj
-```
-<Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
-  </ItemGroup>
-
-</Project>
-```
-
-## File: Infraestructura/Context/DataSeeder.cs
-```csharp
-using Dominio.Context.Entidades;
-using Dominio.Context.Entidades.Seguridad;
-
-namespace Infraestructura.Context
-{
-    public static class DataSeeder
-    {
-        public static void Seed(MyContext context)
-        {
-            var ahora = DateTime.Now;
-            var modificadoPor = "System";
-            var transaccionUId = Guid.NewGuid();
-            var tipoTransaccion = "cargaInicial";
-            var descripcionTransaccion = "Added";
-            // Verifica si ya existen registros
-            if (!context.Rol.Any())
-            {
-                context.Rol.AddRange(
-                    new Rol 
-                    { 
-                        RolId = "Admin", 
-                        Descripcion = "Administrador del sistema", 
-                        DescripcionTransaccion = descripcionTransaccion, 
-                        FechaTransaccion = ahora, 
-                        ModificadoPor = modificadoPor,
-                        TransaccionUId = transaccionUId,
-                        TipoTransaccion = tipoTransaccion
-                    },
-                    new Rol 
-                    { 
-                        RolId = "User", 
-                        Descripcion = "Usuario estándar", 
-                        DescripcionTransaccion = descripcionTransaccion, 
-                        FechaTransaccion = ahora,
-                        ModificadoPor = modificadoPor,
-                        TipoTransaccion = tipoTransaccion,
-                        TransaccionUId = transaccionUId
-                    }
-                );
-            }
-
-            if (!context.Usuarios.Any())
-            {
-                context.Usuarios.Add(
-                    new Usuario 
-                    {
-                        UsuarioId = "admin", 
-                        Nombre = "Administrador", 
-                        Apellido = "Sistema",
-                        Contrasena = PasswordEncryptor.HashPassword("admin123*"), 
-                        RolId = "Admin",
-                        Activo = true,
-                        DescripcionTransaccion = descripcionTransaccion, 
-                        FechaTransaccion = ahora, 
-                        ModificadoPor = modificadoPor,
-                        TransaccionUId = transaccionUId,
-                        TipoTransaccion = tipoTransaccion,
-                    });
-            }
-
-            if (!context.Pantalla.Any())
-            {   
-                context.Pantalla.AddRange(
-                    new Pantalla
-                    {
-                        PantallaId = "Seguridad",
-                        Descripcion = "Administracion de la seguridad",
-                        DescripcionTransaccion = descripcionTransaccion,
-                        FechaTransaccion = ahora,
-                        ModificadoPor = modificadoPor,
-                        TransaccionUId = transaccionUId,
-                        TipoTransaccion = tipoTransaccion,
-                        
-                    });
-            }
-
-            if (!context.Permisos.Any())
-            {
-                context.Permisos.AddRange(
-                    new Permisos
-                    {
-                        RolId = "Admin",
-                        PantallaId = "Seguridad",
-                        DescripcionTransaccion = descripcionTransaccion,
-                        FechaTransaccion = ahora,
-                        ModificadoPor = modificadoPor,
-                        Editar = true,
-                        Eliminar = true,
-                        Ver = true,
-                        TransaccionUId = transaccionUId,
-                        TipoTransaccion = tipoTransaccion,
-                    }
-                );
-            }
-            // Guarda los cambios
-            context.SaveChanges();
-        }
-    }
-}
-```
+````
 
 ## File: Infraestructura/Context/GenericRepository.cs
-```csharp
+````csharp
 using Dominio.Core;
 using Dominio.Core.Extensions;
 using Infraestructura.Core;
@@ -3277,10 +1645,10 @@ namespace Infraestructura.Context
         }
     }
 }
-```
+````
 
 ## File: Infraestructura/Context/IDataContext.cs
-```csharp
+````csharp
 using Infraestructura.Core;
 
 namespace Infraestructura.Context
@@ -3289,10 +1657,10 @@ namespace Infraestructura.Context
     {
     }
 }
-```
+````
 
 ## File: Infraestructura/Context/IGenericRepository.cs
-```csharp
+````csharp
 using Dominio.Core;
 using Infraestructura.Core;
 using Microsoft.Data.SqlClient;
@@ -3520,10 +1888,10 @@ namespace Infraestructura.Context
         IEnumerable<TEntity> ExecuteQuery<TEntity>(SqlParameter[] parms, string sqlQuery);
     }
 }
-```
+````
 
 ## File: Infraestructura/Context/Mapping/ConfiguracionesMap/ConfiguracionesDetalleMap.cs
-```csharp
+````csharp
 using Dominio.Context.Entidades.ConfiguracionesAgg;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -3548,10 +1916,10 @@ namespace Infraestructura.Context.Mapping.ConfiguracionesMap
         }
     }
 }
-```
+````
 
 ## File: Infraestructura/Context/Mapping/ConfiguracionesMap/ConfiguracionesMap.cs
-```csharp
+````csharp
 using Dominio.Context.Entidades.ConfiguracionesAgg;
 using Microsoft.EntityFrameworkCore;
 
@@ -3569,10 +1937,10 @@ namespace Infraestructura.Context.Mapping.ConfiguracionesMap
         }
     }
 }
-```
+````
 
 ## File: Infraestructura/Context/Mapping/Seguridad/PantallaMap.cs
-```csharp
+````csharp
 using Dominio.Context.Entidades.Seguridad;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -3592,10 +1960,10 @@ namespace Infraestructura.Context.Mapping.Seguridad
         }
     }
 }
-```
+````
 
 ## File: Infraestructura/Context/Mapping/Seguridad/PermisosMap.cs
-```csharp
+````csharp
 using Dominio.Context.Entidades.Seguridad;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -3621,10 +1989,10 @@ namespace Infraestructura.Context.Mapping.Seguridad
         }
     }
 }
-```
+````
 
 ## File: Infraestructura/Core/DynamicQueryable.cs
-```csharp
+````csharp
 //Copyright (C) Microsoft Corporation.  All rights reserved.
 using System.Linq.Expressions;
 using System.Reflection;
@@ -6039,10 +4407,10 @@ namespace System.Linq.Dynamic
         public const string IdentifierExpected = "Identifier expected";
     }
 }
-```
+````
 
 ## File: Infraestructura/Core/EntityMapping.cs
-```csharp
+````csharp
 namespace Infraestructura.Core
 {
     public class EntityMapping
@@ -6052,10 +4420,10 @@ namespace Infraestructura.Core
         public string TransactionTableName { get; set; }
     }
 }
-```
+````
 
 ## File: Infraestructura/Core/Exception/ThrowIf.cs
-```csharp
+````csharp
 using Dominio.Core.Extensions;
 
 namespace Infraestructura.Core.Exception
@@ -6097,10 +4465,10 @@ namespace Infraestructura.Core.Exception
         }
     }
 }
-```
+````
 
 ## File: Infraestructura/Core/Identity/TransactionIdentity.cs
-```csharp
+````csharp
 namespace Infraestructura.Core.Identity
 {
     public class TransactionIdentity
@@ -6121,10 +4489,10 @@ namespace Infraestructura.Core.Identity
         public DateTime TransactionUtcDate { get; set; }
     }
 }
-```
+````
 
 ## File: Infraestructura/Core/IQueryableUnitOfWork.cs
-```csharp
+````csharp
 using Microsoft.EntityFrameworkCore;
 
 namespace Infraestructura.Core
@@ -6214,10 +4582,10 @@ namespace Infraestructura.Core
         Task<IEnumerable<TEntity>> ExecuteQueryAsync<TEntity>(string sqlCommand, params object[] parameters) where TEntity: class;
     }
 }
-```
+````
 
 ## File: Infraestructura/Core/IUnitOfWork.cs
-```csharp
+````csharp
 using Dominio.Core;
 
 namespace Infraestructura.Core
@@ -6245,106 +4613,10 @@ namespace Infraestructura.Core
         void Commit(TransactionInfo transactionInfo);
     }
 }
-```
-
-## File: Infraestructura/Core/Jwtoken/ITokenService.cs
-```csharp
-using Dominio.Context.Entidades.Seguridad;
-
-namespace Infraestructura.Core.Jwtoken
-{
-    public interface ITokenService
-    {
-        string Generate(Usuario user);
-        string GenerateRefreshToken();
-        System.Security.Claims.ClaimsPrincipal GetPrincipalFromExpiredToken(string token);
-    }
-}
-```
-
-## File: Infraestructura/Core/Jwtoken/JwtTokenService.cs
-```csharp
-using Dominio.Context.Entidades.Seguridad;
-using Dominio.Core.Extensions;
-using Dominio.Core.Jwtoken;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
-using System.Configuration;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
-
-namespace Infraestructura.Core.Jwtoken
-{
-    public class JwtTokenService : ITokenService
-    {
-        private readonly JwtSettings _jwtSettings;
-
-        public JwtTokenService(IOptions<JwtSettings> options)
-        {
-            _jwtSettings = options.Value;
-        }
-
-        public string Generate(Usuario user)
-        {
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.Name, user.Nombre ?? string.Empty),
-                new Claim(ClaimTypes.Email, user.UsuarioId ?? string.Empty),
-                new Claim(ClaimTypes.NameIdentifier, user.UsuarioId ?? string.Empty)
-            };
-            // Add role claims if available
-            if (!string.IsNullOrWhiteSpace(user.RolId))
-            {
-                claims.Add(new Claim(ClaimTypes.Role, user.RolId));
-            }
-            var tokenDescriptor = new SecurityTokenDescriptor
-            {
-                Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpirationInMinutes),
-                Issuer = _jwtSettings.Issuer,
-                Audience = _jwtSettings.Audience,
-                SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature)
-            };
-            var token = tokenHandler.CreateToken(tokenDescriptor);
-            return tokenHandler.WriteToken(token);
-        }
-
-        public string GenerateRefreshToken()
-        {
-            var randomNumber = new byte[64];
-            using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
-            rng.GetBytes(randomNumber);
-            return Convert.ToBase64String(randomNumber);
-        }
-
-        public ClaimsPrincipal GetPrincipalFromExpiredToken(string token)
-        {
-            var tokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateAudience = false,
-                ValidateIssuer = false,
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret)),
-                ValidateLifetime = false 
-            };
-
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out SecurityToken securityToken);
-            if (securityToken is not JwtSecurityToken jwtSecurityToken || !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
-                throw new SecurityTokenException("Invalid token");
-
-            return principal;
-        }
-    }
-}
-```
+````
 
 ## File: Infraestructura/Core/Logging/Transaction.cs
-```csharp
+````csharp
 namespace Infraestructura.Core.Logging
 {
     public class Transaction
@@ -6377,10 +4649,10 @@ namespace Infraestructura.Core.Logging
         }
     }
 }
-```
+````
 
 ## File: Infraestructura/Core/Logging/TransactionDetail.cs
-```csharp
+````csharp
 namespace Infraestructura.Core.Logging
 {
     public class TransactionDetail
@@ -6391,10 +4663,10 @@ namespace Infraestructura.Core.Logging
         public string TransactionType { get; set; }
     }
 }
-```
+````
 
 ## File: Infraestructura/Core/ModifiedEntityEntry.cs
-```csharp
+````csharp
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace Infraestructura.Core
@@ -6421,10 +4693,10 @@ namespace Infraestructura.Core
         }
     }
 }
-```
+````
 
 ## File: Infraestructura/Core/RestClient/HttpRestClientFactory.cs
-```csharp
+````csharp
 using Infraestructura.Core.Exception;
 using System.Net.Http.Headers;
 
@@ -6462,10 +4734,10 @@ namespace Infraestructura.Core.RestClient
         }
     }
 }
-```
+````
 
 ## File: Infraestructura/Core/RestClient/IRestClient.cs
-```csharp
+````csharp
 namespace Infraestructura.Core.RestClient
 {
     /// <summary>
@@ -6537,10 +4809,10 @@ namespace Infraestructura.Core.RestClient
             where TResponse : class;
     }
 }
-```
+````
 
 ## File: Infraestructura/Core/RestClient/IRestClientFactory.cs
-```csharp
+````csharp
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -6559,10 +4831,10 @@ namespace Infraestructura.Core.RestClient
         IRestClient Create(string baseAddress);
     }
 }
-```
+````
 
 ## File: Infraestructura/Core/RestClient/QueryStringBuilder.cs
-```csharp
+````csharp
 using System.Collections;
 using System.Reflection;
 using System.Web;
@@ -6674,10 +4946,10 @@ namespace Infraestructura.Core.RestClient
         }
     }
 }
-```
+````
 
 ## File: Infraestructura/Core/RestClient/RestClientFactory.cs
-```csharp
+````csharp
 namespace Infraestructura.Core.RestClient
 {
     public static class RestClientFactory
@@ -6707,10 +4979,10 @@ namespace Infraestructura.Core.RestClient
         }
     }
 }
-```
+````
 
 ## File: Infraestructura/Core/SqlCommandInfo.cs
-```csharp
+````csharp
 namespace Infraestructura.Core
 {
     public class SqlCommandInfo
@@ -6725,10 +4997,10 @@ namespace Infraestructura.Core
         public object[] Parameters { get; set; }
     }
 }
-```
+````
 
 ## File: Infraestructura/Core/TransactionScopeFactory.cs
-```csharp
+````csharp
 using System.Transactions;
 
 namespace Infraestructura.Core
@@ -6747,10 +5019,1117 @@ namespace Infraestructura.Core
         }
     }
 }
-```
+````
+
+## File: Infraestructura/Migrations/20260529013725_AddRefreshToken.cs
+````csharp
+using System;
+using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace Infraestructura.Migrations
+{
+    /// <inheritdoc />
+    public partial class AddRefreshToken : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.EnsureSchema(
+                name: "comunes");
+
+            migrationBuilder.EnsureSchema(
+                name: "Comunes");
+
+            migrationBuilder.EnsureSchema(
+                name: "Seguridad");
+
+            migrationBuilder.CreateTable(
+                name: "Configuraciones",
+                schema: "comunes",
+                columns: table => new
+                {
+                    ConfiguracionId = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
+                    Descripcion = table.Column<string>(type: "varchar(100)", unicode: false, maxLength: 100, nullable: false),
+                    ModificadoPor = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
+                    FechaTransaccion = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    DescripcionTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false),
+                    RowVersion = table.Column<byte[]>(type: "varbinary(max)", nullable: false),
+                    TransaccionUId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    TipoTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Configuraciones", x => x.ConfiguracionId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Pantalla",
+                schema: "Seguridad",
+                columns: table => new
+                {
+                    PantallaId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Descripcion = table.Column<string>(type: "varchar(max)", unicode: false, nullable: false),
+                    ModificadoPor = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
+                    FechaTransaccion = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    DescripcionTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false),
+                    RowVersion = table.Column<byte[]>(type: "varbinary(max)", nullable: false),
+                    TransaccionUId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    TipoTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Pantalla", x => x.PantallaId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Rol",
+                schema: "Seguridad",
+                columns: table => new
+                {
+                    RolId = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
+                    Descripcion = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
+                    ModificadoPor = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
+                    FechaTransaccion = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    DescripcionTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false),
+                    RowVersion = table.Column<byte[]>(type: "varbinary(max)", nullable: false),
+                    TransaccionUId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    TipoTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Rol", x => x.RolId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ConfiguracionesDetalle",
+                schema: "Comunes",
+                columns: table => new
+                {
+                    ConfiguracionId = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
+                    Atributo = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
+                    Valor = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
+                    Descripcion = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    ModificadoPor = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
+                    FechaTransaccion = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    DescripcionTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false),
+                    RowVersion = table.Column<byte[]>(type: "varbinary(max)", nullable: false),
+                    TransaccionUId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    TipoTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ConfiguracionesDetalle", x => new { x.ConfiguracionId, x.Atributo });
+                    table.ForeignKey(
+                        name: "FK_ConfiguracionesDetalle_Configuraciones_ConfiguracionId",
+                        column: x => x.ConfiguracionId,
+                        principalSchema: "comunes",
+                        principalTable: "Configuraciones",
+                        principalColumn: "ConfiguracionId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Permisos",
+                schema: "Seguridad",
+                columns: table => new
+                {
+                    RolId = table.Column<string>(type: "varchar(25)", nullable: false),
+                    PantallaId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Ver = table.Column<bool>(type: "bit", nullable: false),
+                    Editar = table.Column<bool>(type: "bit", nullable: false),
+                    Eliminar = table.Column<bool>(type: "bit", nullable: false),
+                    ModificadoPor = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
+                    FechaTransaccion = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    DescripcionTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false),
+                    RowVersion = table.Column<byte[]>(type: "varbinary(max)", nullable: false),
+                    TransaccionUId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    TipoTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Permisos", x => new { x.RolId, x.PantallaId });
+                    table.ForeignKey(
+                        name: "FK_Permisos_Rol_RolId",
+                        column: x => x.RolId,
+                        principalSchema: "Seguridad",
+                        principalTable: "Rol",
+                        principalColumn: "RolId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Usuario",
+                schema: "Seguridad",
+                columns: table => new
+                {
+                    UsuarioId = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
+                    Contrasena = table.Column<string>(type: "nvarchar(250)", maxLength: 250, nullable: false),
+                    Nombre = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    Apellido = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    Activo = table.Column<bool>(type: "bit", nullable: false),
+                    RolId = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
+                    RefreshToken = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    RefreshTokenExpiryTime = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    ModificadoPor = table.Column<string>(type: "varchar(25)", unicode: false, maxLength: 25, nullable: false),
+                    FechaTransaccion = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    DescripcionTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false),
+                    RowVersion = table.Column<byte[]>(type: "varbinary(max)", nullable: false),
+                    TransaccionUId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    TipoTransaccion = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Usuario", x => x.UsuarioId);
+                    table.ForeignKey(
+                        name: "FK_Usuario_Rol_RolId",
+                        column: x => x.RolId,
+                        principalSchema: "Seguridad",
+                        principalTable: "Rol",
+                        principalColumn: "RolId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Usuario_RolId",
+                schema: "Seguridad",
+                table: "Usuario",
+                column: "RolId");
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropTable(
+                name: "ConfiguracionesDetalle",
+                schema: "Comunes");
+
+            migrationBuilder.DropTable(
+                name: "Pantalla",
+                schema: "Seguridad");
+
+            migrationBuilder.DropTable(
+                name: "Permisos",
+                schema: "Seguridad");
+
+            migrationBuilder.DropTable(
+                name: "Usuario",
+                schema: "Seguridad");
+
+            migrationBuilder.DropTable(
+                name: "Configuraciones",
+                schema: "comunes");
+
+            migrationBuilder.DropTable(
+                name: "Rol",
+                schema: "Seguridad");
+        }
+    }
+}
+````
+
+## File: Infraestructura/Migrations/20260529013725_AddRefreshToken.Designer.cs
+````csharp
+// <auto-generated />
+using System;
+using Infraestructura.Context;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+
+#nullable disable
+
+namespace Infraestructura.Migrations
+{
+    [DbContext(typeof(MyContext))]
+    [Migration("20260529013725_AddRefreshToken")]
+    partial class AddRefreshToken
+    {
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        {
+#pragma warning disable 612, 618
+            modelBuilder
+                .HasAnnotation("ProductVersion", "8.0.4")
+                .HasAnnotation("Relational:MaxIdentifierLength", 128);
+
+            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("Dominio.Context.Entidades.ConfiguracionesAgg.Configuraciones", b =>
+                {
+                    b.Property<string>("ConfiguracionId")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)")
+                        .HasColumnName("ConfiguracionId");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("Descripcion");
+
+                    b.Property<string>("DescripcionTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("DescripcionTransaccion");
+
+                    b.Property<DateTime>("FechaTransaccion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FechaTransaccion");
+
+                    b.Property<string>("ModificadoPor")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("ModificadoPor");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("varbinary(max)")
+                        .HasColumnName("RowVersion");
+
+                    b.Property<string>("TipoTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("TipoTransaccion");
+
+                    b.Property<Guid>("TransaccionUId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("TransaccionUId");
+
+                    b.HasKey("ConfiguracionId");
+
+                    b.ToTable("Configuraciones", "comunes");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.ConfiguracionesAgg.ConfiguracionesDetalle", b =>
+                {
+                    b.Property<string>("ConfiguracionId")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)")
+                        .HasColumnName("ConfiguracionId");
+
+                    b.Property<string>("Atributo")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)")
+                        .HasColumnName("Atributo");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("Descripcion");
+
+                    b.Property<string>("DescripcionTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("DescripcionTransaccion");
+
+                    b.Property<DateTime>("FechaTransaccion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FechaTransaccion");
+
+                    b.Property<string>("ModificadoPor")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("ModificadoPor");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("varbinary(max)")
+                        .HasColumnName("RowVersion");
+
+                    b.Property<string>("TipoTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("TipoTransaccion");
+
+                    b.Property<Guid>("TransaccionUId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("TransaccionUId");
+
+                    b.Property<string>("Valor")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)")
+                        .HasColumnName("Valor");
+
+                    b.HasKey("ConfiguracionId", "Atributo");
+
+                    b.ToTable("ConfiguracionesDetalle", "Comunes");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Pantalla", b =>
+                {
+                    b.Property<string>("PantallaId")
+                        .HasColumnType("nvarchar(450)")
+                        .HasColumnName("PantallaId");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(max)")
+                        .HasColumnName("Descripcion");
+
+                    b.Property<string>("DescripcionTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("DescripcionTransaccion");
+
+                    b.Property<DateTime>("FechaTransaccion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FechaTransaccion");
+
+                    b.Property<string>("ModificadoPor")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("ModificadoPor");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("varbinary(max)")
+                        .HasColumnName("RowVersion");
+
+                    b.Property<string>("TipoTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("TipoTransaccion");
+
+                    b.Property<Guid>("TransaccionUId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("TransaccionUId");
+
+                    b.HasKey("PantallaId");
+
+                    b.ToTable("Pantalla", "Seguridad");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Permisos", b =>
+                {
+                    b.Property<string>("RolId")
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("RolId");
+
+                    b.Property<string>("PantallaId")
+                        .HasColumnType("nvarchar(450)")
+                        .HasColumnName("PantallaId");
+
+                    b.Property<string>("DescripcionTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("DescripcionTransaccion");
+
+                    b.Property<bool>("Editar")
+                        .HasColumnType("bit")
+                        .HasColumnName("Editar");
+
+                    b.Property<bool>("Eliminar")
+                        .HasColumnType("bit")
+                        .HasColumnName("Eliminar");
+
+                    b.Property<DateTime>("FechaTransaccion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FechaTransaccion");
+
+                    b.Property<string>("ModificadoPor")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("ModificadoPor");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("varbinary(max)")
+                        .HasColumnName("RowVersion");
+
+                    b.Property<string>("TipoTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("TipoTransaccion");
+
+                    b.Property<Guid>("TransaccionUId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("TransaccionUId");
+
+                    b.Property<bool>("Ver")
+                        .HasColumnType("bit")
+                        .HasColumnName("Ver");
+
+                    b.HasKey("RolId", "PantallaId");
+
+                    b.ToTable("Permisos", "Seguridad");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Rol", b =>
+                {
+                    b.Property<string>("RolId")
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("RolId");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("Descripcion");
+
+                    b.Property<string>("DescripcionTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("DescripcionTransaccion");
+
+                    b.Property<DateTime>("FechaTransaccion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FechaTransaccion");
+
+                    b.Property<string>("ModificadoPor")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("ModificadoPor");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("varbinary(max)")
+                        .HasColumnName("RowVersion");
+
+                    b.Property<string>("TipoTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("TipoTransaccion");
+
+                    b.Property<Guid>("TransaccionUId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("TransaccionUId");
+
+                    b.HasKey("RolId");
+
+                    b.ToTable("Rol", "Seguridad");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Usuario", b =>
+                {
+                    b.Property<string>("UsuarioId")
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("UsuarioId");
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("bit")
+                        .HasColumnName("Activo");
+
+                    b.Property<string>("Apellido")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("Apellido");
+
+                    b.Property<string>("Contrasena")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)")
+                        .HasColumnName("Contrasena");
+
+                    b.Property<string>("DescripcionTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("DescripcionTransaccion");
+
+                    b.Property<DateTime>("FechaTransaccion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FechaTransaccion");
+
+                    b.Property<string>("ModificadoPor")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("ModificadoPor");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("Nombre");
+
+                    b.Property<string>("RefreshToken")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("RefreshTokenExpiryTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RolId")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("RolId");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("varbinary(max)")
+                        .HasColumnName("RowVersion");
+
+                    b.Property<string>("TipoTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("TipoTransaccion");
+
+                    b.Property<Guid>("TransaccionUId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("TransaccionUId");
+
+                    b.HasKey("UsuarioId");
+
+                    b.HasIndex("RolId");
+
+                    b.ToTable("Usuario", "Seguridad");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.ConfiguracionesAgg.ConfiguracionesDetalle", b =>
+                {
+                    b.HasOne("Dominio.Context.Entidades.ConfiguracionesAgg.Configuraciones", "Configuraciones")
+                        .WithMany("ConfiguracionesDetalle")
+                        .HasForeignKey("ConfiguracionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Configuraciones");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Permisos", b =>
+                {
+                    b.HasOne("Dominio.Context.Entidades.Seguridad.Rol", "Rol")
+                        .WithMany("Permisos")
+                        .HasForeignKey("RolId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Rol");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Usuario", b =>
+                {
+                    b.HasOne("Dominio.Context.Entidades.Seguridad.Rol", "Rol")
+                        .WithMany("Usuarios")
+                        .HasForeignKey("RolId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Rol");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.ConfiguracionesAgg.Configuraciones", b =>
+                {
+                    b.Navigation("ConfiguracionesDetalle");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Rol", b =>
+                {
+                    b.Navigation("Permisos");
+
+                    b.Navigation("Usuarios");
+                });
+#pragma warning restore 612, 618
+        }
+    }
+}
+````
+
+## File: Infraestructura/Migrations/MyContextModelSnapshot.cs
+````csharp
+// <auto-generated />
+using System;
+using Infraestructura.Context;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+
+#nullable disable
+
+namespace Infraestructura.Migrations
+{
+    [DbContext(typeof(MyContext))]
+    partial class MyContextModelSnapshot : ModelSnapshot
+    {
+        protected override void BuildModel(ModelBuilder modelBuilder)
+        {
+#pragma warning disable 612, 618
+            modelBuilder
+                .HasAnnotation("ProductVersion", "8.0.4")
+                .HasAnnotation("Relational:MaxIdentifierLength", 128);
+
+            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("Dominio.Context.Entidades.ConfiguracionesAgg.Configuraciones", b =>
+                {
+                    b.Property<string>("ConfiguracionId")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)")
+                        .HasColumnName("ConfiguracionId");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("Descripcion");
+
+                    b.Property<string>("DescripcionTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("DescripcionTransaccion");
+
+                    b.Property<DateTime>("FechaTransaccion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FechaTransaccion");
+
+                    b.Property<string>("ModificadoPor")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("ModificadoPor");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("varbinary(max)")
+                        .HasColumnName("RowVersion");
+
+                    b.Property<string>("TipoTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("TipoTransaccion");
+
+                    b.Property<Guid>("TransaccionUId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("TransaccionUId");
+
+                    b.HasKey("ConfiguracionId");
+
+                    b.ToTable("Configuraciones", "comunes");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.ConfiguracionesAgg.ConfiguracionesDetalle", b =>
+                {
+                    b.Property<string>("ConfiguracionId")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)")
+                        .HasColumnName("ConfiguracionId");
+
+                    b.Property<string>("Atributo")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)")
+                        .HasColumnName("Atributo");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("Descripcion");
+
+                    b.Property<string>("DescripcionTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("DescripcionTransaccion");
+
+                    b.Property<DateTime>("FechaTransaccion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FechaTransaccion");
+
+                    b.Property<string>("ModificadoPor")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("ModificadoPor");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("varbinary(max)")
+                        .HasColumnName("RowVersion");
+
+                    b.Property<string>("TipoTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("TipoTransaccion");
+
+                    b.Property<Guid>("TransaccionUId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("TransaccionUId");
+
+                    b.Property<string>("Valor")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)")
+                        .HasColumnName("Valor");
+
+                    b.HasKey("ConfiguracionId", "Atributo");
+
+                    b.ToTable("ConfiguracionesDetalle", "Comunes");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Pantalla", b =>
+                {
+                    b.Property<string>("PantallaId")
+                        .HasColumnType("nvarchar(450)")
+                        .HasColumnName("PantallaId");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(max)")
+                        .HasColumnName("Descripcion");
+
+                    b.Property<string>("DescripcionTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("DescripcionTransaccion");
+
+                    b.Property<DateTime>("FechaTransaccion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FechaTransaccion");
+
+                    b.Property<string>("ModificadoPor")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("ModificadoPor");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("varbinary(max)")
+                        .HasColumnName("RowVersion");
+
+                    b.Property<string>("TipoTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("TipoTransaccion");
+
+                    b.Property<Guid>("TransaccionUId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("TransaccionUId");
+
+                    b.HasKey("PantallaId");
+
+                    b.ToTable("Pantalla", "Seguridad");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Permisos", b =>
+                {
+                    b.Property<string>("RolId")
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("RolId");
+
+                    b.Property<string>("PantallaId")
+                        .HasColumnType("nvarchar(450)")
+                        .HasColumnName("PantallaId");
+
+                    b.Property<string>("DescripcionTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("DescripcionTransaccion");
+
+                    b.Property<bool>("Editar")
+                        .HasColumnType("bit")
+                        .HasColumnName("Editar");
+
+                    b.Property<bool>("Eliminar")
+                        .HasColumnType("bit")
+                        .HasColumnName("Eliminar");
+
+                    b.Property<DateTime>("FechaTransaccion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FechaTransaccion");
+
+                    b.Property<string>("ModificadoPor")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("ModificadoPor");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("varbinary(max)")
+                        .HasColumnName("RowVersion");
+
+                    b.Property<string>("TipoTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("TipoTransaccion");
+
+                    b.Property<Guid>("TransaccionUId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("TransaccionUId");
+
+                    b.Property<bool>("Ver")
+                        .HasColumnType("bit")
+                        .HasColumnName("Ver");
+
+                    b.HasKey("RolId", "PantallaId");
+
+                    b.ToTable("Permisos", "Seguridad");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Rol", b =>
+                {
+                    b.Property<string>("RolId")
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("RolId");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("Descripcion");
+
+                    b.Property<string>("DescripcionTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("DescripcionTransaccion");
+
+                    b.Property<DateTime>("FechaTransaccion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FechaTransaccion");
+
+                    b.Property<string>("ModificadoPor")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("ModificadoPor");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("varbinary(max)")
+                        .HasColumnName("RowVersion");
+
+                    b.Property<string>("TipoTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("TipoTransaccion");
+
+                    b.Property<Guid>("TransaccionUId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("TransaccionUId");
+
+                    b.HasKey("RolId");
+
+                    b.ToTable("Rol", "Seguridad");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Usuario", b =>
+                {
+                    b.Property<string>("UsuarioId")
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("UsuarioId");
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("bit")
+                        .HasColumnName("Activo");
+
+                    b.Property<string>("Apellido")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("Apellido");
+
+                    b.Property<string>("Contrasena")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)")
+                        .HasColumnName("Contrasena");
+
+                    b.Property<string>("DescripcionTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("DescripcionTransaccion");
+
+                    b.Property<DateTime>("FechaTransaccion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("FechaTransaccion");
+
+                    b.Property<string>("ModificadoPor")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("ModificadoPor");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("Nombre");
+
+                    b.Property<string>("RefreshToken")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("RefreshTokenExpiryTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RolId")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(25)")
+                        .HasColumnName("RolId");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("varbinary(max)")
+                        .HasColumnName("RowVersion");
+
+                    b.Property<string>("TipoTransaccion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("TipoTransaccion");
+
+                    b.Property<Guid>("TransaccionUId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("TransaccionUId");
+
+                    b.HasKey("UsuarioId");
+
+                    b.HasIndex("RolId");
+
+                    b.ToTable("Usuario", "Seguridad");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.ConfiguracionesAgg.ConfiguracionesDetalle", b =>
+                {
+                    b.HasOne("Dominio.Context.Entidades.ConfiguracionesAgg.Configuraciones", "Configuraciones")
+                        .WithMany("ConfiguracionesDetalle")
+                        .HasForeignKey("ConfiguracionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Configuraciones");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Permisos", b =>
+                {
+                    b.HasOne("Dominio.Context.Entidades.Seguridad.Rol", "Rol")
+                        .WithMany("Permisos")
+                        .HasForeignKey("RolId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Rol");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Usuario", b =>
+                {
+                    b.HasOne("Dominio.Context.Entidades.Seguridad.Rol", "Rol")
+                        .WithMany("Usuarios")
+                        .HasForeignKey("RolId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Rol");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.ConfiguracionesAgg.Configuraciones", b =>
+                {
+                    b.Navigation("ConfiguracionesDetalle");
+                });
+
+            modelBuilder.Entity("Dominio.Context.Entidades.Seguridad.Rol", b =>
+                {
+                    b.Navigation("Permisos");
+
+                    b.Navigation("Usuarios");
+                });
+#pragma warning restore 612, 618
+        }
+    }
+}
+````
 
 ## File: WebServices/appsettings.Development.json
-```json
+````json
 {
   "Logging": {
     "LogLevel": {
@@ -6759,10 +6138,10 @@ namespace Infraestructura.Core
     }
   }
 }
-```
+````
 
 ## File: WebServices/Controllers/ConfiguracionesController.cs
-```csharp
+````csharp
 using Aplicacion.DTOs.ConfiguracionesDTO;
 using Aplicacion.Services.ConfiguracionesApp;
 using Microsoft.AspNetCore.Mvc;
@@ -6816,71 +6195,10 @@ namespace WebServices.Controllers
         }
     }
 }
-```
-
-## File: WebServices/Extensions/DependencyInjectionRepository.cs
-```csharp
-using Aplicacion.Core;
-using Aplicacion.Services.ConfiguracionesApp;
-using Aplicacion.Services.Seguridad;
-using CrossCutting.Configuration;
-using Infraestructura.Context;
-using Infraestructura.Core.Jwtoken;
-using Infraestructura.Core.RestClient;
-using Microsoft.EntityFrameworkCore;
-
-namespace WebServices.Extensions
-{
-    public static class DependencyInjectionRepository
-    {
-        public static IServiceCollection AddPersistenceInfrastructure(this IServiceCollection services, IConfiguration configuration)
-        {
-            string connectionString = configuration.GetConnectionString("conectionDataBase");
-
-            // Inicialización única de configuraciones
-            AppSettingsManager.Initialize(connectionString);
-
-            services.AddDbContext<MyContext>(dbContextOption =>
-                dbContextOption.UseSqlServer(connectionString),
-                ServiceLifetime.Transient
-            );
-
-            services.AddTransient<IDataContext, MyContext>();
-            services.AddTransient(typeof(IGenericRepository<>), typeof(GenericRepository<>));
-
-            return services;
-        }
-
-        public static IServiceCollection AddApplicationServices(this IServiceCollection services)
-        {
-            // Servicios de Aplicación
-            services.AddScoped<SecurityAplicationService>();
-            services.AddScoped<IConfiguracionesApplicationService, ConfiguracionesApplicationService>();
-
-            // AutoMapper
-            services.AddAutoMapper(cfg => cfg.AddMaps(typeof(AutoMapperProfile).Assembly));
-
-            return services;
-        }
-
-        public static IServiceCollection AddExternalAndSecurityServices(this IServiceCollection services)
-        {
-            // JWT
-            services.AddTransient<ITokenService, JwtTokenService>();
-
-            // Rest Client
-            RestClientFactory.SetCurrent(new HttpRestClientFactory());
-            //services.AddTransient<IRestClient, HttpRestClient>();
-            //services.AddTransient<IRestClientFactory, HttpRestClientFactory>();
-
-            return services;
-        }
-    }
-}
-```
+````
 
 ## File: WebServices/Jwtoken/JwtConfiguration.cs
-```csharp
+````csharp
 using Dominio.Core.Jwtoken;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -6925,10 +6243,10 @@ namespace WebServices.Jwtoken
         }
     }
 }
-```
+````
 
 ## File: WebServices/Middleware/GlobalExceptionHandlingMiddleware.cs
-```csharp
+````csharp
 using Dominio.Core.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
@@ -6976,60 +6294,10 @@ namespace WebServices.Middleware
         }
     }
 }
-```
-
-## File: WebServices/Properties/launchSettings.json
-```json
-{
-  "$schema": "http://json.schemastore.org/launchsettings.json",
-  "iisSettings": {
-    "windowsAuthentication": false,
-    "anonymousAuthentication": true,
-    "iisExpress": {
-      "applicationUrl": "http://localhost:1876",
-      "sslPort": 44325
-    }
-  },
-  "profiles": {
-    "http": {
-      "commandName": "Project",
-      "dotnetRunMessages": true,
-      "launchBrowser": true,
-      "launchUrl": "scalar/v1",
-      "applicationUrl": "http://localhost:5283",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    },
-    "https": {
-      "commandName": "Project",
-      "dotnetRunMessages": true,
-      "launchBrowser": true,
-      "launchUrl": "scalar/v1",
-      "applicationUrl": "https://localhost:7217;http://localhost:5283",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    },
-    "IIS Express": {
-      "commandName": "IISExpress",
-      "launchBrowser": true,
-      "launchUrl": "scalar/v1",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    },
-    "runtimeOptions": {
-      "configProperties": {
-        "System.Globalization.Invariant": false
-      }
-    }
-  }
-}
-```
+````
 
 ## File: WebServices/WeatherForecast.cs
-```csharp
+````csharp
 namespace WebServices
 {
     public class WeatherForecast
@@ -7043,46 +6311,20 @@ namespace WebServices
         public string? Summary { get; set; }
     }
 }
-```
+````
 
 ## File: WebServices/WebServices.http
-```
+````
 @WebServices_HostAddress = http://localhost:5283
 
 GET {{WebServices_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
-```
-
-## File: Aplicacion/Aplicacion.csproj
-```
-<Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="AutoMapper" Version="16.1.1" />
-    <!-- Add safe packages for identity and caching -->
-    <PackageReference Include="Microsoft.Identity.Client" Version="4.84.1" />
-    <PackageReference Include="Azure.Identity" Version="1.21.0" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Dominio\Dominio.csproj" />
-    <ProjectReference Include="..\Infraestructura\Infraestructura.csproj" />
-  </ItemGroup>
-
-</Project>
-```
+````
 
 ## File: Aplicacion/DTOs/QueryInfo.cs
-```csharp
+````csharp
 using System.Text;
 
 namespace Aplicacion.DTOs
@@ -7175,10 +6417,10 @@ namespace Aplicacion.DTOs
 
     }
 }
-```
+````
 
 ## File: Aplicacion/DTOs/RequestBase.cs
-```csharp
+````csharp
 namespace Aplicacion.DTOs
 {
     public class RequestBase
@@ -7187,10 +6429,10 @@ namespace Aplicacion.DTOs
         public QueryInfo? QueryInfo { get; set; }
     }
 }
-```
+````
 
 ## File: Aplicacion/DTOs/RequestUserInfo.cs
-```csharp
+````csharp
 namespace Aplicacion.DTOs
 {
     public class RequestUserInfo
@@ -7198,10 +6440,10 @@ namespace Aplicacion.DTOs
         public string? UsuarioId { get; set; }
     }
 }
-```
+````
 
 ## File: Aplicacion/DTOs/ResponseBase.cs
-```csharp
+````csharp
 using Dominio.Core.Extensions;
 
 namespace Aplicacion.DTOs
@@ -7234,10 +6476,10 @@ namespace Aplicacion.DTOs
         }
     }
 }
-```
+````
 
 ## File: Aplicacion/Helpers/DynamicFilterFactory.cs
-```csharp
+````csharp
 using Aplicacion.DTOs;
 using Dominio.Core;
 
@@ -7276,10 +6518,358 @@ namespace Aplicacion.Helpers
         }
     }
 }
-```
+````
+
+## File: Aplicacion/Services/Seguridad/SecurityAplicationService.cs
+````csharp
+using Aplicacion.Core;
+using Aplicacion.DTOs;
+using Aplicacion.DTOs.Seguridad;
+using Aplicacion.Helpers;
+using AutoMapper;
+using Dominio.Context.Entidades;
+using Dominio.Context.Entidades.Seguridad;
+using Dominio.Core;
+using Dominio.Core.Extensions;
+using Infraestructura.Context;
+using Infraestructura.Core.Jwtoken;
+
+namespace Aplicacion.Services.Seguridad
+{
+    public class SecurityAplicationService : BaseDisposable
+    {
+        private readonly IGenericRepository<IDataContext> _genericRepository;
+        private readonly ITokenService _tokenService;
+        private readonly IMapper _mapper;
+        public SecurityAplicationService(IGenericRepository<IDataContext> genericRepository, ITokenService tokenService, IMapper mapper)
+        {
+            _genericRepository = genericRepository;
+            _tokenService = tokenService;
+            _mapper = mapper;
+        }
+
+        public UsuarioDTO EditarUsuario(EdicionUsuarioRequest request)
+        {
+            string mensajeValidacion = request.Usuario.ValidarCampos();
+
+            if (mensajeValidacion.HasValue())
+            {
+                return new UsuarioDTO
+                {
+                    Message = mensajeValidacion,
+                };
+            }
+
+            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
+
+            if (usuarioExiste.IsNull())
+            {
+                return new UsuarioDTO
+                {
+                    Message = "El usuario no existe"
+                };
+            }
+
+            if (request.Usuario.EditarContrasena)
+            {
+                usuarioExiste.Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena);
+            }
+
+            usuarioExiste.Nombre = request.Usuario.Nombre.ValueOrEmpty();
+            usuarioExiste.Apellido = request.Usuario.Apellido.ValueOrEmpty();
+            usuarioExiste.RolId = request.Usuario.RolId.ValueOrEmpty();
+            usuarioExiste.Activo = request.Usuario.Activo;
+
+            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarUsuario");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+            return new UsuarioDTO();
+        }
+
+        public List<PantallaDTO> ObtenerPantallas()
+        {
+            var pantallas = _genericRepository.GetAll<Pantalla>();
+            return pantallas.Select(r => new PantallaDTO { Descripcion = r.Descripcion, PantallaId = r.PantallaId }).ToList();
+        }
+
+        public RolDTO EdicionPermisos(EdicionPermisosRequest request)
+        {
+            var permisos = _genericRepository.GetFiltered<Permisos>(r => r.RolId == request.RolId);
+
+            foreach (var item in request.Permisos)
+            {
+                var permiso = permisos.FirstOrDefault(r => r.PantallaId == item.PantallaId);
+                if (permiso.IsNotNull())
+                {
+                    permiso.Ver = item.Ver;
+                    permiso.Editar = item.Editar;
+                    permiso.Eliminar = item.Eliminar;
+
+                    if (!permiso.Ver)
+                    {
+                        _genericRepository.Remove(permiso);
+                    }
+                }
+                else
+                {
+                    var nuevoPermiso = new Permisos
+                    {
+                        Editar = item.Editar,
+                        Eliminar = item.Eliminar,
+                        PantallaId = item.PantallaId,
+                        RolId = item.RolId,
+                        Ver = item.Ver,
+                    };
+                    _genericRepository.Add(nuevoPermiso);
+                }
+
+
+                TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarUsuario");
+                _genericRepository.UnitOfWork.Commit(transactionInfo);
+            }
+            return new RolDTO { };
+        }
+
+        public UsuarioDTO CrearUsuario(EdicionUsuarioRequest request)
+        {
+            string mensajeValidacion = request.Usuario.ValidarCampos();
+
+            if (mensajeValidacion.HasValue())
+            {
+                return new UsuarioDTO
+                {
+                    Message = mensajeValidacion,
+                };
+            }
+
+            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
+
+            if (usuarioExiste.IsNotNull())
+            {
+                return new UsuarioDTO
+                {
+                    Message = "Usuario ya esta registrado"
+                };
+            }
+
+            var usuario = new Usuario
+            {
+                Apellido = request.Usuario.Apellido.ValueOrEmpty(),
+                Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena),
+                Nombre = request.Usuario.Nombre.ValueOrEmpty(),
+                RolId = request.Usuario.RolId.ValueOrEmpty(),
+                UsuarioId = request.Usuario.UsuarioId.ValueOrEmpty(),
+                Activo = request.Usuario.Activo
+            };
+
+            _genericRepository.Add(usuario);
+            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarUsuario");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+            return _mapper.Map<UsuarioDTO>(usuario);
+        }
+
+        public UsuarioDTO IniciarSesion(UserRequest request)
+        {
+            List<string> includes = ["Rol", "Rol.Permisos"];
+
+            Usuario usuario = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.UsuarioId, includes);
+
+            if (usuario.IsNotNull() && PasswordEncryptor.VerifyPassword(request?.Password, usuario.Contrasena))
+            {
+                if (!usuario.Activo)
+                {
+                    return new UsuarioDTO { Message = $"Usuario {usuario.UsuarioId} esta desactivado" };
+                }
+                var newAccessToken = _tokenService.Generate(usuario);
+                var newRefreshToken = _tokenService.GenerateRefreshToken();
+
+                usuario.RefreshToken = newRefreshToken;
+                usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7); 
+                
+                var tInfo = new TransactionInfo {
+                    TransaccionUId = Guid.NewGuid(),
+                    TipoTransaccion = "IniciarSesion",
+                    FechaTransaccion = DateTime.Now,
+                    ModificadoPor = usuario.UsuarioId,
+                    DescripcionTransaccion = "Refresh Token update"
+                };
+                _genericRepository.UnitOfWork.Commit(tInfo);
+
+                return new UsuarioDTO
+                {
+                    Apellido = usuario.Apellido,
+                    Nombre = usuario.Nombre,
+                    RolId = usuario.RolId,
+                    Token = newAccessToken,
+                    RefreshToken = newRefreshToken,
+                    UsuarioAutenticado = true,
+                    UsuarioId = usuario.UsuarioId,
+                    Permisos = MapPermisosDto(usuario.Rol?.Permisos)
+                };
+            }
+
+            return new UsuarioDTO
+            {
+                Message = "Usuario o Contraseña no valido",
+                UsuarioAutenticado = false
+            };
+        }
+
+        public UsuarioDTO RefreshToken(TokenRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.AccessToken) || string.IsNullOrWhiteSpace(request.RefreshToken))
+            {
+                return new UsuarioDTO { Message = "Solicitud de token inválida", UsuarioAutenticado = false };
+            }
+            
+            var usuario = _genericRepository.GetSingle<Usuario>(u => u.RefreshToken == request.RefreshToken, ["Rol", "Rol.Permisos"]);
+
+            if (usuario == null || usuario.RefreshToken != request.RefreshToken || usuario.RefreshTokenExpiryTime <= DateTime.UtcNow)
+            {
+                return new UsuarioDTO { Message = "Token de refresco inválido o expirado", UsuarioAutenticado = false };
+            }
+
+            var newAccessToken = _tokenService.Generate(usuario);
+            var newRefreshToken = _tokenService.GenerateRefreshToken();
+
+            usuario.RefreshToken = newRefreshToken;
+            usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+
+            var tInfo = new TransactionInfo {
+                TransaccionUId = Guid.NewGuid(),
+                TipoTransaccion = "RefreshToken",
+                FechaTransaccion = DateTime.Now,
+                ModificadoPor = usuario.UsuarioId,
+                DescripcionTransaccion = "Refresh Token issue"
+            };
+            _genericRepository.UnitOfWork.Commit(tInfo);
+
+            return new UsuarioDTO
+            {
+                Apellido = usuario.Apellido,
+                Nombre = usuario.Nombre,
+                RolId = usuario.RolId,
+                Token = newAccessToken,
+                RefreshToken = newRefreshToken,
+                UsuarioAutenticado = true,
+                UsuarioId = usuario.UsuarioId,
+                Permisos = MapPermisosDto(usuario.Rol?.Permisos)
+            };
+        }
+
+        public SearchResult<UsuarioDTO> ObtenerUsuario(GetUserRequest request)
+        {
+            var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(request.QueryInfo);
+            var usuarios = _genericRepository.GetPagedAndFiltered<Usuario>(dynamicFilter);
+
+            return new SearchResult<UsuarioDTO>
+            {
+                PageCount = usuarios.PageCount,
+                ItemCount = usuarios.ItemCount,
+                TotalItems = usuarios.TotalItems,
+                PageIndex = usuarios.PageIndex,
+                Items = (from qry in usuarios.Items as IEnumerable<Usuario> select MapUsuarioDto(qry)).ToList(),
+            };
+
+        }
+
+        public RolDTO CrearRol(EdicionRolRequest request)
+        {
+            var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
+            if (rol.IsNotNull())
+            {
+                return new RolDTO
+                {
+                    Message = $"El rol {request.Rol.RolId} ya existe"
+                };
+            }
+
+            var nuevoRol = new Rol
+            {
+                Descripcion = request.Rol.Descripcion,
+                RolId = request.Rol.RolId
+            };
+
+            _genericRepository.Add(nuevoRol);
+            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarRol");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+
+            return new RolDTO();
+        }
+
+        public RolDTO EditarRol(EdicionRolRequest request)
+        {
+            var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
+
+            if (rol.IsNull())
+            {
+                return new RolDTO
+                {
+                    Message = $"El Rol {request.Rol.RolId} no existe"
+                };
+            }
+
+            rol.Descripcion = request.Rol.Descripcion;
+            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarRol");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+            return new RolDTO();
+        }
+
+        public List<RolDTO> ObtenerRoles()
+        {
+            var includes = new List<string> { "Permisos" };
+            var roles = _genericRepository.GetAll<Rol>(includes);
+
+            return roles.Select(qry =>
+            new RolDTO
+            {
+                Descripcion = qry.Descripcion,
+                RolId = qry.RolId,
+                Permisos = MapPermisosDto(qry?.Permisos),
+            }).ToList();
+        }
+
+        private static List<PermisosDTO> MapPermisosDto(List<Permisos>? permisos)
+        {
+            return permisos.Select(r => new PermisosDTO
+            {
+                Editar = r.Editar,
+                Eliminar = r.Eliminar,
+                PantallaId = r.PantallaId,
+                RolId = r.RolId,
+                Ver = r.Ver,
+            }).ToList();
+        }
+
+        private static UsuarioDTO MapUsuarioDto(Usuario qry)
+        {
+            return new UsuarioDTO
+            {
+                Apellido = qry.Apellido,
+                Contrasena = qry.Contrasena,
+                Nombre = qry.Nombre,
+                RolId = qry.RolId,
+                UsuarioId = qry.UsuarioId,
+                FechaTransaccion = qry.FechaTransaccion,
+                Activo = qry.Activo
+            };
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                if (_genericRepository.IsNotNull()) _genericRepository.Dispose();
+
+            }
+
+            base.Dispose(disposing);
+        }
+    }
+}
+````
 
 ## File: CrossCutting/Configuration/AppSettingsManager.cs
-```csharp
+````csharp
 using Dominio.Core.Extensions;
 using Microsoft.Data.SqlClient;
 using System;
@@ -7542,32 +7132,52 @@ namespace CrossCutting.Configuration
     }
 
 }
-```
+````
 
-## File: Dominio/Core/Entity.cs
-```csharp
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+## File: CrossCutting/CrossCutting.csproj
+````
+<Project Sdk="Microsoft.NET.Sdk">
 
-namespace Dominio.Core
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dominio\Dominio.csproj" />
+  </ItemGroup>
+
+</Project>
+````
+
+## File: Dominio/Context/Entidades/PasswordEncryptor.cs
+````csharp
+namespace Dominio.Context.Entidades
 {
-    public abstract class Entity
+    public static class PasswordEncryptor
     {
-        public string? ModificadoPor { get; set; }
-        public DateTime FechaTransaccion { get; set; }
-        public string DescripcionTransaccion { get; set; }
-        public byte[] RowVersion { get; set; }
-        public Guid TransaccionUId { get; set; }
-        public string TipoTransaccion { get; set; }
+        public static string HashPassword(string password)
+        {
+            if (string.IsNullOrEmpty(password)) return string.Empty;
+            return BCrypt.Net.BCrypt.HashPassword(password);
+        }
+
+        public static bool VerifyPassword(string password, string hash)
+        {
+            if (string.IsNullOrEmpty(password) || string.IsNullOrEmpty(hash)) return false;
+            return BCrypt.Net.BCrypt.Verify(password, hash);
+        }
     }
 }
-```
+````
 
 ## File: Dominio/Core/Extensions/DateTimeExtensions.cs
-```csharp
+````csharp
 using System.Globalization;
 
 namespace Dominio.Core.Extensions
@@ -7792,10 +7402,10 @@ namespace Dominio.Core.Extensions
         }
     }
 }
-```
+````
 
 ## File: Dominio/Core/Extensions/DomainListExtensions.cs
-```csharp
+````csharp
 namespace Dominio.Core.Extensions
 {
     public static class DomainListExtensions
@@ -7848,10 +7458,10 @@ namespace Dominio.Core.Extensions
         string GetEqualityKey();
     }
 }
-```
+````
 
 ## File: Dominio/Core/Extensions/EntidadExtension.cs
-```csharp
+````csharp
 using System.Runtime.Serialization;
 
 namespace Dominio.Core.Extensions
@@ -7906,10 +7516,10 @@ namespace Dominio.Core.Extensions
         }
     }
 }
-```
+````
 
 ## File: Dominio/Core/Extensions/ListExtensions.cs
-```csharp
+````csharp
 using System.Data;
 
 namespace Dominio.Core.Extensions
@@ -8095,10 +7705,10 @@ namespace Dominio.Core.Extensions
         }
     }
 }
-```
+````
 
 ## File: Dominio/Core/Extensions/NumericExtensions.cs
-```csharp
+````csharp
 namespace Dominio.Core.Extensions
 {
     public static class NumericExtensions
@@ -8369,10 +7979,10 @@ namespace Dominio.Core.Extensions
         }
     }
 }
-```
+````
 
 ## File: Dominio/Core/Extensions/ReflectionManager.cs
-```csharp
+````csharp
 using System.Reflection;
 
 namespace Dominio.Core.Extensions
@@ -8490,10 +8100,10 @@ namespace Dominio.Core.Extensions
         }
     }
 }
-```
+````
 
 ## File: Dominio/Core/Extensions/StringExtensions.cs
-```csharp
+````csharp
 using System.Text.RegularExpressions;
 
 namespace Dominio.Core.Extensions
@@ -9156,10 +8766,145 @@ namespace Dominio.Core.Extensions
         }
     }
 }
-```
+````
+
+## File: Dominio/Core/Jwtoken/JwtSettings.cs
+````csharp
+namespace Dominio.Core.Jwtoken
+{
+    public class JwtSettings
+    {
+        public string Secret { get; set; }
+        public int ExpirationInMinutes { get; set; }
+        public string Issuer { get; set; }
+        public string Audience { get; set; }
+        public int RefreshTokenExpirationInDays { get; set; }
+    }
+}
+````
+
+## File: Dominio/Dominio.csproj
+````
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
+  </ItemGroup>
+
+</Project>
+````
+
+## File: Infraestructura/Context/DataSeeder.cs
+````csharp
+using Dominio.Context.Entidades;
+using Dominio.Context.Entidades.Seguridad;
+
+namespace Infraestructura.Context
+{
+    public static class DataSeeder
+    {
+        public static void Seed(MyContext context)
+        {
+            var ahora = DateTime.Now;
+            var modificadoPor = "System";
+            var transaccionUId = Guid.NewGuid();
+            var tipoTransaccion = "cargaInicial";
+            var descripcionTransaccion = "Added";
+            // Verifica si ya existen registros
+            if (!context.Rol.Any())
+            {
+                context.Rol.AddRange(
+                    new Rol 
+                    { 
+                        RolId = "Admin", 
+                        Descripcion = "Administrador del sistema", 
+                        DescripcionTransaccion = descripcionTransaccion, 
+                        FechaTransaccion = ahora, 
+                        ModificadoPor = modificadoPor,
+                        TransaccionUId = transaccionUId,
+                        TipoTransaccion = tipoTransaccion
+                    },
+                    new Rol 
+                    { 
+                        RolId = "User", 
+                        Descripcion = "Usuario estándar", 
+                        DescripcionTransaccion = descripcionTransaccion, 
+                        FechaTransaccion = ahora,
+                        ModificadoPor = modificadoPor,
+                        TipoTransaccion = tipoTransaccion,
+                        TransaccionUId = transaccionUId
+                    }
+                );
+            }
+
+            if (!context.Usuarios.Any())
+            {
+                context.Usuarios.Add(
+                    new Usuario 
+                    {
+                        UsuarioId = "admin", 
+                        Nombre = "Administrador", 
+                        Apellido = "Sistema",
+                        Contrasena = PasswordEncryptor.HashPassword("admin123*"), 
+                        RolId = "Admin",
+                        Activo = true,
+                        DescripcionTransaccion = descripcionTransaccion, 
+                        FechaTransaccion = ahora, 
+                        ModificadoPor = modificadoPor,
+                        TransaccionUId = transaccionUId,
+                        TipoTransaccion = tipoTransaccion,
+                    });
+            }
+
+            if (!context.Pantalla.Any())
+            {   
+                context.Pantalla.AddRange(
+                    new Pantalla
+                    {
+                        PantallaId = "Seguridad",
+                        Descripcion = "Administracion de la seguridad",
+                        DescripcionTransaccion = descripcionTransaccion,
+                        FechaTransaccion = ahora,
+                        ModificadoPor = modificadoPor,
+                        TransaccionUId = transaccionUId,
+                        TipoTransaccion = tipoTransaccion,
+                        
+                    });
+            }
+
+            if (!context.Permisos.Any())
+            {
+                context.Permisos.AddRange(
+                    new Permisos
+                    {
+                        RolId = "Admin",
+                        PantallaId = "Seguridad",
+                        DescripcionTransaccion = descripcionTransaccion,
+                        FechaTransaccion = ahora,
+                        ModificadoPor = modificadoPor,
+                        Editar = true,
+                        Eliminar = true,
+                        Ver = true,
+                        TransaccionUId = transaccionUId,
+                        TipoTransaccion = tipoTransaccion,
+                    }
+                );
+            }
+            // Guarda los cambios
+            context.SaveChanges();
+        }
+    }
+}
+````
 
 ## File: Infraestructura/Context/Mapping/EntityMap.cs
-```csharp
+````csharp
 using Dominio.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -9180,10 +8925,10 @@ namespace Infraestructura.Context.Mapping
         }
     }
 }
-```
+````
 
 ## File: Infraestructura/Context/Mapping/Seguridad/RolMap.cs
-```csharp
+````csharp
 using Dominio.Context.Entidades.Seguridad;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -9204,10 +8949,10 @@ namespace Infraestructura.Context.Mapping.Seguridad
         }
     }
 }
-```
+````
 
 ## File: Infraestructura/Core/BCUnitOfWork.cs
-```csharp
+````csharp
 using Dominio.Core;
 using Infraestructura.Context;
 using Infraestructura.Core.Identity;
@@ -9684,10 +9429,106 @@ namespace Infraestructura.Core
         }
     }
 }
-```
+````
+
+## File: Infraestructura/Core/Jwtoken/ITokenService.cs
+````csharp
+using Dominio.Context.Entidades.Seguridad;
+
+namespace Infraestructura.Core.Jwtoken
+{
+    public interface ITokenService
+    {
+        string Generate(Usuario user);
+        string GenerateRefreshToken();
+        System.Security.Claims.ClaimsPrincipal GetPrincipalFromExpiredToken(string token);
+    }
+}
+````
+
+## File: Infraestructura/Core/Jwtoken/JwtTokenService.cs
+````csharp
+using Dominio.Context.Entidades.Seguridad;
+using Dominio.Core.Extensions;
+using Dominio.Core.Jwtoken;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using System.Configuration;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+
+namespace Infraestructura.Core.Jwtoken
+{
+    public class JwtTokenService : ITokenService
+    {
+        private readonly JwtSettings _jwtSettings;
+
+        public JwtTokenService(IOptions<JwtSettings> options)
+        {
+            _jwtSettings = options.Value;
+        }
+
+        public string Generate(Usuario user)
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, user.Nombre ?? string.Empty),
+                new Claim(ClaimTypes.Email, user.UsuarioId ?? string.Empty),
+                new Claim(ClaimTypes.NameIdentifier, user.UsuarioId ?? string.Empty)
+            };
+            // Add role claims if available
+            if (!string.IsNullOrWhiteSpace(user.RolId))
+            {
+                claims.Add(new Claim(ClaimTypes.Role, user.RolId));
+            }
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(claims),
+                Expires = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpirationInMinutes),
+                Issuer = _jwtSettings.Issuer,
+                Audience = _jwtSettings.Audience,
+                SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature)
+            };
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            return tokenHandler.WriteToken(token);
+        }
+
+        public string GenerateRefreshToken()
+        {
+            var randomNumber = new byte[64];
+            using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+            rng.GetBytes(randomNumber);
+            return Convert.ToBase64String(randomNumber);
+        }
+
+        public ClaimsPrincipal GetPrincipalFromExpiredToken(string token)
+        {
+            var tokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateAudience = false,
+                ValidateIssuer = false,
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret)),
+                ValidateLifetime = false 
+            };
+
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out SecurityToken securityToken);
+            if (securityToken is not JwtSecurityToken jwtSecurityToken || !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
+                throw new SecurityTokenException("Invalid token");
+
+            return principal;
+        }
+    }
+}
+````
 
 ## File: Infraestructura/Core/RestClient/HttpRestClient.cs
-```csharp
+````csharp
 using Infraestructura.Core.Exception;
 using Newtonsoft.Json;
 using System.Net.Http.Headers;
@@ -9818,10 +9659,10 @@ namespace Infraestructura.Core.RestClient
         }
     }
 }
-```
+````
 
 ## File: TemplateBackEndNetCore.sln
-```
+````
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.34525.116
@@ -9870,10 +9711,10 @@ Global
 		SolutionGuid = {5AEF57F0-D726-432E-A5E8-A202D08133A8}
 	EndGlobalSection
 EndGlobal
-```
+````
 
 ## File: WebServices/Controllers/TestRestClient.cs
-```csharp
+````csharp
 using Infraestructura.Core.RestClient;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9958,10 +9799,10 @@ namespace WebServices.Controllers
         //{"name":{"first":"Robert","middle":"","last":"Smith"},"age":25,"DOB":"-","hobbies":["running","coding","-"],"education":{"highschool":"N\/A","college":"Yale"}}
     }
 }
-```
+````
 
 ## File: WebServices/Controllers/WeatherForecastController.cs
-```csharp
+````csharp
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9997,10 +9838,147 @@ namespace WebServices.Controllers
         }
     }
 }
-```
+````
+
+## File: WebServices/Extensions/DependencyInjectionRepository.cs
+````csharp
+using Aplicacion.Core;
+using Aplicacion.Services.ConfiguracionesApp;
+using Aplicacion.Services.Seguridad;
+using CrossCutting.Configuration;
+using Infraestructura.Context;
+using Infraestructura.Core.Jwtoken;
+using Infraestructura.Core.RestClient;
+using Microsoft.EntityFrameworkCore;
+
+namespace WebServices.Extensions
+{
+    public static class DependencyInjectionRepository
+    {
+        public static IServiceCollection AddPersistenceInfrastructure(this IServiceCollection services, IConfiguration configuration)
+        {
+            string connectionString = configuration.GetConnectionString("conectionDataBase");
+
+            // Inicialización única de configuraciones
+            AppSettingsManager.Initialize(connectionString);
+
+            services.AddDbContext<MyContext>(dbContextOption =>
+                dbContextOption.UseSqlServer(connectionString),
+                ServiceLifetime.Transient
+            );
+
+            services.AddTransient<IDataContext, MyContext>();
+            services.AddTransient(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+
+            return services;
+        }
+
+        public static IServiceCollection AddApplicationServices(this IServiceCollection services)
+        {
+            // Servicios de Aplicación
+            services.AddScoped<SecurityAplicationService>();
+            services.AddScoped<IConfiguracionesApplicationService, ConfiguracionesApplicationService>();
+
+            // AutoMapper
+            services.AddAutoMapper(cfg => cfg.AddMaps(typeof(AutoMapperProfile).Assembly));
+
+            return services;
+        }
+
+        public static IServiceCollection AddExternalAndSecurityServices(this IServiceCollection services)
+        {
+            // JWT
+            services.AddTransient<ITokenService, JwtTokenService>();
+
+            // Rest Client
+            RestClientFactory.SetCurrent(new HttpRestClientFactory());
+            //services.AddTransient<IRestClient, HttpRestClient>();
+            //services.AddTransient<IRestClientFactory, HttpRestClientFactory>();
+
+            return services;
+        }
+    }
+}
+````
+
+## File: WebServices/Properties/launchSettings.json
+````json
+{
+  "$schema": "http://json.schemastore.org/launchsettings.json",
+  "iisSettings": {
+    "windowsAuthentication": false,
+    "anonymousAuthentication": true,
+    "iisExpress": {
+      "applicationUrl": "http://localhost:1876",
+      "sslPort": 44325
+    }
+  },
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "launchUrl": "scalar/v1",
+      "applicationUrl": "http://localhost:5283",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "launchUrl": "scalar/v1",
+      "applicationUrl": "https://localhost:7217;http://localhost:5283",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "IIS Express": {
+      "commandName": "IISExpress",
+      "launchBrowser": true,
+      "launchUrl": "scalar/v1",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "runtimeOptions": {
+      "configProperties": {
+        "System.Globalization.Invariant": false
+      }
+    }
+  }
+}
+````
+
+## File: Aplicacion/Aplicacion.csproj
+````
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoMapper" Version="16.1.1" />
+    <!-- Add safe packages for identity and caching -->
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.84.1" />
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dominio\Dominio.csproj" />
+    <ProjectReference Include="..\Infraestructura\Infraestructura.csproj" />
+  </ItemGroup>
+
+</Project>
+````
 
 ## File: Dominio/Context/Entidades/Seguridad/Rol.cs
-```csharp
+````csharp
 using Dominio.Core;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -10016,10 +9994,32 @@ namespace Dominio.Context.Entidades.Seguridad
 
     }
 }
-```
+````
+
+## File: Dominio/Core/Entity.cs
+````csharp
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Dominio.Core
+{
+    public abstract class Entity
+    {
+        public string? ModificadoPor { get; set; }
+        public DateTime FechaTransaccion { get; set; }
+        public string DescripcionTransaccion { get; set; }
+        public byte[] RowVersion { get; set; }
+        public Guid TransaccionUId { get; set; }
+        public string TipoTransaccion { get; set; }
+    }
+}
+````
 
 ## File: Dominio/Core/Extensions/EnumerableExtensions.cs
-```csharp
+````csharp
 namespace Dominio.Core.Extensions
 {
     public static class EnumerableExtensions
@@ -10441,10 +10441,10 @@ namespace Dominio.Core.Extensions
         }
     }
 }
-```
+````
 
 ## File: EstructuraBaseDatos.txt
-```
+````
 -- Crear esquemas
 CREATE SCHEMA Comunes;
 CREATE SCHEMA Seguridad;
@@ -10682,10 +10682,10 @@ CREATE TABLE [Comunes].[ConfiguracionesDetalle_Transacciones](
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
-```
+````
 
 ## File: Infraestructura/Context/MyContext.cs
-```csharp
+````csharp
 using Dominio.Context.Entidades.ConfiguracionesAgg;
 using Dominio.Context.Entidades.Seguridad;
 using Dominio.Core;
@@ -10729,10 +10729,69 @@ namespace Infraestructura.Context
         }
     }
 }
-```
+````
+
+## File: Aplicacion/DTOs/Seguridad/UserRequest.cs
+````csharp
+namespace Aplicacion.DTOs.Seguridad
+{
+    public class UserRequest
+    {
+        public string? UsuarioId { get; set; }
+        public string? Password { get; set; }
+    }
+
+    public class EdicionUsuarioRequest : RequestBase
+    {
+        public UsuarioDTO? Usuario { get; set; }
+    }
+
+    public class GetUserRequest : RequestBase { }
+
+    public class EdicionRolRequest : RequestBase
+    {
+        public RolDTO? Rol { get; set; }
+    }
+
+    public class EdicionPermisosRequest : RequestBase
+    {
+        public string? RolId { get; set; }
+        public List<PermisosDTO>? Permisos { get; set; }
+    }
+}
+````
+
+## File: Infraestructura/Context/Mapping/Seguridad/UsuarioMap.cs
+````csharp
+using Dominio.Context.Entidades.Seguridad;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace Infraestructura.Context.Mapping.Seguridad
+{
+    internal class UsuarioMap : EntityMap<Usuario>
+    {
+        public override void Configure(EntityTypeBuilder<Usuario> builder)
+        {
+            builder.HasKey(r => r.UsuarioId);
+            builder.ToTable("Usuario", "Seguridad");
+            builder.Property(r => r.UsuarioId).HasColumnName("UsuarioId").IsRequired().IsUnicode(false).HasMaxLength(25);
+            builder.Property(r => r.Nombre).HasColumnName("Nombre").IsRequired().HasMaxLength(50);
+            builder.Property(r => r.Apellido).HasColumnName("Apellido").IsRequired().HasMaxLength(50);
+            builder.Property(r => r.Contrasena).HasColumnName("Contrasena").IsRequired().HasMaxLength(250);
+            builder.Property(r => r.RolId).HasColumnName("RolId").IsRequired().IsUnicode(false).HasMaxLength(25);
+            builder.Property(r => r.Activo).HasColumnName("Activo").IsRequired();
+
+            builder.HasOne(x => x.Rol).WithMany(r => r.Usuarios).HasForeignKey(x => x.RolId);
+
+            base.Configure(builder);
+        }
+    }
+}
+````
 
 ## File: Infraestructura/Infraestructura.csproj
-```
+````
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
@@ -10763,40 +10822,10 @@ namespace Infraestructura.Context
   </ItemGroup>
 
 </Project>
-```
-
-## File: Aplicacion/DTOs/Seguridad/UserRequest.cs
-```csharp
-namespace Aplicacion.DTOs.Seguridad
-{
-    public class UserRequest
-    {
-        public string? UsuarioId { get; set; }
-        public string? Password { get; set; }
-    }
-
-    public class EdicionUsuarioRequest : RequestBase
-    {
-        public UsuarioDTO? Usuario { get; set; }
-    }
-
-    public class GetUserRequest : RequestBase { }
-
-    public class EdicionRolRequest : RequestBase
-    {
-        public RolDTO? Rol { get; set; }
-    }
-
-    public class EdicionPermisosRequest : RequestBase
-    {
-        public string? RolId { get; set; }
-        public List<PermisosDTO>? Permisos { get; set; }
-    }
-}
-```
+````
 
 ## File: Dominio/Context/Entidades/Seguridad/Usuario.cs
-```csharp
+````csharp
 using Dominio.Core;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -10821,39 +10850,10 @@ namespace Dominio.Context.Entidades.Seguridad
         public virtual Rol? Rol { get; set; }
     }
 }
-```
-
-## File: Infraestructura/Context/Mapping/Seguridad/UsuarioMap.cs
-```csharp
-using Dominio.Context.Entidades.Seguridad;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
-
-namespace Infraestructura.Context.Mapping.Seguridad
-{
-    internal class UsuarioMap : EntityMap<Usuario>
-    {
-        public override void Configure(EntityTypeBuilder<Usuario> builder)
-        {
-            builder.HasKey(r => r.UsuarioId);
-            builder.ToTable("Usuario", "Seguridad");
-            builder.Property(r => r.UsuarioId).HasColumnName("UsuarioId").IsRequired().IsUnicode(false).HasMaxLength(25);
-            builder.Property(r => r.Nombre).HasColumnName("Nombre").IsRequired().HasMaxLength(50);
-            builder.Property(r => r.Apellido).HasColumnName("Apellido").IsRequired().HasMaxLength(50);
-            builder.Property(r => r.Contrasena).HasColumnName("Contrasena").IsRequired().HasMaxLength(250);
-            builder.Property(r => r.RolId).HasColumnName("RolId").IsRequired().IsUnicode(false).HasMaxLength(25);
-            builder.Property(r => r.Activo).HasColumnName("Activo").IsRequired();
-
-            builder.HasOne(x => x.Rol).WithMany(r => r.Usuarios).HasForeignKey(x => x.RolId);
-
-            base.Configure(builder);
-        }
-    }
-}
-```
+````
 
 ## File: WebServices/WebServices.csproj
-```
+````
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
@@ -10889,10 +10889,10 @@ namespace Infraestructura.Context.Mapping.Seguridad
   </ItemGroup>
 
 </Project>
-```
+````
 
 ## File: Aplicacion/DTOs/Seguridad/UsuarioDTO.cs
-```csharp
+````csharp
 using Dominio.Core.Extensions;
 using System.Text;
 
@@ -10941,52 +10941,10 @@ namespace Aplicacion.DTOs.Seguridad
         }
     }
 }
-```
-
-## File: README.md
-```markdown
-<h1 align="center">TemplateBackEndNetCore</h1>
-
-Template base para crear proyectos backend Asp.net core 8.
-## 🚀 Tecnologias
-
-- C#
-- .NET Core 8
-- Entity Framework Core
-- AutoMapper
-- BCrypt
-- Swagger
-- JWT
-
-## Instalación
-
-1. Clona el repositorio a tu máquina local.
-2. Abre el proyecto en Visual Studio o tu IDE preferido.
-3. Configura la cadena de conexión a la base de datos en el archivo `appsettings.json`.
-4. Ejecuta el comando `Update-Database` en la Consola del Administrador de Paquetes para aplicar las migraciones a la base de datos.
-
-## Uso
-
-Describe cómo usar el proyecto template, incluyendo ejemplos de código si es necesario.
-
-## Contribución
-
-Si deseas contribuir a este proyecto, por favor sigue las siguientes pautas:
-- Abre un issue para discutir los cambios que deseas realizar.
-- Realiza tus cambios en una nueva rama.
-- Envía un Pull Request con una descripción clara de los cambios propuestos.
-
-## Licencia
-
-Este proyecto está bajo la licencia [insertar licencia aquí].
-
-## Estructura de Archivos
-
-Describe la estructura de directorios y archivos importantes en el proyecto.
-```
+````
 
 ## File: WebServices/appsettings.json
-```json
+````json
 {
   "Logging": {
     "LogLevel": {
@@ -11008,10 +10966,204 @@ Describe la estructura de directorios y archivos importantes en el proyecto.
     "Audience": "TemplateNetCore"
   }
 }
+````
+
+## File: README.md
+````markdown
+# 🚀 AspNetCore10 Backend Boilerplate
+
+A production-ready, clean architecture **ASP.NET Core** backend template built with **.NET 10** and **EF Core 8**. Designed to be a solid starting point for any enterprise-level API, including security, authentication with Refresh Tokens, role-based access control, audit logging, and modern API documentation.
+
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?style=for-the-badge&logo=dotnet)](https://dotnet.microsoft.com/)
+[![EF Core](https://img.shields.io/badge/EF%20Core-8.0-512BD4?style=for-the-badge&logo=dotnet)](https://docs.microsoft.com/ef/core/)
+[![SQL Server](https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver)](https://www.microsoft.com/sql-server)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
+
+---
+
+## ✨ Features
+
+| Feature | Details |
+|---|---|
+| 🏗️ **Clean Architecture** | Dominio, Aplicacion, Infraestructura, WebServices |
+| 🔐 **JWT Authentication** | Access Token + Refresh Token |
+| 🔒 **BCrypt Password Hashing** | Secure, salted hashing with `BCrypt.Net-Next` |
+| 👥 **Role-Based Access Control** | Fine-grained screen/action permissions per role |
+| 🗃️ **EF Core Migrations** | Code-first database schema with migration support |
+| 📋 **Audit Log** | Full transaction logging for all entity changes |
+| 🗺️ **AutoMapper 16** | Modern object mapping configuration |
+| 📖 **Scalar API Docs** | Modern OpenAPI 3.1 UI (replaces Swagger) |
+| ⚡ **DataSeeder** | Automatic seeding of default roles, users, and permissions |
+| 🌐 **CORS** | Pre-configured for frontend integration |
+| 🛡️ **Global Exception Middleware** | Centralized error handling |
+
+---
+
+## 🏛️ Architecture
+
+The solution follows **Clean Architecture** principles, organized into four layers:
+
+```
+📦 TemplateBackEndNetCore
+ ├── 📂 Dominio           → Entities, domain contracts, value objects
+ ├── 📂 Aplicacion        → Use cases, DTOs, application services
+ ├── 📂 Infraestructura   → EF Core, repositories, JWT, migrations
+ ├── 📂 WebServices       → ASP.NET Core API, controllers, middleware
+ └── 📂 CrossCutting      → Shared utilities (config, helpers)
 ```
 
+---
+
+## 🔑 Authentication Flow
+
+### Login
+```
+POST /api/User/login
+```
+Returns an **Access Token** (short-lived) and a **Refresh Token** (long-lived, stored in DB).
+
+### Refresh Token
+```
+POST /api/User/refresh-token
+```
+Exchange an expired Access Token + Refresh Token for a new pair, without re-entering credentials.
+
+---
+
+## 📋 API Endpoints
+
+### 🔓 Public
+| Method | Route | Description |
+|---|---|---|
+| `POST` | `/api/User/login` | Authenticate and get tokens |
+| `POST` | `/api/User/refresh-token` | Renew tokens |
+
+### 🔒 Protected (requires JWT Bearer token)
+| Method | Route | Description |
+|---|---|---|
+| `POST` | `/api/User/crear-usuario` | Create a new user |
+| `POST` | `/api/User/editar-usuario` | Edit an existing user |
+| `POST` | `/api/User/obtener-usuarios` | Paginated user list |
+| `GET`  | `/api/User/obtener-roles` | List all roles |
+| `POST` | `/api/User/crear-rol` | Create a new role |
+| `POST` | `/api/User/editar-rol` | Edit a role |
+| `GET`  | `/api/User/obtener-pantalla` | List all screens |
+| `POST` | `/api/User/edicion-permisos` | Assign permissions to a role |
+
+---
+
+## 🗃️ Database
+
+The project uses **SQL Server** with **EF Core Code-First Migrations**.
+
+### Schemas
+- `Seguridad` — Users, Roles, Permissions, Screens
+- `Comunes` — Configurations, Transaction Logs
+
+### Apply Migrations
+```bash
+dotnet ef database update --context MyContext --project Infraestructura --startup-project WebServices
+```
+
+### Default Seed Data
+On first run, the `DataSeeder` automatically creates:
+
+| Type | Value |
+|---|---|
+| **Default Admin User** | `admin` / `admin123*` |
+| **Roles** | `Admin`, `User` |
+| **Screen** | `Seguridad` |
+| **Permission** | Admin → Seguridad (Ver, Editar, Eliminar) |
+
+---
+
+## ⚙️ Configuration
+
+### `appsettings.json`
+```json
+{
+  "ConnectionStrings": {
+    "conectionDataBase": "Server=YOUR_SERVER;Database=YOUR_DB;User Id=YOUR_USER;Password=YOUR_PASS;TrustServerCertificate=true"
+  },
+  "JwtSettings": {
+    "Secret": "YOUR_SUPER_SECRET_KEY_MIN_32_CHARS",
+    "ExpirationInMinutes": 60,
+    "RefreshTokenExpirationInDays": 7,
+    "Issuer": "YourIssuer",
+    "Audience": "YourAudience"
+  }
+}
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- SQL Server 2019+ (or LocalDB for development)
+
+### Setup
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/Alex16leiva/AspNetCore10-Backend-Boilerplate.git
+cd AspNetCore10-Backend-Boilerplate
+
+# 2. Configure your connection string in WebServices/appsettings.json
+
+# 3. Apply EF Core migrations
+dotnet ef database update --context MyContext --project Infraestructura --startup-project WebServices
+
+# 4. Run the API
+cd WebServices
+dotnet run
+```
+
+### API Documentation
+Once running, open your browser at:
+```
+https://localhost:7217/scalar/v1
+```
+
+---
+
+## 🛡️ Security Highlights
+
+- ✅ **BCrypt** — Password hashing with automatic salt (replaces plain SHA-256)
+- ✅ **JWT Bearer** — Stateless authentication
+- ✅ **Refresh Token Rotation** — New refresh token issued on every renewal
+- ✅ **Refresh Token Expiry** — Configurable expiration (default: 7 days)
+- ✅ **Secure Dependencies** — All NuGet packages audited for known vulnerabilities
+
+---
+
+## 📦 Key Packages
+
+| Package | Version | Purpose |
+|---|---|---|
+| `Microsoft.AspNetCore.OpenApi` | 10.0.x | Native OpenAPI 3.1 generation |
+| `Scalar.AspNetCore` | 2.x | Modern API documentation UI |
+| `Microsoft.EntityFrameworkCore.SqlServer` | 8.x | ORM + SQL Server provider |
+| `AutoMapper` | 16.x | Object-object mapping |
+| `BCrypt.Net-Next` | Latest | Secure password hashing |
+| `Microsoft.AspNetCore.Authentication.JwtBearer` | 8.x | JWT middleware |
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** — free to use, modify, and distribute.
+
+---
+
+<div align="center">
+  Made with ❤️ by <a href="https://github.com/Alex16leiva">Alex16leiva</a>
+</div>
+````
+
 ## File: WebServices/Controllers/UserController.cs
-```csharp
+````csharp
 using Aplicacion.DTOs;
 using Aplicacion.DTOs.Seguridad;
 using Aplicacion.Services.Seguridad;
@@ -11114,10 +11266,10 @@ namespace WebServices.Controllers
         }
     }
 }
-```
+````
 
 ## File: WebServices/Program.cs
-```csharp
+````csharp
 using Aplicacion.Core;
 using Infraestructura.Context;
 using Scalar.AspNetCore;
@@ -11184,4 +11336,4 @@ app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 app.MapControllers();
 
 app.Run();
-```
+````

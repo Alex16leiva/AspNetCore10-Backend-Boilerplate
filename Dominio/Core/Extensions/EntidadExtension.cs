@@ -35,7 +35,8 @@ namespace Dominio.Core.Extensions
         /// // Copia: Ana, 30
         /// </code>
         /// </example>
-        public static T DeepCopy<T>(this T theSource)
+        public static T DeepCopy<T>(this T theSource) 
+            where T : class 
         {
             T theCopy;
 

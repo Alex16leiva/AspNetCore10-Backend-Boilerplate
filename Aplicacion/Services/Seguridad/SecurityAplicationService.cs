@@ -159,16 +159,12 @@ namespace Aplicacion.Services.Seguridad
                 var newRefreshToken = _tokenService.GenerateRefreshToken();
 
                 usuario.RefreshToken = newRefreshToken;
-                usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7); 
-                
-                var tInfo = new TransactionInfo {
-                    TransaccionUId = Guid.NewGuid(),
-                    TipoTransaccion = "IniciarSesion",
-                    FechaTransaccion = DateTime.Now,
-                    ModificadoPor = usuario.UsuarioId,
-                    DescripcionTransaccion = "Refresh Token update"
-                };
-                _genericRepository.UnitOfWork.Commit(tInfo);
+                usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+
+                request.RequestUserInfo.UsuarioId = usuario.UsuarioId;
+
+                TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("IniciarSesion");
+                _genericRepository.UnitOfWork.Commit(transactionInfo);
 
                 return new UsuarioDTO
                 {
@@ -210,14 +206,8 @@ namespace Aplicacion.Services.Seguridad
             usuario.RefreshToken = newRefreshToken;
             usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
 
-            var tInfo = new TransactionInfo {
-                TransaccionUId = Guid.NewGuid(),
-                TipoTransaccion = "RefreshToken",
-                FechaTransaccion = DateTime.Now,
-                ModificadoPor = usuario.UsuarioId,
-                DescripcionTransaccion = "Refresh Token issue"
-            };
-            _genericRepository.UnitOfWork.Commit(tInfo);
+            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("RefreshToken");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
 
             return new UsuarioDTO
             {
@@ -245,7 +235,6 @@ namespace Aplicacion.Services.Seguridad
                 PageIndex = usuarios.PageIndex,
                 Items = (from qry in usuarios.Items as IEnumerable<Usuario> select MapUsuarioDto(qry)).ToList(),
             };
-
         }
 
         public RolDTO CrearRol(EdicionRolRequest request)

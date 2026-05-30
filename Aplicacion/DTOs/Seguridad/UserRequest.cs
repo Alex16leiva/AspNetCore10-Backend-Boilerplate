@@ -1,6 +1,6 @@
 ﻿namespace Aplicacion.DTOs.Seguridad
 {
-    public class UserRequest
+    public class UserRequest : RequestBase
     {
         public string? UsuarioId { get; set; }
         public string? Password { get; set; }

@@ -8,8 +8,8 @@ namespace Aplicacion.DTOs
         {
             PageIndex = 0;
             PageSize = 10;
-            SortFields = new List<string>();
-            CustomFilters = new Dictionary<string, object>();
+            SortFields = [];
+            CustomFilters = [];
         }
 
         /// <summary>
