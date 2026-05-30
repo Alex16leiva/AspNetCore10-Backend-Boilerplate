@@ -24,6 +24,11 @@ namespace Dominio.Core.Result
         /// Errores detallados en caso de validación fallida.
         /// </summary>
         IReadOnlyCollection<string> Errors { get; }
+
+        /// <summary>
+        /// Indica el tipo/estado del resultado (validación, excepción, error de aplicación, éxito).
+        /// </summary>
+        ResultStatus Status { get; }
     }
 
     /// <summary>

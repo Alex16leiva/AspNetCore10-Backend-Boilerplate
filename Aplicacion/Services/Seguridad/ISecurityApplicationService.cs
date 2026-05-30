@@ -1,19 +1,20 @@
 using Aplicacion.DTOs;
 using Aplicacion.DTOs.Seguridad;
+using Dominio.Core.Result;
 
 namespace Aplicacion.Services.Seguridad
 {
     public interface ISecurityApplicationService
     {
-        UsuarioDTO EditarUsuario(EdicionUsuarioRequest request);
-        List<PantallaDTO> ObtenerPantallas();
-        RolDTO EdicionPermisos(EdicionPermisosRequest request);
-        UsuarioDTO CrearUsuario(EdicionUsuarioRequest request);
-        UsuarioDTO IniciarSesion(UserRequest request);
-        UsuarioDTO RefreshToken(TokenRequest request);
-        SearchResult<UsuarioDTO> ObtenerUsuario(GetUserRequest request);
-        RolDTO CrearRol(EdicionRolRequest request);
-        RolDTO EditarRol(EdicionRolRequest request);
-        List<RolDTO> ObtenerRoles();
+        Task<Result<UsuarioDTO>> EditarUsuario(EdicionUsuarioRequest request);
+        Task<Result<List<PantallaDTO>>> ObtenerPantallas();
+        Task<Result<RolDTO>> EdicionPermisos(EdicionPermisosRequest request);
+        Task<Result<UsuarioDTO>> CrearUsuario(EdicionUsuarioRequest request);
+        Task<Result<UsuarioDTO>> IniciarSesion(UserRequest request);
+        Task<Result<UsuarioDTO>> RefreshToken(TokenRequest request);
+        Task<Result<SearchResult<UsuarioDTO>>> ObtenerUsuario(GetUserRequest request);
+        Task<Result<RolDTO>> CrearRol(EdicionRolRequest request);
+        Task<Result<RolDTO>> EditarRol(EdicionRolRequest request);
+        Task<Result<List<RolDTO>>> ObtenerRoles();
     }
 }

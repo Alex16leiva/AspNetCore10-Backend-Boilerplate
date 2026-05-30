@@ -15,8 +15,8 @@ namespace Dominio.Core.Result
         /// <summary>
         /// Constructor privado para inicializar un resultado genérico.
         /// </summary>
-        private Result(bool isSuccess, T? data, string message, string? errorCode = null, IEnumerable<string>? errors = null)
-            : base(isSuccess, message, errorCode, errors)
+        private Result(bool isSuccess, T? data, string message, string? errorCode = null, IEnumerable<string>? errors = null, ResultStatus status = ResultStatus.ApplicationError)
+            : base(isSuccess, message, errorCode, errors, status)
         {
             Data = data;
         }
@@ -29,7 +29,7 @@ namespace Dominio.Core.Result
         /// <returns>Un <see cref="Result{T}"/> exitoso con el valor especificado.</returns>
         public static Result<T> Success(T data, string message = "Operación exitosa")
         {
-            return new Result<T>(true, data, message);
+            return new Result<T>(true, data, message, null, null, ResultStatus.Success);
         }
 
         /// <summary>
@@ -38,9 +38,9 @@ namespace Dominio.Core.Result
         /// <param name="message">Mensaje de error.</param>
         /// <param name="errorCode">Código de error opcional.</param>
         /// <returns>Un <see cref="Result{T}"/> fallido.</returns>
-        public static Result<T> Failure(string message, string? errorCode = null)
+        public static Result<T> Failure(string message, string? errorCode = null, ResultStatus status = ResultStatus.ApplicationError)
         {
-            return new Result<T>(false, default, message, errorCode);
+            return new Result<T>(false, default, message, errorCode, null, status);
         }
 
         /// <summary>
@@ -52,7 +52,7 @@ namespace Dominio.Core.Result
         /// <returns>Un <see cref="Result{T}"/> con errores de validación.</returns>
         public static Result<T> ValidationFailure(string message, IEnumerable<string> errors, string? errorCode = null)
         {
-            return new Result<T>(false, default, message, errorCode, errors);
+            return new Result<T>(false, default, message, errorCode, errors, ResultStatus.ValidationError);
         }
 
         /// <summary>
@@ -75,7 +75,7 @@ namespace Dominio.Core.Result
             }
             catch (Exception ex)
             {
-                return Result<TNew>.Failure($"Error en proyección: {ex.Message}", "PROJECTION_ERROR");
+                return Result<TNew>.Failure($"Error en proyección: {ex.Message}", "PROJECTION_ERROR", ResultStatus.Exception);
             }
         }
 
@@ -98,7 +98,7 @@ namespace Dominio.Core.Result
             }
             catch (Exception ex)
             {
-                return Result<TNew>.Failure($"Error en encadenamiento: {ex.Message}", "BIND_ERROR");
+                return Result<TNew>.Failure($"Error en encadenamiento: {ex.Message}", "BIND_ERROR", ResultStatus.Exception);
             }
         }
     }

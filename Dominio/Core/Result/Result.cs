@@ -1,5 +1,13 @@
 namespace Dominio.Core.Result
 {
+    public enum ResultStatus
+    {
+        Success,
+        ValidationError,
+        ApplicationError,
+        Exception
+    }
+
     /// <summary>
     /// Clase base para resultados de operación sin valor genérico.
     /// Implementa <see cref="IResult"/> y proporciona constructores para casos de éxito y fallo.
@@ -27,14 +35,20 @@ namespace Dominio.Core.Result
         public IReadOnlyCollection<string> Errors { get; protected set; }
 
         /// <summary>
+        /// Estado del resultado (éxito, validación, error de aplicación, excepción).
+        /// </summary>
+        public ResultStatus Status { get; protected set; }
+
+        /// <summary>
         /// Constructor protegido para inicializar un resultado.
         /// </summary>
-        protected Result(bool isSuccess, string message, string? errorCode = null, IEnumerable<string>? errors = null)
+        protected Result(bool isSuccess, string message, string? errorCode = null, IEnumerable<string>? errors = null, ResultStatus status = ResultStatus.ApplicationError)
         {
             IsSuccess = isSuccess;
             Message = message;
             ErrorCode = errorCode;
             Errors = errors?.ToList().AsReadOnly() ?? Array.Empty<string>().AsReadOnly();
+            Status = status;
         }
 
         /// <summary>
@@ -42,7 +56,7 @@ namespace Dominio.Core.Result
         /// </summary>
         public static Result Success(string message = "Operación exitosa")
         {
-            return new Result(true, message);
+            return new Result(true, message, null, null, ResultStatus.Success);
         }
 
         /// <summary>
@@ -50,7 +64,7 @@ namespace Dominio.Core.Result
         /// </summary>
         public static Result Failure(string message, string? errorCode = null)
         {
-            return new Result(false, message, errorCode);
+            return new Result(false, message, errorCode, null, ResultStatus.ApplicationError);
         }
 
         /// <summary>
@@ -58,7 +72,7 @@ namespace Dominio.Core.Result
         /// </summary>
         public static Result ValidationFailure(string message, IEnumerable<string> errors, string? errorCode = null)
         {
-            return new Result(false, message, errorCode, errors);
+            return new Result(false, message, errorCode, errors, ResultStatus.ValidationError);
         }
     }
 }

@@ -1,6 +1,7 @@
 using Aplicacion.Core;
 using Aplicacion.DTOs;
 using Aplicacion.DTOs.Seguridad;
+using System.Threading.Tasks;
 using Aplicacion.Helpers;
 using AutoMapper;
 using Dominio.Context.Entidades;
@@ -8,6 +9,7 @@ using Dominio.Context.Entidades.Seguridad;
 using Dominio.Core;
 using Dominio.Core.Extensions;
 using Dominio.Core.Jwtoken;
+using Dominio.Core.Result;
 using Infraestructura.Context;
 using Infraestructura.Core.Jwtoken;
 using Microsoft.Extensions.Options;
@@ -30,46 +32,49 @@ namespace Aplicacion.Services.Seguridad
             _jwtSettings = jwtSettings.Value;
         }
 
-        public UsuarioDTO EditarUsuario(EdicionUsuarioRequest request)
+        public Task<Result<UsuarioDTO>> EditarUsuario(EdicionUsuarioRequest request)
         {
-            // DTO validation is handled by FluentValidation at the API layer
+            if (request.IsNull() || request.Usuario.IsNull())
+            { 
+                return Task.FromResult(Result<UsuarioDTO>.Failure("Usuario es obligatorio", "NULL_USUARIO"));
+            }
 
             Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
 
             if (usuarioExiste.IsNull())
-            {
-                return new UsuarioDTO
-                {
-                    Message = "El usuario no existe"
-                };
+            { 
+                return Task.FromResult(Result<UsuarioDTO>.Failure("El usuario no existe", "USER_NOT_FOUND"));
             }
 
             if (request.Usuario.EditarContrasena)
             {
                 usuarioExiste.Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena);
-            }
+            } 
 
             usuarioExiste.Nombre = request.Usuario.Nombre.ValueOrEmpty();
             usuarioExiste.Apellido = request.Usuario.Apellido.ValueOrEmpty();
             usuarioExiste.RolId = request.Usuario.RolId.ValueOrEmpty();
             usuarioExiste.Activo = request.Usuario.Activo;
 
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarUsuario");
+            TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("EditarUsuario")
+                ?? new TransactionInfo { GenerateTransaction = false }; 
             _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return new UsuarioDTO();
+
+            return Task.FromResult(Result<UsuarioDTO>.Success(_mapper.Map<UsuarioDTO>(usuarioExiste), "Usuario actualizado exitosamente"));
         }
 
-        public List<PantallaDTO> ObtenerPantallas()
+        public Task<Result<List<PantallaDTO>>> ObtenerPantallas()
         {
             var pantallas = _genericRepository.GetAll<Pantalla>();
-            return pantallas.Select(r => new PantallaDTO { Descripcion = r.Descripcion, PantallaId = r.PantallaId }).ToList();
+            var lista = pantallas.Select(r => new PantallaDTO { Descripcion = r.Descripcion, PantallaId = r.PantallaId }).ToList(); 
+            return Task.FromResult(Result<List<PantallaDTO>>.Success(lista));
         }
 
-        public RolDTO EdicionPermisos(EdicionPermisosRequest request)
+        public Task<Result<RolDTO>> EdicionPermisos(EdicionPermisosRequest request)
         {
             var permisos = _genericRepository.GetFiltered<Permisos>(r => r.RolId == request.RolId);
 
-            foreach (var item in request.Permisos)
+            foreach (var item in request.Permisos) 
             {
                 var permiso = permisos.FirstOrDefault(r => r.PantallaId == item.PantallaId);
                 if (permiso.IsNotNull())
@@ -85,7 +90,7 @@ namespace Aplicacion.Services.Seguridad
                 }
                 else
                 {
-                    var nuevoPermiso = new Permisos
+                    var nuevoPermiso = new Permisos 
                     {
                         Editar = item.Editar,
                         Eliminar = item.Eliminar,
@@ -93,69 +98,67 @@ namespace Aplicacion.Services.Seguridad
                         RolId = item.RolId,
                         Ver = item.Ver,
                     };
-                    _genericRepository.Add(nuevoPermiso);
+                    _genericRepository.Add(nuevoPermiso); 
                 }
             }
             
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarUsuario");
+            TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("AgregarUsuario")
+                ?? new TransactionInfo { GenerateTransaction = false };
             _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return new RolDTO { };
+            return Task.FromResult(Result<RolDTO>.Success(new RolDTO())); 
         }
 
-        public UsuarioDTO CrearUsuario(EdicionUsuarioRequest request)
+        public Task<Result<UsuarioDTO>> CrearUsuario(EdicionUsuarioRequest request)
         {
-            // DTO validation is handled by FluentValidation at the API layer
             if (request.IsNull() || request.Usuario.IsNull())
-            {
-                return new UsuarioDTO
-                {
-                    Message = "Usuario es obligatorio"
-                };
+            { 
+                return Task.FromResult(Result<UsuarioDTO>.Failure("Usuario es obligatorio", "NULL_USUARIO"));
             }
 
-            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
+            var usuarioRequest = request.Usuario;
+
+            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == usuarioRequest.UsuarioId);
 
             if (usuarioExiste.IsNotNull())
-            {
-                return new UsuarioDTO
-                {
-                    Message = "Usuario ya esta registrado"
-                };
+            { 
+                return Task.FromResult(Result<UsuarioDTO>.Failure("Usuario ya esta registrado", "USER_EXISTS"));
             }
 
             var usuario = new Usuario
             {
-                Apellido = request.Usuario.Apellido.ValueOrEmpty(),
-                Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena),
-                Nombre = request.Usuario.Nombre.ValueOrEmpty(),
-                RolId = request.Usuario.RolId.ValueOrEmpty(),
-                UsuarioId = request.Usuario.UsuarioId.ValueOrEmpty(),
-                Activo = request.Usuario.Activo
+                Apellido = usuarioRequest.Apellido.ValueOrEmpty(),
+                Contrasena = PasswordEncryptor.HashPassword(usuarioRequest.Contrasena), 
+                Nombre = usuarioRequest.Nombre.ValueOrEmpty(),
+                RolId = usuarioRequest.RolId.ValueOrEmpty(),
+                UsuarioId = usuarioRequest.UsuarioId.ValueOrEmpty(),
+                Activo = usuarioRequest.Activo
             };
 
             _genericRepository.Add(usuario);
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarUsuario");
+            TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("AgregarUsuario")
+                ?? new TransactionInfo { GenerateTransaction = false };
             _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return _mapper.Map<UsuarioDTO>(usuario);
+            return Task.FromResult(Result<UsuarioDTO>.Success(_mapper.Map<UsuarioDTO>(usuario), "Usuario creado exitosamente"));
         }
 
-        public UsuarioDTO IniciarSesion(UserRequest request)
+        public Task<Result<UsuarioDTO>> IniciarSesion(UserRequest request)
         {
-            List<string> includes = ["Rol", "Rol.Permisos"];
+            var includes = new List<string> { "Rol", "Rol.Permisos" };
 
-            if (request.Password.HasValue())
-            {
-                
+            if (string.IsNullOrWhiteSpace(request?.Password) || string.IsNullOrWhiteSpace(request?.UsuarioId))
+            { 
+                return Task.FromResult(Result<UsuarioDTO>.Failure("Usuario o Contraseña no valido", "INVALID_CREDENTIALS"));
             }
 
             Usuario usuario = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.UsuarioId, includes);
 
-            if (usuario.IsNotNull() && PasswordEncryptor.VerifyPassword(request?.Password, usuario.Contrasena))
+            if (usuario.IsNotNull() && PasswordEncryptor.VerifyPassword(request.Password, usuario.Contrasena))
             {
                 if (!usuario.Activo)
-                {
-                    return new UsuarioDTO { Message = $"Usuario {usuario.UsuarioId} esta desactivado" };
+                { 
+                    return Task.FromResult(Result<UsuarioDTO>.Failure($"Usuario {usuario.UsuarioId} esta desactivado", "USER_INACTIVE"));
                 }
+
                 var newAccessToken = _tokenService.Generate(usuario);
                 var newRefreshToken = _tokenService.GenerateRefreshToken();
 
@@ -171,7 +174,7 @@ namespace Aplicacion.Services.Seguridad
                     ?? new TransactionInfo { GenerateTransaction = false };
                 _genericRepository.UnitOfWork.Commit(transactionInfo);
 
-                return new UsuarioDTO
+                var resultDto = new UsuarioDTO
                 {
                     Apellido = usuario.Apellido,
                     Nombre = usuario.Nombre,
@@ -182,43 +185,41 @@ namespace Aplicacion.Services.Seguridad
                     UsuarioId = usuario.UsuarioId,
                     Permisos = MapPermisosDto(usuario.Rol?.Permisos)
                 };
+
+                return Task.FromResult(Result<UsuarioDTO>.Success(resultDto, "Inicio de sesión exitoso"));
             }
 
-            return new UsuarioDTO
-            {
-                Message = "Usuario o Contraseña no valido",
-                UsuarioAutenticado = false
-            };
+            return Task.FromResult(Result<UsuarioDTO>.Failure("Usuario o Contraseña no valido", "INVALID_CREDENTIALS"));
         }
 
-        public UsuarioDTO RefreshToken(TokenRequest request)
+        public Task<Result<UsuarioDTO>> RefreshToken(TokenRequest request)
         {
             if (request == null || string.IsNullOrWhiteSpace(request.AccessToken) || string.IsNullOrWhiteSpace(request.RefreshToken))
-            {
-                return new UsuarioDTO { Message = "Solicitud de token inválida", UsuarioAutenticado = false };
+            { 
+                return Task.FromResult(Result<UsuarioDTO>.Failure("Solicitud de token inválida", "INVALID_TOKEN_REQUEST"));
             }
 
             ClaimsPrincipal principal;
             try
             {
                 principal = _tokenService.GetPrincipalFromExpiredToken(request.AccessToken);
-            }
+            } 
             catch (SecurityTokenException)
             {
-                return new UsuarioDTO { Message = "Token de acceso inválido", UsuarioAutenticado = false };
+                return Task.FromResult(Result<UsuarioDTO>.Failure("Token de acceso inválido", "INVALID_ACCESS_TOKEN"));
             }
 
             string? userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrWhiteSpace(userId))
-            {
-                return new UsuarioDTO { Message = "Token de acceso inválido", UsuarioAutenticado = false };
+            { 
+                return Task.FromResult(Result<UsuarioDTO>.Failure("Token de acceso inválido", "INVALID_ACCESS_TOKEN"));
             }
 
             var usuario = _genericRepository.GetSingle<Usuario>(u => u.UsuarioId == userId && u.RefreshToken == request.RefreshToken, new List<string> { "Rol", "Rol.Permisos" });
 
             if (usuario == null || usuario.RefreshTokenExpiryTime <= DateTime.UtcNow)
-            {
-                return new UsuarioDTO { Message = "Token de refresco inválido o expirado", UsuarioAutenticado = false };
+            { 
+                return Task.FromResult(Result<UsuarioDTO>.Failure("Token de refresco inválido o expirado", "INVALID_REFRESH_TOKEN"));
             }
 
             var newAccessToken = _tokenService.Generate(usuario);
@@ -231,7 +232,7 @@ namespace Aplicacion.Services.Seguridad
                 ?? new TransactionInfo { GenerateTransaction = false };
             _genericRepository.UnitOfWork.Commit(transactionInfo);
 
-            return new UsuarioDTO
+            var resultDto = new UsuarioDTO 
             {
                 Apellido = usuario.Apellido,
                 Nombre = usuario.Nombre,
@@ -242,15 +243,16 @@ namespace Aplicacion.Services.Seguridad
                 UsuarioId = usuario.UsuarioId,
                 Permisos = MapPermisosDto(usuario.Rol?.Permisos)
             };
+
+            return Task.FromResult(Result<UsuarioDTO>.Success(resultDto, "Token renovado correctamente"));
         }
 
-        public SearchResult<UsuarioDTO> ObtenerUsuario(GetUserRequest request)
+        public Task<Result<SearchResult<UsuarioDTO>>> ObtenerUsuario(GetUserRequest request)
         {
             var queryInfo = request.QueryInfo ?? new QueryInfo();
             var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(queryInfo);
             var usuarios = _genericRepository.GetPagedAndFiltered<Usuario>(dynamicFilter);
-
-            return new SearchResult<UsuarioDTO>
+            var result = new SearchResult<UsuarioDTO>
             {
                 PageCount = usuarios.PageCount,
                 ItemCount = usuarios.ItemCount,
@@ -258,25 +260,21 @@ namespace Aplicacion.Services.Seguridad
                 PageIndex = usuarios.PageIndex,
                 Items = (from qry in usuarios.Items as IEnumerable<Usuario> select MapUsuarioDto(qry)).ToList(),
             };
+
+            return Task.FromResult(Result<SearchResult<UsuarioDTO>>.Success(result));
         }
 
-        public RolDTO CrearRol(EdicionRolRequest request)
+        public Task<Result<RolDTO>> CrearRol(EdicionRolRequest request)
         {
             if (request.Rol is null)
             {
-                return new RolDTO
-                {
-                    Message = "El rol es obligatorio"
-                };
+                return Task.FromResult(Result<RolDTO>.Failure("El rol es obligatorio", "NULL_ROLE"));
             }
 
             var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
             if (rol.IsNotNull())
             {
-                return new RolDTO
-                {
-                    Message = $"El rol {request.Rol.RolId} ya existe"
-                };
+                return Task.FromResult(Result<RolDTO>.Failure($"El rol {request.Rol.RolId} ya existe", "ROLE_EXISTS"));
             }
 
             var nuevoRol = new Rol
@@ -290,48 +288,43 @@ namespace Aplicacion.Services.Seguridad
                 ?? new TransactionInfo { GenerateTransaction = false };
             _genericRepository.UnitOfWork.Commit(transactionInfo);
 
-            return new RolDTO();
+            return Task.FromResult(Result<RolDTO>.Success(new RolDTO()));
         }
 
-        public RolDTO EditarRol(EdicionRolRequest request)
+        public Task<Result<RolDTO>> EditarRol(EdicionRolRequest request)
         {
             if (request.Rol is null)
             {
-                return new RolDTO
-                {
-                    Message = "El rol es obligatorio"
-                };
+                return Task.FromResult(Result<RolDTO>.Failure("El rol es obligatorio", "NULL_ROLE"));
             }
 
             var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
 
             if (rol.IsNull())
             {
-                return new RolDTO
-                {
-                    Message = $"El Rol {request.Rol.RolId} no existe"
-                };
+                return Task.FromResult(Result<RolDTO>.Failure($"El Rol {request.Rol.RolId} no existe", "ROLE_NOT_FOUND"));
             }
 
             rol.Descripcion = request.Rol.Descripcion;
             TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("EditarRol")
                 ?? new TransactionInfo { GenerateTransaction = false };
             _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return new RolDTO();
+            return Task.FromResult(Result<RolDTO>.Success(new RolDTO()));
         }
 
-        public List<RolDTO> ObtenerRoles()
+        public Task<Result<List<RolDTO>>> ObtenerRoles()
         {
             var includes = new List<string> { "Permisos" };
             var roles = _genericRepository.GetAll<Rol>(includes);
-
-            return roles.Select(qry =>
+            var lista = roles.Select(qry =>
             new RolDTO
             {
                 Descripcion = qry.Descripcion,
                 RolId = qry.RolId,
                 Permisos = MapPermisosDto(qry?.Permisos),
             }).ToList();
+
+            return Task.FromResult(Result<List<RolDTO>>.Success(lista));
         }
 
         private static List<PermisosDTO> MapPermisosDto(List<Permisos>? permisos)

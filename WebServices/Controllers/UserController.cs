@@ -1,6 +1,7 @@
 using Aplicacion.DTOs;
 using Aplicacion.DTOs.Seguridad;
 using Aplicacion.Services.Seguridad;
+using Dominio.Core.Result;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,84 +20,100 @@ namespace WebServices.Controllers
         [AllowAnonymous]
         [Route("login")]
         [HttpPost]
-        public UsuarioDTO Login([FromBody] UserRequest request)
+        public async Task<IActionResult> Login([FromBody] UserRequest request)
         {
-            UsuarioDTO usuario = _securityAppService.IniciarSesion(request);
-
-            return usuario;
+            var usuario = await _securityAppService.IniciarSesion(request);
+            return MapResult(usuario);
         }
 
         [AllowAnonymous]
         [HttpPost("refresh-token")]
-        public UsuarioDTO RefreshToken([FromBody] TokenRequest request)
+        public async Task<IActionResult> RefreshToken([FromBody] TokenRequest request)
         {
-            UsuarioDTO usuario = _securityAppService.RefreshToken(request);
-            return usuario;
+            var usuario = await _securityAppService.RefreshToken(request);
+            return MapResult(usuario);
         }
 
         [Authorize]
         [HttpPost("crear-usuario")]
-        public UsuarioDTO CreateUser(EdicionUsuarioRequest request)
+        public async Task<IActionResult> CreateUser(EdicionUsuarioRequest request)
         {
-            UsuarioDTO usuario = _securityAppService.CrearUsuario(request);
-
-            return usuario;
+            var usuario = await _securityAppService.CrearUsuario(request);
+            return MapResult(usuario);
         }
 
         [Authorize]
         [HttpPost("editar-usuario")]
-        public UsuarioDTO EditarUsuario(EdicionUsuarioRequest request)
+        public async Task<IActionResult> EditarUsuario(EdicionUsuarioRequest request)
         {
-            UsuarioDTO usuario = _securityAppService.EditarUsuario(request);
-            return usuario;
+            var usuario = await _securityAppService.EditarUsuario(request);
+            return MapResult(usuario);
         }
 
         [Authorize]
         [HttpPost("obtener-usuarios")]
-        public SearchResult<UsuarioDTO> ObtenerUsuarios(GetUserRequest request)
+        public async Task<IActionResult> ObtenerUsuarios(GetUserRequest request)
         {
-            var usuarios = _securityAppService.ObtenerUsuario(request);
-            return usuarios;
+            var usuarios = await _securityAppService.ObtenerUsuario(request);
+            return MapResult(usuarios);
         }
 
         [Authorize]
         [HttpGet("obtener-roles")]
-        public List<RolDTO> ObtenerRoles()
+        public async Task<IActionResult> ObtenerRoles()
         {
-            var roles = _securityAppService.ObtenerRoles();
-            return roles;
+            var roles = await _securityAppService.ObtenerRoles();
+            return MapResult(roles);
         }
 
         [Authorize]
         [HttpPost("crear-rol")]
-        public RolDTO CrearRol(EdicionRolRequest request)
+        public async Task<IActionResult> CrearRol(EdicionRolRequest request)
         {
-            var rol = _securityAppService.CrearRol(request);
-            return rol;
+            var rol = await _securityAppService.CrearRol(request);
+            return MapResult(rol);
         }
 
         [Authorize]
         [HttpPost("editar-rol")]
-        public RolDTO EditarRol(EdicionRolRequest request)
+        public async Task<IActionResult> EditarRol(EdicionRolRequest request)
         {
-            var rol = _securityAppService.EditarRol(request);
-            return rol;
+            var rol = await _securityAppService.EditarRol(request);
+            return MapResult(rol);
         }
 
         [Authorize]
         [HttpGet("obtener-pantalla")]
-        public List<PantallaDTO> ObtenerPantalla()
+        public async Task<IActionResult> ObtenerPantalla()
         {
-            var pantallas = _securityAppService.ObtenerPantallas();
-            return pantallas;
+            var pantallas = await _securityAppService.ObtenerPantallas();
+            return MapResult(pantallas);
         }
 
         [Authorize]
         [HttpPost("edicion-permisos")]
-        public RolDTO EdicionPermisos(EdicionPermisosRequest request)
+        public async Task<IActionResult> EdicionPermisos(EdicionPermisosRequest request)
         {
-            var rol = _securityAppService.EdicionPermisos(request);
-            return rol;
+            var rol = await _securityAppService.EdicionPermisos(request);
+            return MapResult(rol);
+        }
+
+        private IActionResult MapResult<T>(Result<T> result)
+        {
+            if (result == null) return StatusCode(500);
+
+            if (result.IsSuccess)
+            {
+                return Ok(result.Data);
+            }
+
+            return result.Status switch
+            {
+                ResultStatus.ValidationError => BadRequest(result),
+                ResultStatus.ApplicationError => Conflict(result),
+                ResultStatus.Exception => StatusCode(500, result),
+                _ => BadRequest(result),
+            };
         }
     }
 }
