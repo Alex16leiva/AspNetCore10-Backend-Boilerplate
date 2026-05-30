@@ -52,7 +52,7 @@ namespace Infraestructura.Core.RestClient
             // For complex types first we need to figure out if the property is a collection or not.
             if (typeof(ICollection).IsAssignableFrom(propertyInfo.PropertyType))
             {
-                List<string> propertiesStringBuilder = new List<string>();
+                List<string> propertiesStringBuilder = [];
                 string collectionPropertyName = propertyInfo.Name;
 
                 Type collectionType = propertyInfo.PropertyType.GetGenericArguments()[0];
