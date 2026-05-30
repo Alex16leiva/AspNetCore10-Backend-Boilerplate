@@ -26,7 +26,7 @@ namespace Dominio.Core.Extensions
         /// Console.WriteLine($"Resultado2: {resultado2[0]}");
         /// </code>
         /// </example>
-        public static object[] ToObject(this string value)
+        public static object[] ToObject(this string? value)
         {
             return new object[] { value.ValueOrEmpty() };
         }
@@ -55,7 +55,7 @@ namespace Dominio.Core.Extensions
         /// Console.WriteLine($"Resultado3: {resultado3}");
         /// </code>
         /// </example>
-        public static decimal ToDecimal(this string decimalStringValue)
+        public static decimal ToDecimal(this string? decimalStringValue)
         {
             decimal decimalValue = 0;
             if (decimalStringValue.HasValue())
@@ -89,7 +89,7 @@ namespace Dominio.Core.Extensions
         /// Console.WriteLine($"Resultado3: {resultado3}");
         /// </code>
         /// </example>
-        public static int ToInt(this string decimalStringValue)
+        public static int ToInt(this string? decimalStringValue)
         {
             int decimalValue = 0;
             if (decimalStringValue.HasValue())
@@ -124,7 +124,7 @@ namespace Dominio.Core.Extensions
         /// Console.WriteLine($"Resultado3: {resultado3}");
         /// </code>
         /// </example>
-        public static string GetNumericValues(this string decimalStringValue)
+        public static string GetNumericValues(this string? decimalStringValue)
         {
             string output = string.Empty;
             if (decimalStringValue.HasValue())
@@ -158,7 +158,7 @@ namespace Dominio.Core.Extensions
         /// Console.WriteLine($"Texto1: {resultado1}, Texto2: {resultado2}, Texto3: {resultado3}, Texto4: {resultado4}");
         /// </code>
         /// </example>
-        public static bool HasValue(this string stringValue)
+        public static bool HasValue(this string? stringValue)
         {
             return !string.IsNullOrEmpty(stringValue) && !string.IsNullOrWhiteSpace(stringValue);
         }
@@ -188,7 +188,7 @@ namespace Dominio.Core.Extensions
         /// Console.WriteLine($"Texto1: '{resultado1}', Texto2: '{resultado2}', Texto3: '{resultado3}', Texto4: '{resultado4}'");
         /// </code>
         /// </example>
-        public static string ValueOrEmpty(this string stringValue)
+        public static string ValueOrEmpty(this string? stringValue)
         {
             return HasValue(stringValue) ? stringValue.Trim() : string.Empty;
         }
@@ -245,7 +245,7 @@ namespace Dominio.Core.Extensions
         /// Console.WriteLine($"Texto1: {resultado1}, Texto2: {resultado2}, Texto3: {resultado3}, Texto4: {resultado4}");
         /// </code>
         /// </example>
-        public static bool IsMissingValue(this string stringValue)
+        public static bool IsMissingValue(this string? stringValue)
         {
             return !HasValue(stringValue);
         }
@@ -387,7 +387,7 @@ namespace Dominio.Core.Extensions
         /// Console.WriteLine($"Resultado4: {resultado4}");
         /// </code>
         /// </example>
-        public static DateTime ToDateTime(this string dateStringValue)
+        public static DateTime ToDateTime(this string? dateStringValue)
         {
             DateTime dateValue = DateTime.MinValue;
             if (dateStringValue.HasValue())
@@ -421,8 +421,13 @@ namespace Dominio.Core.Extensions
         /// Console.WriteLine(resultado2);
         /// </code>
         /// </example>
-        public static string AddSpacesBeforeCapitalLetters(this string value)
+        public static string AddSpacesBeforeCapitalLetters(this string? value)
         {
+            if (!value.HasValue())
+            {
+                return string.Empty;
+            }
+
             return string.Concat(value.Select(x => Char.IsUpper(x) ? " " + x : x.ToString())).TrimStart(' ');
         }
 
@@ -561,9 +566,11 @@ namespace Dominio.Core.Extensions
         /// Console.WriteLine($"Resultado3: '{resultado3}'");
         /// </code>
         /// </example>
-        public static string RemoveSpaceEmpty(this string str)
+        public static string RemoveSpaceEmpty(this string? str)
         {
-            return Regex.Replace(str, @"\s", "")?.Trim();
+            return str == null
+                ? string.Empty
+                : Regex.Replace(str, @"\s", "").Trim();
         }
 
         /// <summary>

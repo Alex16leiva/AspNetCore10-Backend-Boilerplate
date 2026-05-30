@@ -105,6 +105,13 @@ namespace Aplicacion.Services.Seguridad
         public UsuarioDTO CrearUsuario(EdicionUsuarioRequest request)
         {
             // DTO validation is handled by FluentValidation at the API layer
+            if (request.IsNull() || request.Usuario.IsNull())
+            {
+                return new UsuarioDTO
+                {
+                    Message = "Usuario es obligatorio"
+                };
+            }
 
             Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
 
@@ -134,7 +141,12 @@ namespace Aplicacion.Services.Seguridad
 
         public UsuarioDTO IniciarSesion(UserRequest request)
         {
-            List<string> includes = new List<string> { "Rol", "Rol.Permisos" };
+            List<string> includes = ["Rol", "Rol.Permisos"];
+
+            if (request.Password.HasValue())
+            {
+                
+            }
 
             Usuario usuario = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.UsuarioId, includes);
 
@@ -234,7 +246,8 @@ namespace Aplicacion.Services.Seguridad
 
         public SearchResult<UsuarioDTO> ObtenerUsuario(GetUserRequest request)
         {
-            var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(request.QueryInfo);
+            var queryInfo = request.QueryInfo ?? new QueryInfo();
+            var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(queryInfo);
             var usuarios = _genericRepository.GetPagedAndFiltered<Usuario>(dynamicFilter);
 
             return new SearchResult<UsuarioDTO>
@@ -249,6 +262,14 @@ namespace Aplicacion.Services.Seguridad
 
         public RolDTO CrearRol(EdicionRolRequest request)
         {
+            if (request.Rol is null)
+            {
+                return new RolDTO
+                {
+                    Message = "El rol es obligatorio"
+                };
+            }
+
             var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
             if (rol.IsNotNull())
             {
@@ -265,7 +286,8 @@ namespace Aplicacion.Services.Seguridad
             };
 
             _genericRepository.Add(nuevoRol);
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarRol");
+            TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("AgregarRol")
+                ?? new TransactionInfo { GenerateTransaction = false };
             _genericRepository.UnitOfWork.Commit(transactionInfo);
 
             return new RolDTO();
@@ -273,6 +295,14 @@ namespace Aplicacion.Services.Seguridad
 
         public RolDTO EditarRol(EdicionRolRequest request)
         {
+            if (request.Rol is null)
+            {
+                return new RolDTO
+                {
+                    Message = "El rol es obligatorio"
+                };
+            }
+
             var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
 
             if (rol.IsNull())
@@ -284,7 +314,8 @@ namespace Aplicacion.Services.Seguridad
             }
 
             rol.Descripcion = request.Rol.Descripcion;
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarRol");
+            TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("EditarRol")
+                ?? new TransactionInfo { GenerateTransaction = false };
             _genericRepository.UnitOfWork.Commit(transactionInfo);
             return new RolDTO();
         }
@@ -305,14 +336,14 @@ namespace Aplicacion.Services.Seguridad
 
         private static List<PermisosDTO> MapPermisosDto(List<Permisos>? permisos)
         {
-            return permisos.Select(r => new PermisosDTO
+            return permisos?.Select(r => new PermisosDTO
             {
                 Editar = r.Editar,
                 Eliminar = r.Eliminar,
                 PantallaId = r.PantallaId,
                 RolId = r.RolId,
                 Ver = r.Ver,
-            }).ToList();
+            }).ToList() ?? new List<PermisosDTO>();
         }
 
         private static UsuarioDTO MapUsuarioDto(Usuario qry)
