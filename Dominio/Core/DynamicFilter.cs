@@ -2,13 +2,10 @@
 {
     public class DynamicFilter
     {
-        public DynamicFilter()
-        {
-        }
-
         public DynamicFilter(int pageIndex, int pageSize, List<string> sortFields = null, bool ascending = true,
             List<string> includes = null, string predicate = null, object[] paramValues = null)
         {
+            
             PageIndex = pageIndex;
             PageSize = pageSize;
             Ascending = ascending;
