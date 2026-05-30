@@ -4,6 +4,7 @@ using Aplicacion.Services.Seguridad;
 using Dominio.Core.Result;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace WebServices.Controllers
 {
@@ -18,6 +19,7 @@ namespace WebServices.Controllers
         }
 
         [AllowAnonymous]
+        [EnableRateLimiting("AuthPolicy")]
         [Route("login")]
         [HttpPost]
         public async Task<IActionResult> Login([FromBody] UserRequest request)
@@ -27,6 +29,7 @@ namespace WebServices.Controllers
         }
 
         [AllowAnonymous]
+        [EnableRateLimiting("AuthPolicy")]
         [HttpPost("refresh-token")]
         public async Task<IActionResult> RefreshToken([FromBody] TokenRequest request)
         {

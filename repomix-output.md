@@ -864,180 +864,6 @@ namespace Aplicacion.Helpers
 }
 ````
 
-## File: Aplicacion/Services/ConfiguracionesApp/ConfiguracionesApplicationService.cs
-````csharp
-using Aplicacion.DTOs;
-using Aplicacion.DTOs.ConfiguracionesDTO;
-using Aplicacion.Helpers;
-using Dominio.Context.Entidades.ConfiguracionesAgg;
-using Dominio.Core;
-using Dominio.Core.Extensions;
-using Infraestructura.Context;
-
-namespace Aplicacion.Services.ConfiguracionesApp
-{
-    public class ConfiguracionesApplicationService : IConfiguracionesApplicationService
-    {
-        private readonly IGenericRepository<IDataContext> _genericRepository;
-
-        public ConfiguracionesApplicationService(IGenericRepository<IDataContext> genericRepository)
-        {
-            _genericRepository = genericRepository;
-        }
-
-        public async Task<ConfiguracionesDTO> CrearConfiguracion(ConfiguracionesRequest request)
-        {
-            var existingConfiguracion = await _genericRepository.GetSingleAsync<Configuraciones>(x => x.ConfiguracionId == request.Configuraciones.ConfiguracionId);
-            if (existingConfiguracion.IsNotNull()) {
-                return new ConfiguracionesDTO
-                {
-                    ConfiguracionId = existingConfiguracion.ConfiguracionId,
-                    Descripcion = existingConfiguracion.Descripcion,
-                    Message = $"Ya existe una configuración con el ID {existingConfiguracion.ConfiguracionId}" 
-                };
-            }
-
-            var configuracion = new Configuraciones
-            {
-                ConfiguracionId = request.Configuraciones.ConfiguracionId,
-                Descripcion = request.Configuraciones.Descripcion
-            };
-            await _genericRepository.AddAsync(configuracion);
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("CrearConfiguracion");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return mapConfiguracionesDTO(configuracion);
-        }
-
-        public async Task<ConfiguracionesDetalleDTO> EditarConfiguracionesDetalle(ConfiguracionesRequest request)
-        {
-            var existingConfiguracionDetalle = await _genericRepository.GetSingleAsync<ConfiguracionesDetalle>(x => x.ConfiguracionId == request.ConfiguracionesDetalle.ConfiguracionId && x.Atributo == request.ConfiguracionesDetalle.Atributo);
-            if (existingConfiguracionDetalle.IsNull())
-            {
-                return new ConfiguracionesDetalleDTO
-                {
-                    ConfiguracionId = request.ConfiguracionesDetalle.ConfiguracionId,
-                    Atributo = request.ConfiguracionesDetalle.Atributo,
-                    Descripcion = request.ConfiguracionesDetalle.Descripcion,
-                    Valor = request.ConfiguracionesDetalle.Valor,
-                    Message = $"No existe un detalle de configuración con el ID {request.ConfiguracionesDetalle.ConfiguracionId} y el atributo {request.ConfiguracionesDetalle.Atributo}"
-                };
-            }
-            existingConfiguracionDetalle.Descripcion = request.ConfiguracionesDetalle.Descripcion;
-            existingConfiguracionDetalle.Valor = request.ConfiguracionesDetalle.Valor;
-
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarConfiguracionDetalle");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return mapConfiguracionesDetalleDTO(existingConfiguracionDetalle);
-        }
-
-        public async Task<ConfiguracionesDTO> EditarConfiguracion(ConfiguracionesRequest request)
-        {
-            var existingConfiguracion = await _genericRepository.GetSingleAsync<Configuraciones>(x => x.ConfiguracionId == request.Configuraciones.ConfiguracionId);
-            if (existingConfiguracion.IsNull())
-            {
-                return new ConfiguracionesDTO
-                {
-                    ConfiguracionId = request.Configuraciones.ConfiguracionId,
-                    Descripcion = request.Configuraciones.Descripcion,
-                    Message = $"No existe una configuración con el ID {request.Configuraciones.ConfiguracionId}"
-                };
-            }
-            existingConfiguracion.Descripcion = request.Configuraciones.Descripcion;
-
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarConfiguracion");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-
-            return mapConfiguracionesDTO(existingConfiguracion);
-        }
-
-        public async Task<ConfiguracionesDetalleDTO> CrearConfiguracionDetalle(ConfiguracionesRequest request)
-        {
-            var existingConfiguracion = await _genericRepository.GetSingleAsync<Configuraciones>(x => x.ConfiguracionId == request.ConfiguracionesDetalle.ConfiguracionId);
-            if (existingConfiguracion.IsNull())
-            {
-                return new ConfiguracionesDetalleDTO
-                {
-                    ConfiguracionId = request.ConfiguracionesDetalle.ConfiguracionId,
-                    Descripcion = request.ConfiguracionesDetalle.Descripcion,
-                    Message = $"La configuración con el ID {request.ConfiguracionesDetalle.ConfiguracionId} no existe"
-                };
-            }
-
-            var configuracionesDetalle = new ConfiguracionesDetalle
-            {
-                ConfiguracionId = request.ConfiguracionesDetalle.ConfiguracionId,
-                Atributo = request.ConfiguracionesDetalle.Atributo,
-                Descripcion = request.ConfiguracionesDetalle.Descripcion,
-                Valor = request.ConfiguracionesDetalle.Valor,
-            };
-
-            await _genericRepository.AddAsync(configuracionesDetalle);
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("CrearConfiguracionDetalle");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return mapConfiguracionesDetalleDTO(configuracionesDetalle);
-        }
-
-        private static ConfiguracionesDetalleDTO mapConfiguracionesDetalleDTO(ConfiguracionesDetalle configuracionesDetalle)
-        {
-            if (configuracionesDetalle.IsNull()) return null;
-            return new ConfiguracionesDetalleDTO
-            {
-                ConfiguracionId = configuracionesDetalle.ConfiguracionId,
-                Atributo = configuracionesDetalle.Atributo,
-                Descripcion = configuracionesDetalle.Descripcion,
-                Valor = configuracionesDetalle.Valor,
-            };
-        }
-
-        public async Task<SearchResult<ConfiguracionesDTO>> ObtenerConfiguracionesPaginado(ConfiguracionesRequest request)
-        {
-            var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(request.QueryInfo);
-            var configuraciones = await _genericRepository.GetPagedAndFilteredAsync<Configuraciones>(dynamicFilter);
-            return new SearchResult<ConfiguracionesDTO>
-            {
-                ItemCount = configuraciones.ItemCount,
-                PageCount = configuraciones.PageCount,
-                PageIndex = configuraciones.PageIndex,
-                TotalItems = configuraciones.TotalItems,
-                Items = (from query in configuraciones.Items as IEnumerable<Configuraciones> select mapConfiguracionesDTO(query) ).ToList()
-            };
-        }
-
-        private static ConfiguracionesDTO mapConfiguracionesDTO(Configuraciones query)
-        {
-            if (query.IsNull()) return null;
-            return new ConfiguracionesDTO
-            {
-                ConfiguracionId = query.ConfiguracionId,
-                Descripcion = query.Descripcion,
-                ConfiguracionesDetalle = query.ConfiguracionesDetalle?
-                    .Select(detalle => mapConfiguracionesDetalleDTO(detalle))
-                    .ToList() ?? new List<ConfiguracionesDetalleDTO>()
-            };
-        }
-    }
-}
-````
-
-## File: Aplicacion/Services/ConfiguracionesApp/IConfiguracionesApplicationService.cs
-````csharp
-using Aplicacion.DTOs;
-using Aplicacion.DTOs.ConfiguracionesDTO;
-
-namespace Aplicacion.Services.ConfiguracionesApp
-{
-    public interface IConfiguracionesApplicationService
-    {
-        Task<SearchResult<ConfiguracionesDTO>> ObtenerConfiguracionesPaginado(ConfiguracionesRequest request);
-        Task<ConfiguracionesDTO> CrearConfiguracion(ConfiguracionesRequest request);
-        Task<ConfiguracionesDTO> EditarConfiguracion(ConfiguracionesRequest request);
-        Task<ConfiguracionesDetalleDTO> CrearConfiguracionDetalle(ConfiguracionesRequest request);
-        Task<ConfiguracionesDetalleDTO> EditarConfiguracionesDetalle(ConfiguracionesRequest request);
-
-    }
-}
-````
-
 ## File: Aplicacion/Services/Seguridad/Examples/ResultPatternExamples.cs
 ````csharp
 using Dominio.Core.Result;
@@ -1385,39 +1211,6 @@ namespace Dominio.Context.Entidades.Seguridad
 }
 ````
 
-## File: Dominio/Core/DynamicFilter.cs
-````csharp
-namespace Dominio.Core
-{
-    public class DynamicFilter
-    {
-        public DynamicFilter()
-        {
-        }
-
-        public DynamicFilter(int pageIndex, int pageSize, List<string> sortFields = null, bool ascending = true,
-            List<string> includes = null, string predicate = null, object[] paramValues = null)
-        {
-            PageIndex = pageIndex;
-            PageSize = pageSize;
-            Ascending = ascending;
-            SortFields = sortFields;
-            Filtro = predicate;
-            Valores = paramValues;
-            Includes = includes;
-        }
-
-        public int PageIndex { get; set; }
-        public int PageSize { get; set; }
-        public List<string> SortFields { get; set; }
-        public bool Ascending { get; set; }
-        public string Filtro { get; set; }
-        public object[] Valores { get; set; }
-        public List<string> Includes { get; set; }
-    }
-}
-````
-
 ## File: Dominio/Core/PagedCollection.cs
 ````csharp
 using System.Collections;
@@ -1461,451 +1254,6 @@ namespace Dominio.Core
     public class TransactionInfo : Entity
     {
         public bool GenerateTransaction { get; set; }
-    }
-}
-````
-
-## File: Infraestructura/Context/GenericRepository.cs
-````csharp
-using Dominio.Core;
-using Dominio.Core.Extensions;
-using Infraestructura.Core;
-using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using System.Linq.Dynamic;
-using System.Linq.Expressions;
-
-
-namespace Infraestructura.Context
-{
-    public class GenericRepository<T> : IGenericRepository<T>
-        where T : IQueryableUnitOfWork
-    {
-        private readonly T _unitOfWork;
-        private readonly IConfiguration _configuration;
-        public GenericRepository(T unitOfWork, IConfiguration configuration)
-        {
-            _unitOfWork = unitOfWork;
-            _configuration = configuration;
-        }
-
-
-        private DbSet<TEntity> GetSet<TEntity>() where TEntity : class
-        {
-            return _unitOfWork.CreateSet<TEntity>();
-        }
-
-        public IUnitOfWork UnitOfWork
-        { 
-            get { return _unitOfWork; } 
-        }
-
-        /// <inheritdoc/>
-        public void Add<TEntity>(TEntity entity) where TEntity : Entity
-        {
-            if (entity.IsNotNull())
-            {
-                entity.FechaTransaccion = DateTime.Now;
-                entity.DescripcionTransaccion = "Insert";
-                entity.RowVersion = Array.Empty<Byte>();
-                GetSet<TEntity>().Add(entity); //Add new item in this set
-            }
-        }
-
-        /// <inheritdoc/>
-        public async Task AddAsync<TEntity>(TEntity entity) where TEntity : Entity
-        {
-            if (entity.IsNotNull())
-            {
-                entity.FechaTransaccion = DateTime.Now;
-                entity.DescripcionTransaccion = "Insert";
-                entity.RowVersion = Array.Empty<Byte>();
-                await GetSet<TEntity>().AddAsync(entity); //Add new item in this set
-            }
-        }
-
-        /// <inheritdoc/>
-        public void AddRange<TEntity>(IEnumerable<TEntity> entities)
-            where TEntity : Entity
-        {
-            if (entities.HasItems())
-            {
-                GetSet<TEntity>().AddRange(entities);
-            }
-        }
-
-        /// <inheritdoc/>
-        public async Task AddRangeAsync<TEntity>(IEnumerable<TEntity> entities) 
-            where TEntity : Entity
-        {
-            if (entities.HasItems())
-            {
-                await GetSet<TEntity>().AddRangeAsync(entities);
-            }
-        }
-
-        public void Dispose()
-        {
-            if (_unitOfWork.IsNotNull())
-            {
-                _unitOfWork.Dispose();
-            }
-        }
-
-        /// <inheritdoc/>
-        public IEnumerable<TEntity> GetAll<TEntity>() 
-            where TEntity : Entity
-        {
-            return GetSet<TEntity>().ToList();
-        }
-
-        /// <inheritdoc/>
-        public async Task<IEnumerable<TEntity>> GetAllAsync<TEntity>()
-            where TEntity : Entity
-        {
-            return await GetSet<TEntity>().ToListAsync();
-        }
-        
-        /// <inheritdoc/>
-        public IEnumerable<TEntity> GetAll<TEntity>(List<string> includes) 
-            where TEntity : Entity
-        {
-            IQueryable<TEntity> items = GetSet<TEntity>();
-
-            if (includes.HasItems())
-            {
-                //Adding Includes to filter.
-                items = includes.Aggregate(items, (current, include) => current.Include(include));
-            }
-
-            return items.ToList();
-        }
-
-        /// <inheritdoc/>
-        public async Task<IEnumerable<TEntity>> GetAllAsync<TEntity>(List<string> includes)
-            where TEntity : Entity
-        {
-            IQueryable<TEntity> items = GetSet<TEntity>();
-
-            if (includes.HasItems())
-            {
-                //Adding Includes to filter.
-                items = includes.Aggregate(items, (current, include) => current.Include(include));
-            }
-
-            return await items.ToListAsync();
-        }
-
-        /// <inheritdoc/>
-        public TEntity GetSingle<TEntity>(Expression<Func<TEntity, bool>> predicate) 
-            where TEntity : Entity
-        {
-            return GetSet<TEntity>().FirstOrDefault(predicate);
-        }
-
-        /// <inheritdoc/>
-        public async Task<TEntity> GetSingleAsync<TEntity>(Expression<Func<TEntity, bool>> predicate) 
-            where TEntity : Entity
-        {
-            return await GetSet<TEntity>().FirstOrDefaultAsync(predicate);
-        }
-
-
-        /// <inheritdoc/>
-        public TEntity GetSingle<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
-            where TEntity : Entity
-        {
-            IQueryable<TEntity> items = GetSet<TEntity>();
-
-            if (includes.HasItems())
-            {
-                //Adding include to the filter.
-                items = includes.Aggregate(items, (current, include) => current.Include(include));
-            }
-
-            return items.FirstOrDefault(predicate);
-        }
-
-        /// <inheritdoc/>
-        public async Task<TEntity> GetSingleAsync<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
-            where TEntity : Entity
-        {
-            IQueryable<TEntity> items = GetSet<TEntity>();
-
-            if (includes.HasItems())
-            {
-                //Adding include to the filter.
-                items = includes.Aggregate(items, (current, include) => current.Include(include));
-            }
-
-            return await items.FirstOrDefaultAsync(predicate);
-        }
-
-        /// <inheritdoc/>
-        public IEnumerable<TEntity> GetFiltered<TEntity>(Expression<Func<TEntity, bool>> predicate)
-            where TEntity : Entity
-        {
-            return GetSet<TEntity>().Where(predicate).ToList();
-        }
-
-        /// <inheritdoc/>
-        public async Task<IEnumerable<TEntity>> GetFilteredAsync<TEntity>(Expression<Func<TEntity, bool>> predicate)
-            where TEntity : Entity
-        {
-            return await GetSet<TEntity>().Where(predicate).ToListAsync();
-        }
-
-        /// <inheritdoc/>
-        public IEnumerable<TEntity> GetFiltered<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
-            where TEntity : Entity
-        {
-            IQueryable<TEntity> items = GetSet<TEntity>();
-            if (includes.HasItems())
-            {
-                //Adding includes to filter
-                items = includes.Aggregate(items, (current, include) => current.Include(include));
-            }
-
-            return items.Where(predicate).ToList();
-        }
-
-        /// <inheritdoc/>
-        public async Task<IEnumerable<TEntity>> GetFilteredAsync<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
-            where TEntity : Entity
-        {
-            IQueryable<TEntity> items = GetSet<TEntity>();
-            if (includes.HasItems())
-            {
-                //Adding includes to filter
-                items = includes.Aggregate(items, (current, include) => current.Include(include));
-            }
-
-            return await items.Where(predicate).ToListAsync();
-        }
-
-        public PagedCollection GetPagedAndFiltered<TEntity>(DynamicFilter filterDef)
-            where TEntity : Entity
-        {
-            IQueryable<TEntity> items = !string.IsNullOrWhiteSpace(filterDef.Filtro)
-                                            ? GetSet<TEntity>().Where(filterDef.Filtro, filterDef.Valores)
-                                            : GetSet<TEntity>();
-
-            if (filterDef.Includes.HasItems())
-            {
-                //Adding Includes to the filter
-                items = filterDef.Includes.Aggregate(items, (current, include) => current.Include(include));
-            }
-
-            int totalItems = items.Count();
-
-            if (filterDef.PageSize != 0)
-            {
-                //Adding sort criteria.
-                if (filterDef.SortFields.HasItems())
-                {
-                    string orderKey = filterDef.Ascending ? "ASC" : "DESC";
-
-                    var order = string.Join(" " + orderKey + ", ", filterDef.SortFields.ToArray());
-
-                    if (!order.EndsWith(orderKey))
-                    {
-                        order += " " + orderKey;
-                    }
-
-                    items = items.OrderBy(order);
-
-                    items = items.Skip(filterDef.PageSize * filterDef.PageIndex);
-                }
-
-                items = items.Take(filterDef.PageSize);
-            }
-
-            var pagedItems = items.ToList();
-
-            return new PagedCollection(filterDef.PageIndex, filterDef.PageSize, pagedItems, totalItems, pagedItems.Count());
-        }
-
-        public async Task<PagedCollection> GetPagedAndFilteredAsync<TEntity>(DynamicFilter filterDef)
-            where TEntity : Entity
-        {
-            IQueryable<TEntity> items = !string.IsNullOrWhiteSpace(filterDef.Filtro)
-                                            ? GetSet<TEntity>().Where(filterDef.Filtro, filterDef.Valores)
-                                            : GetSet<TEntity>();
-
-            if (filterDef.Includes.HasItems())
-            {
-                //Adding Includes to the filter
-                items = filterDef.Includes.Aggregate(items, (current, include) => current.Include(include));
-            }
-
-            int totalItems = items.Count();
-
-            if (filterDef.PageSize != 0)
-            {
-                //Adding sort criteria.
-                if (filterDef.SortFields.HasItems())
-                {
-                    string orderKey = filterDef.Ascending ? "ASC" : "DESC";
-
-                    var order = string.Join(" " + orderKey + ", ", filterDef.SortFields.ToArray());
-
-                    if (!order.EndsWith(orderKey))
-                    {
-                        order += " " + orderKey;
-                    }
-
-                    items = items.OrderBy(order);
-
-                    items = items.Skip(filterDef.PageSize * filterDef.PageIndex);
-                }
-
-                items = items.Take(filterDef.PageSize);
-            }
-
-            var pagedItems = await items.ToListAsync();
-
-            return new PagedCollection(filterDef.PageIndex, filterDef.PageSize, pagedItems, totalItems, pagedItems.Count());
-        }
-
-        /// <inheritdoc/>
-        public void Remove<TEntity>(TEntity entity)
-            where TEntity : Entity
-        {
-            if (entity.IsNotNull())
-            {
-                //Attach item if not exist
-                _unitOfWork.Attach(entity);
-
-                //set as "Remove"
-                GetSet<TEntity>().Remove(entity);
-            }
-        }
-
-        /// <inheritdoc/>
-        public void RemoveRange<TEntity>(IEnumerable<TEntity> entities) 
-            where TEntity : Entity
-        {
-            if (entities.HasItems())
-            {
-                //set as removed
-                GetSet<TEntity>().RemoveRange(entities);
-            }
-        }
-
-        /// <inheritdoc/>
-        public void Modify<TEntity>(TEntity item)
-            where TEntity : Entity
-        {
-            if (item.IsNotNull())
-            {
-                _unitOfWork.SetModified(item);
-            }
-        }
-
-        public IEnumerable<TType> ExecuteStoredProcedure<TType>(string storedProcedure, Dictionary<string, object> parameters)
-        {
-            SqlParameter[] sqlParameters = CreateSqlParameters(parameters);
-            string paramNames = GetParamNames(parameters);
-
-            return (string.IsNullOrWhiteSpace(paramNames))
-                ? _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0}", storedProcedure), sqlParameters).ToList()
-                : _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0} {1}", storedProcedure, paramNames), sqlParameters).ToList();
-        }
-
-        public IEnumerable<TType> ExecuteStoredProcedure<TType>(string storedProcedure, SqlParameter[] parameters)
-        {
-            string paramNames = GetParamNames(parameters);
-            return _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0} {1}", storedProcedure, paramNames), parameters).ToList();
-        }
-
-        public TType ExecuteScalarFunction<TType>(string scalarFunction, Dictionary<string, object> parameters)
-        {
-            SqlParameter[] sqlParameters = CreateSqlParameters(parameters);
-            string paramNames = GetParamNames(parameters);
-
-            var result = (string.IsNullOrWhiteSpace(paramNames))
-                ? _unitOfWork.ExecuteScalarFunction<TType>(string.Format("SELECT {0}();", scalarFunction), sqlParameters)
-                : _unitOfWork.ExecuteScalarFunction<TType>(string.Format("SELECT {0}({1});", scalarFunction, paramNames), sqlParameters);
-
-            return result;
-        }
-
-        private string GetParamNames(Dictionary<string, object> parameters)
-        {
-            return (parameters != null && parameters.Any())
-                ? parameters.Select(p => p.Key).Aggregate((i, j) => i + ", " + j)
-                : string.Empty;
-        }
-
-        private string GetParamNames(SqlParameter[] parameters)
-        {
-            return (parameters != null && parameters.Any())
-                ? parameters.Select(p => p.ParameterName).Aggregate((i, j) => i + ", " + j)
-                : string.Empty;
-        }
-
-        public void ExecuteQuery(string sqlQuery, Dictionary<string, object> parameters)
-        {
-            SqlParameter[] sqlParameters = CreateSqlParameters(parameters);
-            _unitOfWork.ExecuteCommand(sqlQuery, sqlParameters);
-        }
-
-        private SqlParameter[] CreateSqlParameters(Dictionary<string, object> parameters)
-        {
-            if (parameters != null && parameters.Any())
-            {
-                return (from qry in parameters select new SqlParameter(qry.Key, qry.Value)).ToArray();
-            }
-
-            return new SqlParameter[0];
-        }
-
-        public void ExecuteQuery(SqlParameter[] parms, string sqlQuery)
-        {
-            _unitOfWork.ExecuteCommand(sqlQuery, parms);
-        }
-
-        public async Task<bool> IsRunningJobsAsync(string jobName)
-        {
-            string connectionString = _configuration.GetConnectionString("conectionDataBase");
-            bool result = false;
-
-            try
-            {
-                using (SqlConnection connection = new SqlConnection(connectionString))
-                {
-                    connection.Open();
-
-                    // Consulta para verificar si el trabajo está siendo ejecutado actualmente
-                    string query = $"SELECT COUNT(*) FROM msdb.dbo.sysjobs j " +
-                        $"INNER JOIN msdb.dbo.sysjobactivity a " +
-                        $"  ON j.job_id = a.job_id " +
-                        $"WHERE j.name = '{jobName}' AND a.run_requested_date IS NOT NULL AND a.stop_execution_date IS NULL";
-
-                    using (SqlCommand command = new SqlCommand(query, connection))
-                    {
-                        int runningJobCount = (int)command.ExecuteScalar();
-
-                        if (runningJobCount > 0)
-                        {
-                            result = true;
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error: { ex.Message }");
-            }
-
-            return result;
-        }
-
-        public IEnumerable<TEntity> ExecuteQuery<TEntity>(SqlParameter[] parms, string sqlQuery)
-        {
-            return _unitOfWork.ExecuteQuery<TEntity>(sqlQuery, parms).ToList();
-        }
     }
 }
 ````
@@ -5096,154 +4444,6 @@ namespace Infraestructura.Core.RestClient
 }
 ````
 
-## File: Infraestructura/Core/RestClient/QueryStringBuilder.cs
-````csharp
-using System.Collections;
-using System.Reflection;
-using System.Web;
-
-namespace Infraestructura.Core.RestClient
-{
-    public static class QueryStringBuilder
-    {
-        /// <summary>
-        /// Covert an object into a query string.
-        /// </summary>
-        /// <typeparam name="T">The object type.</typeparam>
-        /// <param name="obj">The object to be converted into a query string.</param>
-        /// <returns>The converted query string.</returns>
-        public static string GetQueryString<T>(T obj)
-        {
-            IEnumerable<PropertyInfo> propertyInfos = from p in obj.GetType().GetProperties()
-                                                      where p.GetValue(obj, null) != null
-                                                      select p;
-
-            List<string> propertiesStringBuilder = new List<string>();
-
-            foreach (PropertyInfo propertyInfo in propertyInfos)
-            {
-                Type propertyType = propertyInfo.PropertyType;
-
-                if (IsSimpleType(propertyType))
-                {
-                    propertiesStringBuilder.Add(GetSimpleTypeValue(obj, propertyInfo));
-                }
-                else
-                {
-                    string complexTypeValue = GetComplexTypeValue(obj, propertyInfo);
-                    if (!string.IsNullOrWhiteSpace(complexTypeValue))
-                    {
-                        propertiesStringBuilder.Add(complexTypeValue);
-                    }
-                }
-            }
-
-            return string.Join("&", propertiesStringBuilder.ToArray());
-        }
-
-        private static string GetSimpleTypeValue<T>(T obj, PropertyInfo propertyInfo)
-        {
-            // For primitive types we just need to get the property value.
-            return $"{propertyInfo.Name}={HttpUtility.UrlEncode(propertyInfo.GetValue(obj, null).ToString())}";
-        }
-
-        private static string GetComplexTypeValue<T>(T obj, PropertyInfo propertyInfo)
-        {
-            // For complex types first we need to figure out if the property is a collection or not.
-            if (typeof(ICollection).IsAssignableFrom(propertyInfo.PropertyType))
-            {
-                List<string> propertiesStringBuilder = new List<string>();
-                string collectionPropertyName = propertyInfo.Name;
-
-                Type collectionType = propertyInfo.PropertyType.GetGenericArguments()[0];
-
-                if (IsSimpleType(collectionType))
-                {
-                    IEnumerable collection = (IEnumerable)propertyInfo.GetValue(obj, null);
-
-                    foreach (var item in collection)
-                    {
-                        if (item != null)
-                        {
-                            string collectionItem = $"{collectionPropertyName}={HttpUtility.UrlEncode(item.ToString())}";
-
-                            propertiesStringBuilder.Add(collectionItem);
-                        }
-                    }
-                }
-
-                return string.Join("&", propertiesStringBuilder.ToArray());
-            }
-
-            return string.Empty;
-        }
-
-        private static bool IsSimpleType(Type type)
-        {
-            return
-                type.IsPrimitive ||
-                new Type[] {
-                              typeof (Enum),
-                              typeof (string),
-                              typeof (char),
-                              typeof (Guid),
-                              typeof (bool),
-                              typeof (byte),
-                              typeof (short),
-                              typeof (int),
-                              typeof (long),
-                              typeof (float),
-                              typeof (double),
-                              typeof (decimal),
-                              typeof (sbyte),
-                              typeof (ushort),
-                              typeof (uint),
-                              typeof (ulong),
-                              typeof (DateTime),
-                              typeof (DateTimeOffset),
-                              typeof (TimeSpan),
-                }.Contains(type) ||
-                Convert.GetTypeCode(type) != TypeCode.Object ||
-                (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>) && IsSimpleType(type.GetGenericArguments()[0]))
-                ;
-        }
-    }
-}
-````
-
-## File: Infraestructura/Core/RestClient/RestClientFactory.cs
-````csharp
-namespace Infraestructura.Core.RestClient
-{
-    public static class RestClientFactory
-    {
-        private static IRestClientFactory _currentRestClientFactory;
-
-        /// <summary>
-        /// Set the  rest client factory to use.
-        /// </summary>
-        /// <param name="restClientFactory">Rest client factory to use</param>
-        public static void SetCurrent(IRestClientFactory restClientFactory)
-        {
-            _currentRestClientFactory = restClientFactory;
-        }
-
-        /// <summary>
-        /// Create a new 
-        /// <paramref>
-        ///     <name>CaracolKnits.NETFramework.Core.Infrastructure.Crosscutting.RestClient.IRestClient</name>
-        /// </paramref>
-        /// </summary>
-        /// <param name="baseAddress">The API base address to connect to.</param>
-        /// <returns>Created IRestClient</returns>        
-        public static IRestClient CreateClient(string baseAddress)
-        {
-            return (_currentRestClientFactory != null) ? _currentRestClientFactory.Create(baseAddress) : null;
-        }
-    }
-}
-````
-
 ## File: Infraestructura/Core/SqlCommandInfo.cs
 ````csharp
 namespace Infraestructura.Core
@@ -6663,42 +5863,6 @@ namespace Aplicacion.DTOs
 }
 ````
 
-## File: Aplicacion/DTOs/ResponseBase.cs
-````csharp
-using Dominio.Core.Extensions;
-
-namespace Aplicacion.DTOs
-{
-    public abstract class ResponseBase
-    {
-        public string? Message { get; set; }
-        public string? ValidationErrorMessage { get; set; }
-        public string? SuccessMessage { get; set; }
-        public DateTime? FechaTransaccion { get; set; }
-
-        public bool HasValidationMessage()
-        {
-            return Message.HasValue();
-        }
-
-        public bool HasValidationErrorMessage()
-        {
-            return !string.IsNullOrWhiteSpace(ValidationErrorMessage);
-        }
-
-        public void AppendValidationErrorMessage(string message)
-        {
-            if (HasValidationErrorMessage())
-            {
-                ValidationErrorMessage = $"{ValidationErrorMessage}, {message}";
-                return;
-            }
-            ValidationErrorMessage = message;
-        }
-    }
-}
-````
-
 ## File: Aplicacion/DTOs/Seguridad/TokenRequest.cs
 ````csharp
 namespace Aplicacion.DTOs.Seguridad
@@ -6749,6 +5913,229 @@ namespace Aplicacion.Helpers
 
             return param;
         }
+    }
+}
+````
+
+## File: Aplicacion/Services/ConfiguracionesApp/ConfiguracionesApplicationService.cs
+````csharp
+using Aplicacion.DTOs;
+using Aplicacion.DTOs.ConfiguracionesDTO;
+using Aplicacion.Helpers;
+using Dominio.Context.Entidades.ConfiguracionesAgg;
+using Dominio.Core;
+using Dominio.Core.Extensions;
+using Dominio.Core.Result;
+using Infraestructura.Context;
+
+namespace Aplicacion.Services.ConfiguracionesApp
+{
+    public class ConfiguracionesApplicationService : IConfiguracionesApplicationService
+    {
+        private readonly IGenericRepository<IDataContext> _genericRepository;
+
+        public ConfiguracionesApplicationService(IGenericRepository<IDataContext> genericRepository)
+        {
+            _genericRepository = genericRepository;
+        }
+
+        public async Task<Result<ConfiguracionesDTO>> CrearConfiguracion(ConfiguracionesRequest request)
+        {
+            var validationResult = ValidateConfiguracionRequest(request);
+            if (validationResult is not null)
+            {
+                return validationResult;
+            }
+
+            var configuracionRequest = request.Configuraciones!;
+            var existingConfiguracion = await _genericRepository.GetSingleAsync<Configuraciones>(x => x.ConfiguracionId == configuracionRequest.ConfiguracionId);
+            if (existingConfiguracion.IsNotNull())
+            {
+                return Result<ConfiguracionesDTO>.Failure($"Ya existe una configuracion con el ID {existingConfiguracion.ConfiguracionId}", "CONFIGURATION_EXISTS");
+            }
+
+            var configuracion = new Configuraciones
+            {
+                ConfiguracionId = configuracionRequest.ConfiguracionId,
+                Descripcion = configuracionRequest.Descripcion
+            };
+
+            await _genericRepository.AddAsync(configuracion);
+            TransactionInfo transactionInfo = request.RequestUserInfo!.CrearTransactionInfo("CrearConfiguracion");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+
+            return Result<ConfiguracionesDTO>.Success(MapConfiguracionesDTO(configuracion), "Configuracion creada exitosamente");
+        }
+
+        public async Task<Result<ConfiguracionesDetalleDTO>> EditarConfiguracionesDetalle(ConfiguracionesRequest request)
+        {
+            var validationResult = ValidateConfiguracionDetalleRequest(request);
+            if (validationResult is not null)
+            {
+                return validationResult;
+            }
+
+            var detalleRequest = request.ConfiguracionesDetalle!;
+            var existingConfiguracionDetalle = await _genericRepository.GetSingleAsync<ConfiguracionesDetalle>(x => x.ConfiguracionId == detalleRequest.ConfiguracionId && x.Atributo == detalleRequest.Atributo);
+            if (existingConfiguracionDetalle.IsNull())
+            {
+                return Result<ConfiguracionesDetalleDTO>.Failure($"No existe un detalle de configuracion con el ID {detalleRequest.ConfiguracionId} y el atributo {detalleRequest.Atributo}", "CONFIGURATION_DETAIL_NOT_FOUND");
+            }
+
+            existingConfiguracionDetalle.Descripcion = detalleRequest.Descripcion;
+            existingConfiguracionDetalle.Valor = detalleRequest.Valor;
+
+            TransactionInfo transactionInfo = request.RequestUserInfo!.CrearTransactionInfo("EditarConfiguracionDetalle");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+
+            return Result<ConfiguracionesDetalleDTO>.Success(MapConfiguracionesDetalleDTO(existingConfiguracionDetalle), "Detalle de configuracion actualizado exitosamente");
+        }
+
+        public async Task<Result<ConfiguracionesDTO>> EditarConfiguracion(ConfiguracionesRequest request)
+        {
+            var validationResult = ValidateConfiguracionRequest(request);
+            if (validationResult is not null)
+            {
+                return validationResult;
+            }
+
+            var configuracionRequest = request.Configuraciones!;
+            var existingConfiguracion = await _genericRepository.GetSingleAsync<Configuraciones>(x => x.ConfiguracionId == configuracionRequest.ConfiguracionId);
+            if (existingConfiguracion.IsNull())
+            {
+                return Result<ConfiguracionesDTO>.Failure($"No existe una configuracion con el ID {configuracionRequest.ConfiguracionId}", "CONFIGURATION_NOT_FOUND");
+            }
+
+            existingConfiguracion.Descripcion = configuracionRequest.Descripcion;
+
+            TransactionInfo transactionInfo = request.RequestUserInfo!.CrearTransactionInfo("EditarConfiguracion");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+
+            return Result<ConfiguracionesDTO>.Success(MapConfiguracionesDTO(existingConfiguracion), "Configuracion actualizada exitosamente");
+        }
+
+        public async Task<Result<ConfiguracionesDetalleDTO>> CrearConfiguracionDetalle(ConfiguracionesRequest request)
+        {
+            var validationResult = ValidateConfiguracionDetalleRequest(request);
+            if (validationResult is not null)
+            {
+                return validationResult;
+            }
+
+            var detalleRequest = request.ConfiguracionesDetalle!;
+            var existingConfiguracion = await _genericRepository.GetSingleAsync<Configuraciones>(x => x.ConfiguracionId == detalleRequest.ConfiguracionId);
+            if (existingConfiguracion.IsNull())
+            {
+                return Result<ConfiguracionesDetalleDTO>.Failure($"La configuracion con el ID {detalleRequest.ConfiguracionId} no existe", "CONFIGURATION_NOT_FOUND");
+            }
+
+            var configuracionesDetalle = new ConfiguracionesDetalle
+            {
+                ConfiguracionId = detalleRequest.ConfiguracionId,
+                Atributo = detalleRequest.Atributo,
+                Descripcion = detalleRequest.Descripcion,
+                Valor = detalleRequest.Valor,
+            };
+
+            await _genericRepository.AddAsync(configuracionesDetalle);
+            TransactionInfo transactionInfo = request.RequestUserInfo!.CrearTransactionInfo("CrearConfiguracionDetalle");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+
+            return Result<ConfiguracionesDetalleDTO>.Success(MapConfiguracionesDetalleDTO(configuracionesDetalle), "Detalle de configuracion creado exitosamente");
+        }
+
+        public async Task<Result<SearchResult<ConfiguracionesDTO>>> ObtenerConfiguracionesPaginado(ConfiguracionesRequest request)
+        {
+            if (request is null)
+            {
+                return Result<SearchResult<ConfiguracionesDTO>>.Failure("Solicitud es obligatoria", "NULL_REQUEST", ResultStatus.ValidationError);
+            }
+
+            var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(request.QueryInfo);
+            var configuraciones = await _genericRepository.GetPagedAndFilteredAsync<Configuraciones>(dynamicFilter);
+            var result = new SearchResult<ConfiguracionesDTO>
+            {
+                ItemCount = configuraciones.ItemCount,
+                PageCount = configuraciones.PageCount,
+                PageIndex = configuraciones.PageIndex,
+                TotalItems = configuraciones.TotalItems,
+                Items = (from query in configuraciones.Items as IEnumerable<Configuraciones> select MapConfiguracionesDTO(query)).ToList()
+            };
+
+            return Result<SearchResult<ConfiguracionesDTO>>.Success(result);
+        }
+
+        private static Result<ConfiguracionesDTO>? ValidateConfiguracionRequest(ConfiguracionesRequest request)
+        {
+            if (request is null || request.Configuraciones is null)
+            {
+                return Result<ConfiguracionesDTO>.Failure("Configuracion es obligatoria", "NULL_CONFIGURACION", ResultStatus.ValidationError);
+            }
+
+            if (request.RequestUserInfo is null)
+            {
+                return Result<ConfiguracionesDTO>.Failure("Informacion de usuario es obligatoria", "NULL_REQUEST_USER_INFO", ResultStatus.ValidationError);
+            }
+
+            return null;
+        }
+
+        private static Result<ConfiguracionesDetalleDTO>? ValidateConfiguracionDetalleRequest(ConfiguracionesRequest request)
+        {
+            if (request is null || request.ConfiguracionesDetalle is null)
+            {
+                return Result<ConfiguracionesDetalleDTO>.Failure("Detalle de configuracion es obligatorio", "NULL_CONFIGURACION_DETALLE", ResultStatus.ValidationError);
+            }
+
+            if (request.RequestUserInfo is null)
+            {
+                return Result<ConfiguracionesDetalleDTO>.Failure("Informacion de usuario es obligatoria", "NULL_REQUEST_USER_INFO", ResultStatus.ValidationError);
+            }
+
+            return null;
+        }
+
+        private static ConfiguracionesDetalleDTO MapConfiguracionesDetalleDTO(ConfiguracionesDetalle configuracionesDetalle)
+        {
+            return new ConfiguracionesDetalleDTO
+            {
+                ConfiguracionId = configuracionesDetalle.ConfiguracionId,
+                Atributo = configuracionesDetalle.Atributo,
+                Descripcion = configuracionesDetalle.Descripcion,
+                Valor = configuracionesDetalle.Valor,
+            };
+        }
+
+        private static ConfiguracionesDTO MapConfiguracionesDTO(Configuraciones query)
+        {
+            return new ConfiguracionesDTO
+            {
+                ConfiguracionId = query.ConfiguracionId,
+                Descripcion = query.Descripcion,
+                ConfiguracionesDetalle = query.ConfiguracionesDetalle?
+                    .Select(detalle => MapConfiguracionesDetalleDTO(detalle))
+                    .ToList() ?? new List<ConfiguracionesDetalleDTO>()
+            };
+        }
+    }
+}
+````
+
+## File: Aplicacion/Services/ConfiguracionesApp/IConfiguracionesApplicationService.cs
+````csharp
+using Aplicacion.DTOs;
+using Aplicacion.DTOs.ConfiguracionesDTO;
+using Dominio.Core.Result;
+
+namespace Aplicacion.Services.ConfiguracionesApp
+{
+    public interface IConfiguracionesApplicationService
+    {
+        Task<Result<SearchResult<ConfiguracionesDTO>>> ObtenerConfiguracionesPaginado(ConfiguracionesRequest request);
+        Task<Result<ConfiguracionesDTO>> CrearConfiguracion(ConfiguracionesRequest request);
+        Task<Result<ConfiguracionesDTO>> EditarConfiguracion(ConfiguracionesRequest request);
+        Task<Result<ConfiguracionesDetalleDTO>> CrearConfiguracionDetalle(ConfiguracionesRequest request);
+        Task<Result<ConfiguracionesDetalleDTO>> EditarConfiguracionesDetalle(ConfiguracionesRequest request);
     }
 }
 ````
@@ -7085,230 +6472,32 @@ namespace Dominio.Context.Entidades
 }
 ````
 
-## File: Dominio/Core/Extensions/DateTimeExtensions.cs
+## File: Dominio/Core/DynamicFilter.cs
 ````csharp
-using System.Globalization;
-
-namespace Dominio.Core.Extensions
+namespace Dominio.Core
 {
-    public static class DateTimeExtensions
+    public class DynamicFilter
     {
-        /// <summary>
-        /// Devuelve una representación en cadena de un objeto <see cref="DateTime"/> 
-        /// con el formato "yyyy-MMM-dd hh:mm tt".
-        /// </summary>
-        /// <param name="date">La fecha y hora que se desea formatear.</param>
-        /// <returns>
-        /// Una cadena que representa la fecha y hora en el formato:
-        /// Año-Mes abreviado-Día Hora:minutos AM/PM.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// DateTime fechaActual = DateTime.Now;
-        /// string resultado = fechaActual.WeekDateName();
-        /// Console.WriteLine(resultado);
-        /// // Salida posible: "2026-Apr-02 02:50 PM"
-        /// </code>
-        /// </example>
-        public static string WeekDateName(this DateTime date)
+        public DynamicFilter(int pageIndex, int pageSize, List<string> sortFields = null, bool ascending = true,
+            List<string> includes = null, string predicate = null, object[] paramValues = null)
         {
-            return date.ToString("yyyy-MMM-dd hh:mm tt");
+            
+            PageIndex = pageIndex;
+            PageSize = pageSize;
+            Ascending = ascending;
+            SortFields = sortFields;
+            Filtro = predicate;
+            Valores = paramValues;
+            Includes = includes;
         }
 
-        /// <summary>
-        /// Devuelve la fecha mínima (más antigua) de una colección de objetos <see cref="DateTime"/>.
-        /// </summary>
-        /// <param name="dates">La colección de fechas de la cual se obtendrá la mínima.</param>
-        /// <returns>
-        /// El valor <see cref="DateTime"/> más pequeño dentro de la colección.
-        /// </returns>
-        /// <exception cref="InvalidOperationException">
-        /// Se produce si la colección está vacía.
-        /// </exception>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// List<DateTime> fechas = new List<DateTime>
-        /// {
-        ///     new DateTime(2026, 4, 2),
-        ///     new DateTime(2025, 12, 25),
-        ///     new DateTime(2026, 1, 1)
-        /// };
-        ///
-        /// DateTime fechaMinima = fechas.MinDate();
-        /// Console.WriteLine(fechaMinima);
-        /// // Salida: 25/12/2025
-        /// </code>
-        /// </example>
-        public static DateTime MinDate(this IEnumerable<DateTime> dates)
-        {
-            return dates.Items().Min(c => c);
-        }
-
-        /// <summary>
-        /// Devuelve la fecha máxima (más reciente) de una colección de objetos <see cref="DateTime"/>.
-        /// </summary>
-        /// <param name="dates">La colección de fechas de la cual se obtendrá la máxima.</param>
-        /// <returns>
-        /// El valor <see cref="DateTime"/> más grande dentro de la colección.
-        /// </returns>
-        /// <exception cref="InvalidOperationException">
-        /// Se produce si la colección está vacía.
-        /// </exception>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// List<DateTime> fechas = new List<DateTime>
-        /// {
-        ///     new DateTime(2026, 4, 2),
-        ///     new DateTime(2025, 12, 25),
-        ///     new DateTime(2026, 1, 1)
-        /// };
-        ///
-        /// DateTime fechaMaxima = fechas.MaxDate();
-        /// Console.WriteLine(fechaMaxima);
-        /// // Salida: 02/04/2026
-        /// </code>
-        /// </example>
-        public static DateTime MaxDate(this IEnumerable<DateTime> dates)
-        {
-            return dates.Items().Max(c => c);
-        }
-
-        /// <summary>
-        /// Determina si una fecha ocurre antes de otra fecha dada.
-        /// </summary>
-        /// <param name="date">La fecha que se desea evaluar.</param>
-        /// <param name="startDate">La fecha de referencia para comparar.</param>
-        /// <returns>
-        /// <c>true</c> si <paramref name="date"/> ocurre antes de <paramref name="startDate"/>; 
-        /// en caso contrario, <c>false</c>. 
-        /// También devuelve <c>false</c> si cualquiera de las fechas es nula.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// DateTime? fechaEvento = new DateTime(2025, 12, 25);
-        /// DateTime? fechaReferencia = new DateTime(2026, 1, 1);
-        ///
-        /// bool ocurreAntes = fechaEvento.OccursBefore(fechaReferencia);
-        /// Console.WriteLine(ocurreAntes);
-        /// // Salida: True (porque 25/12/2025 ocurre antes de 01/01/2026)
-        /// </code>
-        /// </example>
-        public static bool OccursBefore(this DateTime? date, DateTime? startDate)
-        {
-            if (date.IsNull() || startDate.IsNull()) return false;
-
-            return startDate.Value.Ticks > date.Value.Ticks;
-        }
-
-        /// <summary>
-        /// Determina si una fecha se encuentra dentro de un rango específico.
-        /// </summary>
-        /// <param name="date">La fecha que se desea evaluar.</param>
-        /// <param name="startDate">La fecha inicial del rango.</param>
-        /// <param name="endDate">La fecha final del rango.</param>
-        /// <returns>
-        /// <c>true</c> si <paramref name="date"/> está entre <paramref name="startDate"/> 
-        /// (inclusive) y <paramref name="endDate"/> (exclusiva); en caso contrario, <c>false</c>.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// DateTime fecha = new DateTime(2026, 4, 2);
-        /// DateTime inicio = new DateTime(2026, 4, 1);
-        /// DateTime fin = new DateTime(2026, 4, 10);
-        ///
-        /// bool dentroDelRango = fecha.Between(inicio, fin);
-        /// Console.WriteLine(dentroDelRango);
-        /// // Salida: True (porque 02/04/2026 está entre 01/04/2026 y 10/04/2026)
-        /// </code>
-        /// </example>
-        public static bool Between(this DateTime date, DateTime startDate, DateTime endDate)
-        {
-            if (date.IsNull() || startDate.IsNull()) return false;
-
-            return date.Ticks >= startDate.Ticks && date.Ticks < endDate.Ticks;
-        }
-
-        /// <summary>
-        /// Obtiene el número de semana del año para una fecha determinada,
-        /// utilizando la cultura actual del sistema.
-        /// </summary>
-        /// <param name="date">La fecha de la cual se desea obtener el número de semana.</param>
-        /// <returns>
-        /// Un entero que representa el número de semana del año en el que cae la fecha.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// DateTime fecha = new DateTime(2026, 4, 2);
-        /// int numeroSemana = fecha.GetWeekNumber();
-        /// Console.WriteLine(numeroSemana);
-        /// // Salida posible: 14 (dependiendo de la configuración cultural del sistema)
-        /// </code>
-        /// </example>
-        public static int GetWeekNumber(this DateTime date)
-        {
-            CultureInfo cul = CultureInfo.CurrentCulture;
-
-            return cul.Calendar.GetWeekOfYear(
-                 date,
-                 CalendarWeekRule.FirstDay,
-                 DayOfWeek.Sunday);
-        }
-
-        /// <summary>
-        /// Obtiene el número de la última semana del año actual.
-        /// </summary>
-        /// <param name="date">
-        /// La fecha de referencia (no se utiliza directamente, ya que se reemplaza por el 31 de diciembre del año actual).
-        /// </param>
-        /// <returns>
-        /// Un entero que representa el número de la última semana del año actual.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// DateTime fecha = DateTime.Now;
-        /// int ultimaSemana = fecha.GetLastWeekNumberCurrentYear();
-        /// Console.WriteLine(ultimaSemana);
-        /// // Salida posible: 52 o 53 (dependiendo de cómo se calculen las semanas en la cultura actual)
-        /// </code>
-        /// </example>
-        public static int GetLastWeekNumberCurrentYear(this DateTime date)
-        {
-            date = new DateTime(DateTime.Now.Year, 12, 31);
-            return date.GetWeekNumber();
-        }
-
-        /// <summary>
-        /// Determina si un objeto <see cref="DateTime"/> tiene el valor por defecto.
-        /// </summary>
-        /// <param name="dateTime">La fecha que se desea evaluar.</param>
-        /// <returns>
-        /// <c>true</c> si <paramref name="dateTime"/> es igual a <c>default(DateTime)</c>
-        /// (01/01/0001 00:00:00); en caso contrario, <c>false</c>.
-        /// </returns>
-        /// <example>
-        /// Ejemplo de uso:
-        /// <code>
-        /// DateTime fecha1 = default(DateTime);
-        /// DateTime fecha2 = DateTime.Now;
-        ///
-        /// bool esDefault1 = fecha1.HasDefaultValue(); // True
-        /// bool esDefault2 = fecha2.HasDefaultValue(); // False
-        ///
-        /// Console.WriteLine($"Fecha1 es default: {esDefault1}");
-        /// Console.WriteLine($"Fecha2 es default: {esDefault2}");
-        /// </code>
-        /// </example>
-        public static bool HasDefaultValue(this DateTime dateTime)
-        {
-            return dateTime == default(DateTime);
-        }
+        public int PageIndex { get; set; }
+        public int PageSize { get; set; }
+        public List<string> SortFields { get; set; }
+        public bool Ascending { get; set; }
+        public string Filtro { get; set; }
+        public object[] Valores { get; set; }
+        public List<string> Includes { get; set; }
     }
 }
 ````
@@ -8224,104 +7413,452 @@ namespace Dominio.Core.Result
 </Project>
 ````
 
-## File: Infraestructura/Context/DataSeeder.cs
+## File: Infraestructura/Context/GenericRepository.cs
 ````csharp
-using Dominio.Context.Entidades;
-using Dominio.Context.Entidades.Seguridad;
+using Dominio.Core;
+using Dominio.Core.Extensions;
+using Infraestructura.Core;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using System.Linq.Dynamic;
+using System.Linq.Expressions;
+
 
 namespace Infraestructura.Context
 {
-    public static class DataSeeder
+    public class GenericRepository<T> : IGenericRepository<T>
+        where T : IQueryableUnitOfWork
     {
-        public static void Seed(MyContext context)
+        private readonly T _unitOfWork;
+        private readonly IConfiguration _configuration;
+        public GenericRepository(T unitOfWork, IConfiguration configuration)
         {
-            var ahora = DateTime.Now;
-            var modificadoPor = "System";
-            var transaccionUId = Guid.NewGuid();
-            var tipoTransaccion = "cargaInicial";
-            var descripcionTransaccion = "Added";
-            // Verifica si ya existen registros
-            if (!context.Rol.Any())
+            _unitOfWork = unitOfWork;
+            _configuration = configuration;
+        }
+
+
+        private DbSet<TEntity> GetSet<TEntity>() where TEntity : class
+        {
+            return _unitOfWork.CreateSet<TEntity>();
+        }
+
+        public IUnitOfWork UnitOfWork
+        { 
+            get { return _unitOfWork; } 
+        }
+
+        /// <inheritdoc/>
+        public void Add<TEntity>(TEntity entity) where TEntity : Entity
+        {
+            if (entity.IsNotNull())
             {
-                context.Rol.AddRange(
-                    new Rol 
-                    { 
-                        RolId = "Admin", 
-                        Descripcion = "Administrador del sistema", 
-                        DescripcionTransaccion = descripcionTransaccion, 
-                        FechaTransaccion = ahora, 
-                        ModificadoPor = modificadoPor,
-                        TransaccionUId = transaccionUId,
-                        TipoTransaccion = tipoTransaccion
-                    },
-                    new Rol 
-                    { 
-                        RolId = "User", 
-                        Descripcion = "Usuario estándar", 
-                        DescripcionTransaccion = descripcionTransaccion, 
-                        FechaTransaccion = ahora,
-                        ModificadoPor = modificadoPor,
-                        TipoTransaccion = tipoTransaccion,
-                        TransaccionUId = transaccionUId
+                entity.FechaTransaccion = DateTime.Now;
+                entity.DescripcionTransaccion = "Insert";
+                entity.RowVersion = Array.Empty<Byte>();
+                GetSet<TEntity>().Add(entity); //Add new item in this set
+            }
+        }
+
+        /// <inheritdoc/>
+        public async Task AddAsync<TEntity>(TEntity entity) where TEntity : Entity
+        {
+            if (entity.IsNotNull())
+            {
+                entity.FechaTransaccion = DateTime.Now;
+                entity.DescripcionTransaccion = "Insert";
+                entity.RowVersion = Array.Empty<Byte>();
+                await GetSet<TEntity>().AddAsync(entity); //Add new item in this set
+            }
+        }
+
+        /// <inheritdoc/>
+        public void AddRange<TEntity>(IEnumerable<TEntity> entities)
+            where TEntity : Entity
+        {
+            if (entities.HasItems())
+            {
+                GetSet<TEntity>().AddRange(entities);
+            }
+        }
+
+        /// <inheritdoc/>
+        public async Task AddRangeAsync<TEntity>(IEnumerable<TEntity> entities) 
+            where TEntity : Entity
+        {
+            if (entities.HasItems())
+            {
+                await GetSet<TEntity>().AddRangeAsync(entities);
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_unitOfWork.IsNotNull())
+            {
+                _unitOfWork.Dispose();
+            }
+        }
+
+        /// <inheritdoc/>
+        public IEnumerable<TEntity> GetAll<TEntity>() 
+            where TEntity : Entity
+        {
+            return GetSet<TEntity>().ToList();
+        }
+
+        /// <inheritdoc/>
+        public async Task<IEnumerable<TEntity>> GetAllAsync<TEntity>()
+            where TEntity : Entity
+        {
+            return await GetSet<TEntity>().ToListAsync();
+        }
+        
+        /// <inheritdoc/>
+        public IEnumerable<TEntity> GetAll<TEntity>(List<string> includes) 
+            where TEntity : Entity
+        {
+            IQueryable<TEntity> items = GetSet<TEntity>();
+
+            if (includes.HasItems())
+            {
+                //Adding Includes to filter.
+                items = includes.Aggregate(items, (current, include) => current.Include(include));
+            }
+
+            return items.ToList();
+        }
+
+        /// <inheritdoc/>
+        public async Task<IEnumerable<TEntity>> GetAllAsync<TEntity>(List<string> includes)
+            where TEntity : Entity
+        {
+            IQueryable<TEntity> items = GetSet<TEntity>();
+
+            if (includes.HasItems())
+            {
+                //Adding Includes to filter.
+                items = includes.Aggregate(items, (current, include) => current.Include(include));
+            }
+
+            return await items.ToListAsync();
+        }
+
+        /// <inheritdoc/>
+        public TEntity GetSingle<TEntity>(Expression<Func<TEntity, bool>> predicate) 
+            where TEntity : Entity
+        {
+            return GetSet<TEntity>().FirstOrDefault(predicate);
+        }
+
+        /// <inheritdoc/>
+        public async Task<TEntity> GetSingleAsync<TEntity>(Expression<Func<TEntity, bool>> predicate) 
+            where TEntity : Entity
+        {
+            return await GetSet<TEntity>().FirstOrDefaultAsync(predicate);
+        }
+
+
+        /// <inheritdoc/>
+        public TEntity GetSingle<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
+            where TEntity : Entity
+        {
+            IQueryable<TEntity> items = GetSet<TEntity>();
+
+            if (includes.HasItems())
+            {
+                //Adding include to the filter.
+                items = includes.Aggregate(items, (current, include) => current.Include(include));
+            }
+
+            return items.FirstOrDefault(predicate);
+        }
+
+        /// <inheritdoc/>
+        public async Task<TEntity> GetSingleAsync<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
+            where TEntity : Entity
+        {
+            IQueryable<TEntity> items = GetSet<TEntity>();
+
+            if (includes.HasItems())
+            {
+                //Adding include to the filter.
+                items = includes.Aggregate(items, (current, include) => current.Include(include));
+            }
+
+            return await items.FirstOrDefaultAsync(predicate);
+        }
+
+        /// <inheritdoc/>
+        public IEnumerable<TEntity> GetFiltered<TEntity>(Expression<Func<TEntity, bool>> predicate)
+            where TEntity : Entity
+        {
+            return GetSet<TEntity>().Where(predicate).ToList();
+        }
+
+        /// <inheritdoc/>
+        public async Task<IEnumerable<TEntity>> GetFilteredAsync<TEntity>(Expression<Func<TEntity, bool>> predicate)
+            where TEntity : Entity
+        {
+            return await GetSet<TEntity>().Where(predicate).ToListAsync();
+        }
+
+        /// <inheritdoc/>
+        public IEnumerable<TEntity> GetFiltered<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
+            where TEntity : Entity
+        {
+            IQueryable<TEntity> items = GetSet<TEntity>();
+            if (includes.HasItems())
+            {
+                //Adding includes to filter
+                items = includes.Aggregate(items, (current, include) => current.Include(include));
+            }
+
+            return items.Where(predicate).ToList();
+        }
+
+        /// <inheritdoc/>
+        public async Task<IEnumerable<TEntity>> GetFilteredAsync<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
+            where TEntity : Entity
+        {
+            IQueryable<TEntity> items = GetSet<TEntity>();
+            if (includes.HasItems())
+            {
+                //Adding includes to filter
+                items = includes.Aggregate(items, (current, include) => current.Include(include));
+            }
+
+            return await items.Where(predicate).ToListAsync();
+        }
+
+        public PagedCollection GetPagedAndFiltered<TEntity>(DynamicFilter filterDef)
+            where TEntity : Entity
+        {
+            IQueryable<TEntity> items = !string.IsNullOrWhiteSpace(filterDef.Filtro)
+                                            ? GetSet<TEntity>().Where(filterDef.Filtro, filterDef.Valores)
+                                            : GetSet<TEntity>();
+
+            if (filterDef.Includes.HasItems())
+            {
+                //Adding Includes to the filter
+                items = filterDef.Includes.Aggregate(items, (current, include) => current.Include(include));
+            }
+
+            int totalItems = items.Count();
+
+            if (filterDef.PageSize != 0)
+            {
+                //Adding sort criteria.
+                if (filterDef.SortFields.HasItems())
+                {
+                    string orderKey = filterDef.Ascending ? "ASC" : "DESC";
+
+                    var order = string.Join(" " + orderKey + ", ", filterDef.SortFields.ToArray());
+
+                    if (!order.EndsWith(orderKey))
+                    {
+                        order += " " + orderKey;
                     }
-                );
+
+                    items = items.OrderBy(order);
+
+                    items = items.Skip(filterDef.PageSize * filterDef.PageIndex);
+                }
+
+                items = items.Take(filterDef.PageSize);
             }
 
-            if (!context.Usuarios.Any())
+            var pagedItems = items.ToList();
+
+            return new PagedCollection(filterDef.PageIndex, filterDef.PageSize, pagedItems, totalItems, pagedItems.Count());
+        }
+
+        public async Task<PagedCollection> GetPagedAndFilteredAsync<TEntity>(DynamicFilter filterDef)
+            where TEntity : Entity
+        {
+            IQueryable<TEntity> items = !string.IsNullOrWhiteSpace(filterDef.Filtro)
+                                            ? GetSet<TEntity>().Where(filterDef.Filtro, filterDef.Valores)
+                                            : GetSet<TEntity>();
+
+            if (filterDef.Includes.HasItems())
             {
-                context.Usuarios.Add(
-                    new Usuario 
-                    {
-                        UsuarioId = "admin", 
-                        Nombre = "Administrador", 
-                        Apellido = "Sistema",
-                        Contrasena = PasswordEncryptor.HashPassword("admin123*"), 
-                        RolId = "Admin",
-                        Activo = true,
-                        DescripcionTransaccion = descripcionTransaccion, 
-                        FechaTransaccion = ahora, 
-                        ModificadoPor = modificadoPor,
-                        TransaccionUId = transaccionUId,
-                        TipoTransaccion = tipoTransaccion,
-                    });
+                //Adding Includes to the filter
+                items = filterDef.Includes.Aggregate(items, (current, include) => current.Include(include));
             }
 
-            if (!context.Pantalla.Any())
-            {   
-                context.Pantalla.AddRange(
-                    new Pantalla
-                    {
-                        PantallaId = "Seguridad",
-                        Descripcion = "Administracion de la seguridad",
-                        DescripcionTransaccion = descripcionTransaccion,
-                        FechaTransaccion = ahora,
-                        ModificadoPor = modificadoPor,
-                        TransaccionUId = transaccionUId,
-                        TipoTransaccion = tipoTransaccion,
-                        
-                    });
-            }
+            int totalItems = items.Count();
 
-            if (!context.Permisos.Any())
+            if (filterDef.PageSize != 0)
             {
-                context.Permisos.AddRange(
-                    new Permisos
+                //Adding sort criteria.
+                if (filterDef.SortFields.HasItems())
+                {
+                    string orderKey = filterDef.Ascending ? "ASC" : "DESC";
+
+                    var order = string.Join(" " + orderKey + ", ", filterDef.SortFields.ToArray());
+
+                    if (!order.EndsWith(orderKey))
                     {
-                        RolId = "Admin",
-                        PantallaId = "Seguridad",
-                        DescripcionTransaccion = descripcionTransaccion,
-                        FechaTransaccion = ahora,
-                        ModificadoPor = modificadoPor,
-                        Editar = true,
-                        Eliminar = true,
-                        Ver = true,
-                        TransaccionUId = transaccionUId,
-                        TipoTransaccion = tipoTransaccion,
+                        order += " " + orderKey;
                     }
-                );
+
+                    items = items.OrderBy(order);
+
+                    items = items.Skip(filterDef.PageSize * filterDef.PageIndex);
+                }
+
+                items = items.Take(filterDef.PageSize);
             }
-            // Guarda los cambios
-            context.SaveChanges();
+
+            var pagedItems = await items.ToListAsync();
+
+            return new PagedCollection(filterDef.PageIndex, filterDef.PageSize, pagedItems, totalItems, pagedItems.Count());
+        }
+
+        /// <inheritdoc/>
+        public void Remove<TEntity>(TEntity entity)
+            where TEntity : Entity
+        {
+            if (entity.IsNotNull())
+            {
+                //Attach item if not exist
+                _unitOfWork.Attach(entity);
+
+                //set as "Remove"
+                GetSet<TEntity>().Remove(entity);
+            }
+        }
+
+        /// <inheritdoc/>
+        public void RemoveRange<TEntity>(IEnumerable<TEntity> entities) 
+            where TEntity : Entity
+        {
+            if (entities.HasItems())
+            {
+                //set as removed
+                GetSet<TEntity>().RemoveRange(entities);
+            }
+        }
+
+        /// <inheritdoc/>
+        public void Modify<TEntity>(TEntity item)
+            where TEntity : Entity
+        {
+            if (item.IsNotNull())
+            {
+                _unitOfWork.SetModified(item);
+            }
+        }
+
+        public IEnumerable<TType> ExecuteStoredProcedure<TType>(string storedProcedure, Dictionary<string, object> parameters)
+        {
+            SqlParameter[] sqlParameters = CreateSqlParameters(parameters);
+            string paramNames = GetParamNames(parameters);
+
+            return (string.IsNullOrWhiteSpace(paramNames))
+                ? _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0}", storedProcedure), sqlParameters).ToList()
+                : _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0} {1}", storedProcedure, paramNames), sqlParameters).ToList();
+        }
+
+        public IEnumerable<TType> ExecuteStoredProcedure<TType>(string storedProcedure, SqlParameter[] parameters)
+        {
+            string paramNames = GetParamNames(parameters);
+            return _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0} {1}", storedProcedure, paramNames), parameters).ToList();
+        }
+
+        public TType ExecuteScalarFunction<TType>(string scalarFunction, Dictionary<string, object> parameters)
+        {
+            SqlParameter[] sqlParameters = CreateSqlParameters(parameters);
+            string paramNames = GetParamNames(parameters);
+
+            var result = (string.IsNullOrWhiteSpace(paramNames))
+                ? _unitOfWork.ExecuteScalarFunction<TType>(string.Format("SELECT {0}();", scalarFunction), sqlParameters)
+                : _unitOfWork.ExecuteScalarFunction<TType>(string.Format("SELECT {0}({1});", scalarFunction, paramNames), sqlParameters);
+
+            return result;
+        }
+
+        private string GetParamNames(Dictionary<string, object> parameters)
+        {
+            return (parameters != null && parameters.Any())
+                ? parameters.Select(p => p.Key).Aggregate((i, j) => i + ", " + j)
+                : string.Empty;
+        }
+
+        private string GetParamNames(SqlParameter[] parameters)
+        {
+            return (parameters != null && parameters.Any())
+                ? parameters.Select(p => p.ParameterName).Aggregate((i, j) => i + ", " + j)
+                : string.Empty;
+        }
+
+        public void ExecuteQuery(string sqlQuery, Dictionary<string, object> parameters)
+        {
+            SqlParameter[] sqlParameters = CreateSqlParameters(parameters);
+            _unitOfWork.ExecuteCommand(sqlQuery, sqlParameters);
+        }
+
+        private SqlParameter[] CreateSqlParameters(Dictionary<string, object> parameters)
+        {
+            if (parameters != null && parameters.Any())
+            {
+                return (from qry in parameters select new SqlParameter(qry.Key, qry.Value)).ToArray();
+            }
+
+            return new SqlParameter[0];
+        }
+
+        public void ExecuteQuery(SqlParameter[] parms, string sqlQuery)
+        {
+            _unitOfWork.ExecuteCommand(sqlQuery, parms);
+        }
+
+        public async Task<bool> IsRunningJobsAsync(string jobName)
+        {
+            if (string.IsNullOrWhiteSpace(jobName))
+            {
+                return false;
+            }
+
+            string connectionString = _configuration.GetConnectionString("conectionDataBase")
+                ?? throw new InvalidOperationException("Connection string 'conectionDataBase' not found in configuration.");
+            bool result = false;
+
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    await connection.OpenAsync();
+
+                    string query = "SELECT COUNT(*) FROM msdb.dbo.sysjobs j " +
+                        "INNER JOIN msdb.dbo.sysjobactivity a " +
+                        "  ON j.job_id = a.job_id " +
+                        "WHERE j.name = @jobName AND a.run_requested_date IS NOT NULL AND a.stop_execution_date IS NULL";
+
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.Add(new SqlParameter("@jobName", jobName));
+                        int runningJobCount = (int)(await command.ExecuteScalarAsync() ?? 0);
+
+                        if (runningJobCount > 0)
+                        {
+                            result = true;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: { ex.Message }");
+            }
+
+            return result;
+        }
+
+        public IEnumerable<TEntity> ExecuteQuery<TEntity>(SqlParameter[] parms, string sqlQuery)
+        {
+            return _unitOfWork.ExecuteQuery<TEntity>(sqlQuery, parms).ToList();
         }
     }
 }
@@ -8605,6 +8142,154 @@ namespace Infraestructura.Core.RestClient
 }
 ````
 
+## File: Infraestructura/Core/RestClient/QueryStringBuilder.cs
+````csharp
+using System.Collections;
+using System.Reflection;
+using System.Web;
+
+namespace Infraestructura.Core.RestClient
+{
+    public static class QueryStringBuilder
+    {
+        /// <summary>
+        /// Covert an object into a query string.
+        /// </summary>
+        /// <typeparam name="T">The object type.</typeparam>
+        /// <param name="obj">The object to be converted into a query string.</param>
+        /// <returns>The converted query string.</returns>
+        public static string GetQueryString<T>(T obj)
+        {
+            IEnumerable<PropertyInfo> propertyInfos = from p in obj.GetType().GetProperties()
+                                                      where p.GetValue(obj, null) != null
+                                                      select p;
+
+            List<string> propertiesStringBuilder = new List<string>();
+
+            foreach (PropertyInfo propertyInfo in propertyInfos)
+            {
+                Type propertyType = propertyInfo.PropertyType;
+
+                if (IsSimpleType(propertyType))
+                {
+                    propertiesStringBuilder.Add(GetSimpleTypeValue(obj, propertyInfo));
+                }
+                else
+                {
+                    string complexTypeValue = GetComplexTypeValue(obj, propertyInfo);
+                    if (!string.IsNullOrWhiteSpace(complexTypeValue))
+                    {
+                        propertiesStringBuilder.Add(complexTypeValue);
+                    }
+                }
+            }
+
+            return string.Join("&", propertiesStringBuilder.ToArray());
+        }
+
+        private static string GetSimpleTypeValue<T>(T obj, PropertyInfo propertyInfo)
+        {
+            // For primitive types we just need to get the property value.
+            return $"{propertyInfo.Name}={HttpUtility.UrlEncode(propertyInfo.GetValue(obj, null).ToString())}";
+        }
+
+        private static string GetComplexTypeValue<T>(T obj, PropertyInfo propertyInfo)
+        {
+            // For complex types first we need to figure out if the property is a collection or not.
+            if (typeof(ICollection).IsAssignableFrom(propertyInfo.PropertyType))
+            {
+                List<string> propertiesStringBuilder = [];
+                string collectionPropertyName = propertyInfo.Name;
+
+                Type collectionType = propertyInfo.PropertyType.GetGenericArguments()[0];
+
+                if (IsSimpleType(collectionType))
+                {
+                    IEnumerable collection = (IEnumerable)propertyInfo.GetValue(obj, null);
+
+                    foreach (var item in collection)
+                    {
+                        if (item != null)
+                        {
+                            string collectionItem = $"{collectionPropertyName}={HttpUtility.UrlEncode(item.ToString())}";
+
+                            propertiesStringBuilder.Add(collectionItem);
+                        }
+                    }
+                }
+
+                return string.Join("&", propertiesStringBuilder.ToArray());
+            }
+
+            return string.Empty;
+        }
+
+        private static bool IsSimpleType(Type type)
+        {
+            return
+                type.IsPrimitive ||
+                new Type[] {
+                              typeof (Enum),
+                              typeof (string),
+                              typeof (char),
+                              typeof (Guid),
+                              typeof (bool),
+                              typeof (byte),
+                              typeof (short),
+                              typeof (int),
+                              typeof (long),
+                              typeof (float),
+                              typeof (double),
+                              typeof (decimal),
+                              typeof (sbyte),
+                              typeof (ushort),
+                              typeof (uint),
+                              typeof (ulong),
+                              typeof (DateTime),
+                              typeof (DateTimeOffset),
+                              typeof (TimeSpan),
+                }.Contains(type) ||
+                Convert.GetTypeCode(type) != TypeCode.Object ||
+                (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>) && IsSimpleType(type.GetGenericArguments()[0]))
+                ;
+        }
+    }
+}
+````
+
+## File: Infraestructura/Core/RestClient/RestClientFactory.cs
+````csharp
+namespace Infraestructura.Core.RestClient
+{
+    public static class RestClientFactory
+    {
+        private static IRestClientFactory _currentRestClientFactory;
+
+        /// <summary>
+        /// Set the  rest client factory to use.
+        /// </summary>
+        /// <param name="restClientFactory">Rest client factory to use</param>
+        public static void SetCurrent(IRestClientFactory restClientFactory)
+        {
+            _currentRestClientFactory = restClientFactory;
+        }
+
+        /// <summary>
+        /// Create a new 
+        /// <paramref>
+        /// <name>Crosscutting.RestClient.IRestClient</name>
+        /// </paramref>
+        /// </summary>
+        /// <param name="baseAddress">The API base address to connect to.</param>
+        /// <returns>Created IRestClient</returns>        
+        public static IRestClient CreateClient(string baseAddress)
+        {
+            return (_currentRestClientFactory != null) ? _currentRestClientFactory.Create(baseAddress) : null;
+        }
+    }
+}
+````
+
 ## File: TemplateBackEndNetCore.sln
 ````
 Microsoft Visual Studio Solution File, Format Version 12.00
@@ -8655,65 +8340,6 @@ Global
 		SolutionGuid = {5AEF57F0-D726-432E-A5E8-A202D08133A8}
 	EndGlobalSection
 EndGlobal
-````
-
-## File: WebServices/Controllers/ConfiguracionesController.cs
-````csharp
-using Aplicacion.DTOs.ConfiguracionesDTO;
-using Aplicacion.Services.ConfiguracionesApp;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-
-namespace WebServices.Controllers
-{
-    [Authorize]
-    [ApiController]
-    [Route("api/[controller]")]
-    public class ConfiguracionesController : ControllerBase
-    {
-        private readonly IConfiguracionesApplicationService _configuracionesAppService;
-
-        public ConfiguracionesController(IConfiguracionesApplicationService configuracionesAppService)
-        {
-            _configuracionesAppService = configuracionesAppService;
-        }
-
-        [HttpPost("crear-configuracion")]
-        public async Task<IActionResult> CrearConfiguracion(ConfiguracionesRequest request)
-        {
-            var configuracion = await _configuracionesAppService.CrearConfiguracion(request);
-            return Ok(configuracion);
-        }
-
-        [HttpPost("obtener-configuraciones")]
-        public async Task<IActionResult> GetConfiguraciones(ConfiguracionesRequest request)
-        {
-            var configuraciones = await _configuracionesAppService.ObtenerConfiguracionesPaginado(request);
-            return Ok(configuraciones);
-        }
-
-        [HttpPost("crear-configuracion-detalle")]
-        public async Task<IActionResult> CrearConfiguracionesDetalle(ConfiguracionesRequest request)
-        {
-            var configuracionesDetalle = await _configuracionesAppService.CrearConfiguracionDetalle(request);
-            return Ok(configuracionesDetalle);
-        }
-
-        [HttpPost("editar-configuracion-detalle")]
-        public async Task<IActionResult> EditarConfiguracionesDetalle(ConfiguracionesRequest request)
-        {
-            var configuracionesDetalle = await _configuracionesAppService.EditarConfiguracionesDetalle(request);
-            return Ok(configuracionesDetalle);
-        }
-
-        [HttpPost("editar-configuracion")]
-        public async Task<IActionResult> EditarConfiguracion(ConfiguracionesRequest request)
-        {
-            var configuracion = await _configuracionesAppService.EditarConfiguracion(request);
-            return Ok(configuracion);
-        }
-    }
-}
 ````
 
 ## File: WebServices/Controllers/TestRestClient.cs
@@ -9000,6 +8626,43 @@ namespace Aplicacion.DTOs
 }
 ````
 
+## File: Aplicacion/DTOs/ResponseBase.cs
+````csharp
+using Dominio.Core.Extensions;
+
+namespace Aplicacion.DTOs
+{
+    public abstract class ResponseBase
+    {
+        public string? Message { get; set; }
+        public string? ValidationErrorMessage { get; set; }
+        public string? SuccessMessage { get; set; }
+        public DateTime? FechaTransaccion { get; set; }
+
+        public bool HasValidationMessage()
+        {
+            return Message.HasValue();
+        }
+
+        public bool HasValidationErrorMessage()
+        {
+            return !string.IsNullOrWhiteSpace(ValidationErrorMessage);
+        }
+
+        public void AppendValidationErrorMessage(string message)
+        {
+            if (HasValidationErrorMessage())
+            {
+                ValidationErrorMessage = $"{ValidationErrorMessage}, {message}";
+                return;
+            }
+
+            ValidationErrorMessage = message;
+        }
+    }
+}
+````
+
 ## File: Dominio/Context/Entidades/Seguridad/Rol.cs
 ````csharp
 using Dominio.Core;
@@ -9041,60 +8704,229 @@ namespace Dominio.Core
 }
 ````
 
-## File: Dominio/Core/Extensions/EntidadExtension.cs
+## File: Dominio/Core/Extensions/DateTimeExtensions.cs
 ````csharp
-using System.Runtime.Serialization;
+using System.Globalization;
 
 namespace Dominio.Core.Extensions
 {
-    public static class EntidadExtension
+    public static class DateTimeExtensions
     {
         /// <summary>
-        /// Crea una copia profunda de un objeto utilizando <see cref="DataContractSerializer"/>.
+        /// Devuelve una representación en cadena de un objeto <see cref="DateTime"/> 
+        /// con el formato "yyyy-MMM-dd hh:mm tt".
         /// </summary>
-        /// <typeparam name="T">El tipo del objeto a copiar. Debe ser serializable mediante DataContract.</typeparam>
-        /// <param name="theSource">El objeto fuente que se desea clonar.</param>
+        /// <param name="date">La fecha y hora que se desea formatear.</param>
         /// <returns>
-        /// Una nueva instancia de <typeparamref name="T"/> que representa una copia profunda del objeto original.
+        /// Una cadena que representa la fecha y hora en el formato:
+        /// Año-Mes abreviado-Día Hora:minutos AM/PM.
         /// </returns>
         /// <example>
         /// Ejemplo de uso:
         /// <code>
-        /// [DataContract]
-        /// public class Persona
-        /// {
-        ///     [DataMember]
-        ///     public string Nombre { get; set; }
-        ///
-        ///     [DataMember]
-        ///     public int Edad { get; set; }
-        /// }
-        ///
-        /// Persona original = new Persona { Nombre = "Ana", Edad = 30 };
-        /// Persona copia = original.DeepCopy();
-        ///
-        /// Console.WriteLine($"Original: {original.Nombre}, {original.Edad}");
-        /// Console.WriteLine($"Copia: {copia.Nombre}, {copia.Edad}");
-        /// // Salida: 
-        /// // Original: Ana, 30
-        /// // Copia: Ana, 30
+        /// DateTime fechaActual = DateTime.Now;
+        /// string resultado = fechaActual.WeekDateName();
+        /// Console.WriteLine(resultado);
+        /// // Salida posible: "2026-Apr-02 02:50 PM"
         /// </code>
         /// </example>
-        public static T DeepCopy<T>(this T theSource) 
-            where T : class 
+        public static string WeekDateName(this DateTime date)
         {
-            T theCopy;
+            return date.ToString("yyyy-MMM-dd hh:mm tt");
+        }
 
-            var theDataContactSerializer = new DataContractSerializer(typeof(T));
+        /// <summary>
+        /// Devuelve la fecha mínima (más antigua) de una colección de objetos <see cref="DateTime"/>.
+        /// </summary>
+        /// <param name="dates">La colección de fechas de la cual se obtendrá la mínima.</param>
+        /// <returns>
+        /// El valor <see cref="DateTime"/> más pequeño dentro de la colección.
+        /// </returns>
+        /// <exception cref="InvalidOperationException">
+        /// Se produce si la colección está vacía.
+        /// </exception>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// List<DateTime> fechas = new List<DateTime>
+        /// {
+        ///     new DateTime(2026, 4, 2),
+        ///     new DateTime(2025, 12, 25),
+        ///     new DateTime(2026, 1, 1)
+        /// };
+        ///
+        /// DateTime fechaMinima = fechas.MinDate();
+        /// Console.WriteLine(fechaMinima);
+        /// // Salida: 25/12/2025
+        /// </code>
+        /// </example>
+        public static DateTime MinDate(this IEnumerable<DateTime> dates)
+        {
+            return dates.Items().Min(c => c);
+        }
 
-            using (var memStream = new MemoryStream())
-            {
-                theDataContactSerializer.WriteObject(memStream, theSource);
-                memStream.Position = 0;
-                theCopy = (T)theDataContactSerializer.ReadObject(memStream);
-            }
+        /// <summary>
+        /// Devuelve la fecha máxima (más reciente) de una colección de objetos <see cref="DateTime"/>.
+        /// </summary>
+        /// <param name="dates">La colección de fechas de la cual se obtendrá la máxima.</param>
+        /// <returns>
+        /// El valor <see cref="DateTime"/> más grande dentro de la colección.
+        /// </returns>
+        /// <exception cref="InvalidOperationException">
+        /// Se produce si la colección está vacía.
+        /// </exception>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// List<DateTime> fechas = new List<DateTime>
+        /// {
+        ///     new DateTime(2026, 4, 2),
+        ///     new DateTime(2025, 12, 25),
+        ///     new DateTime(2026, 1, 1)
+        /// };
+        ///
+        /// DateTime fechaMaxima = fechas.MaxDate();
+        /// Console.WriteLine(fechaMaxima);
+        /// // Salida: 02/04/2026
+        /// </code>
+        /// </example>
+        public static DateTime MaxDate(this IEnumerable<DateTime> dates)
+        {
+            return dates.Items().Max(c => c);
+        }
 
-            return theCopy;
+        /// <summary>
+        /// Determina si una fecha ocurre antes de otra fecha dada.
+        /// </summary>
+        /// <param name="date">La fecha que se desea evaluar.</param>
+        /// <param name="startDate">La fecha de referencia para comparar.</param>
+        /// <returns>
+        /// <c>true</c> si <paramref name="date"/> ocurre antes de <paramref name="startDate"/>; 
+        /// en caso contrario, <c>false</c>. 
+        /// También devuelve <c>false</c> si cualquiera de las fechas es nula.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// DateTime? fechaEvento = new DateTime(2025, 12, 25);
+        /// DateTime? fechaReferencia = new DateTime(2026, 1, 1);
+        ///
+        /// bool ocurreAntes = fechaEvento.OccursBefore(fechaReferencia);
+        /// Console.WriteLine(ocurreAntes);
+        /// // Salida: True (porque 25/12/2025 ocurre antes de 01/01/2026)
+        /// </code>
+        /// </example>
+        public static bool OccursBefore(this DateTime? date, DateTime? startDate)
+        {
+            if (!date.HasValue || !startDate.HasValue) return false;
+
+            return startDate.Value.Ticks > date.Value.Ticks;
+        }
+
+        /// <summary>
+        /// Determina si una fecha se encuentra dentro de un rango específico.
+        /// </summary>
+        /// <param name="date">La fecha que se desea evaluar.</param>
+        /// <param name="startDate">La fecha inicial del rango.</param>
+        /// <param name="endDate">La fecha final del rango.</param>
+        /// <returns>
+        /// <c>true</c> si <paramref name="date"/> está entre <paramref name="startDate"/> 
+        /// (inclusive) y <paramref name="endDate"/> (exclusiva); en caso contrario, <c>false</c>.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// DateTime fecha = new DateTime(2026, 4, 2);
+        /// DateTime inicio = new DateTime(2026, 4, 1);
+        /// DateTime fin = new DateTime(2026, 4, 10);
+        ///
+        /// bool dentroDelRango = fecha.Between(inicio, fin);
+        /// Console.WriteLine(dentroDelRango);
+        /// // Salida: True (porque 02/04/2026 está entre 01/04/2026 y 10/04/2026)
+        /// </code>
+        /// </example>
+        public static bool Between(this DateTime date, DateTime startDate, DateTime endDate)
+        {
+            if (date.IsNull() || startDate.IsNull()) return false;
+
+            return date.Ticks >= startDate.Ticks && date.Ticks < endDate.Ticks;
+        }
+
+        /// <summary>
+        /// Obtiene el número de semana del año para una fecha determinada,
+        /// utilizando la cultura actual del sistema.
+        /// </summary>
+        /// <param name="date">La fecha de la cual se desea obtener el número de semana.</param>
+        /// <returns>
+        /// Un entero que representa el número de semana del año en el que cae la fecha.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// DateTime fecha = new DateTime(2026, 4, 2);
+        /// int numeroSemana = fecha.GetWeekNumber();
+        /// Console.WriteLine(numeroSemana);
+        /// // Salida posible: 14 (dependiendo de la configuración cultural del sistema)
+        /// </code>
+        /// </example>
+        public static int GetWeekNumber(this DateTime date)
+        {
+            CultureInfo cul = CultureInfo.CurrentCulture;
+
+            return cul.Calendar.GetWeekOfYear(
+                 date,
+                 CalendarWeekRule.FirstDay,
+                 DayOfWeek.Sunday);
+        }
+
+        /// <summary>
+        /// Obtiene el número de la última semana del año actual.
+        /// </summary>
+        /// <param name="date">
+        /// La fecha de referencia (no se utiliza directamente, ya que se reemplaza por el 31 de diciembre del año actual).
+        /// </param>
+        /// <returns>
+        /// Un entero que representa el número de la última semana del año actual.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// DateTime fecha = DateTime.Now;
+        /// int ultimaSemana = fecha.GetLastWeekNumberCurrentYear();
+        /// Console.WriteLine(ultimaSemana);
+        /// // Salida posible: 52 o 53 (dependiendo de cómo se calculen las semanas en la cultura actual)
+        /// </code>
+        /// </example>
+        public static int GetLastWeekNumberCurrentYear(this DateTime date)
+        {
+            date = new DateTime(DateTime.Now.Year, 12, 31);
+            return date.GetWeekNumber();
+        }
+
+        /// <summary>
+        /// Determina si un objeto <see cref="DateTime"/> tiene el valor por defecto.
+        /// </summary>
+        /// <param name="dateTime">La fecha que se desea evaluar.</param>
+        /// <returns>
+        /// <c>true</c> si <paramref name="dateTime"/> es igual a <c>default(DateTime)</c>
+        /// (01/01/0001 00:00:00); en caso contrario, <c>false</c>.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// DateTime fecha1 = default(DateTime);
+        /// DateTime fecha2 = DateTime.Now;
+        ///
+        /// bool esDefault1 = fecha1.HasDefaultValue(); // True
+        /// bool esDefault2 = fecha2.HasDefaultValue(); // False
+        ///
+        /// Console.WriteLine($"Fecha1 es default: {esDefault1}");
+        /// Console.WriteLine($"Fecha2 es default: {esDefault2}");
+        /// </code>
+        /// </example>
+        public static bool HasDefaultValue(this DateTime dateTime)
+        {
+            return dateTime == default(DateTime);
         }
     }
 }
@@ -10014,6 +9846,109 @@ CREATE TABLE [Comunes].[ConfiguracionesDetalle_Transacciones](
 GO
 ````
 
+## File: Infraestructura/Context/DataSeeder.cs
+````csharp
+using Dominio.Context.Entidades;
+using Dominio.Context.Entidades.Seguridad;
+
+namespace Infraestructura.Context
+{
+    public static class DataSeeder
+    {
+        public static void Seed(MyContext context, string? adminPassword = null)
+        {
+            var ahora = DateTime.Now;
+            var modificadoPor = "System";
+            var transaccionUId = Guid.NewGuid();
+            var tipoTransaccion = "cargaInicial";
+            var descripcionTransaccion = "Added";
+            // Verifica si ya existen registros
+            if (!context.Rol.Any())
+            {
+                context.Rol.AddRange(
+                    new Rol 
+                    { 
+                        RolId = "Admin", 
+                        Descripcion = "Administrador del sistema", 
+                        DescripcionTransaccion = descripcionTransaccion, 
+                        FechaTransaccion = ahora, 
+                        ModificadoPor = modificadoPor,
+                        TransaccionUId = transaccionUId,
+                        TipoTransaccion = tipoTransaccion
+                    },
+                    new Rol 
+                    { 
+                        RolId = "User", 
+                        Descripcion = "Usuario estándar", 
+                        DescripcionTransaccion = descripcionTransaccion, 
+                        FechaTransaccion = ahora,
+                        ModificadoPor = modificadoPor,
+                        TipoTransaccion = tipoTransaccion,
+                        TransaccionUId = transaccionUId
+                    }
+                );
+            }
+
+            if (!context.Usuarios.Any() && !string.IsNullOrWhiteSpace(adminPassword))
+            {
+                context.Usuarios.Add(
+                    new Usuario 
+                    {
+                        UsuarioId = "admin", 
+                        Nombre = "Administrador", 
+                        Apellido = "Sistema",
+                        Contrasena = PasswordEncryptor.HashPassword(adminPassword), 
+                        RolId = "Admin",
+                        Activo = true,
+                        DescripcionTransaccion = descripcionTransaccion, 
+                        FechaTransaccion = ahora, 
+                        ModificadoPor = modificadoPor,
+                        TransaccionUId = transaccionUId,
+                        TipoTransaccion = tipoTransaccion,
+                    });
+            }
+
+            if (!context.Pantalla.Any())
+            {   
+                context.Pantalla.AddRange(
+                    new Pantalla
+                    {
+                        PantallaId = "Seguridad",
+                        Descripcion = "Administracion de la seguridad",
+                        DescripcionTransaccion = descripcionTransaccion,
+                        FechaTransaccion = ahora,
+                        ModificadoPor = modificadoPor,
+                        TransaccionUId = transaccionUId,
+                        TipoTransaccion = tipoTransaccion,
+                        
+                    });
+            }
+
+            if (!context.Permisos.Any())
+            {
+                context.Permisos.AddRange(
+                    new Permisos
+                    {
+                        RolId = "Admin",
+                        PantallaId = "Seguridad",
+                        DescripcionTransaccion = descripcionTransaccion,
+                        FechaTransaccion = ahora,
+                        ModificadoPor = modificadoPor,
+                        Editar = true,
+                        Eliminar = true,
+                        Ver = true,
+                        TransaccionUId = transaccionUId,
+                        TipoTransaccion = tipoTransaccion,
+                    }
+                );
+            }
+            // Guarda los cambios
+            context.SaveChanges();
+        }
+    }
+}
+````
+
 ## File: Infraestructura/Context/MyContext.cs
 ````csharp
 using Dominio.Context.Entidades.ConfiguracionesAgg;
@@ -10542,6 +10477,84 @@ namespace Infraestructura.Core
 }
 ````
 
+## File: WebServices/Controllers/ConfiguracionesController.cs
+````csharp
+using Aplicacion.DTOs.ConfiguracionesDTO;
+using Aplicacion.Services.ConfiguracionesApp;
+using Dominio.Core.Result;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace WebServices.Controllers
+{
+    [Authorize]
+    [ApiController]
+    [Route("api/[controller]")]
+    public class ConfiguracionesController : ControllerBase
+    {
+        private readonly IConfiguracionesApplicationService _configuracionesAppService;
+
+        public ConfiguracionesController(IConfiguracionesApplicationService configuracionesAppService)
+        {
+            _configuracionesAppService = configuracionesAppService;
+        }
+
+        [HttpPost("crear-configuracion")]
+        public async Task<IActionResult> CrearConfiguracion(ConfiguracionesRequest request)
+        {
+            var configuracion = await _configuracionesAppService.CrearConfiguracion(request);
+            return MapResult(configuracion);
+        }
+
+        [HttpPost("obtener-configuraciones")]
+        public async Task<IActionResult> GetConfiguraciones(ConfiguracionesRequest request)
+        {
+            var configuraciones = await _configuracionesAppService.ObtenerConfiguracionesPaginado(request);
+            return MapResult(configuraciones);
+        }
+
+        [HttpPost("crear-configuracion-detalle")]
+        public async Task<IActionResult> CrearConfiguracionesDetalle(ConfiguracionesRequest request)
+        {
+            var configuracionesDetalle = await _configuracionesAppService.CrearConfiguracionDetalle(request);
+            return MapResult(configuracionesDetalle);
+        }
+
+        [HttpPost("editar-configuracion-detalle")]
+        public async Task<IActionResult> EditarConfiguracionesDetalle(ConfiguracionesRequest request)
+        {
+            var configuracionesDetalle = await _configuracionesAppService.EditarConfiguracionesDetalle(request);
+            return MapResult(configuracionesDetalle);
+        }
+
+        [HttpPost("editar-configuracion")]
+        public async Task<IActionResult> EditarConfiguracion(ConfiguracionesRequest request)
+        {
+            var configuracion = await _configuracionesAppService.EditarConfiguracion(request);
+            return MapResult(configuracion);
+        }
+
+        private IActionResult MapResult<T>(Result<T> result)
+        {
+            if (result == null) return StatusCode(500);
+
+            if (result.IsSuccess)
+            {
+                return Ok(result.Data);
+            }
+
+            return result.Status switch
+            {
+                ResultStatus.ValidationError => BadRequest(result),
+                ResultStatus.ApplicationError => Conflict(result),
+                ResultStatus.Exception => StatusCode(500, result),
+                _ => BadRequest(result),
+            };
+        }
+    }
+}
+````
+
 ## File: WebServices/Jwtoken/JwtConfiguration.cs
 ````csharp
 using Dominio.Core.Jwtoken;
@@ -10626,6 +10639,64 @@ namespace WebServices.Jwtoken
   </ItemGroup>
 
 </Project>
+````
+
+## File: Dominio/Core/Extensions/EntidadExtension.cs
+````csharp
+using System.Runtime.Serialization;
+
+namespace Dominio.Core.Extensions
+{
+    public static class EntidadExtension
+    {
+        /// <summary>
+        /// Crea una copia profunda de un objeto utilizando <see cref="DataContractSerializer"/>.
+        /// </summary>
+        /// <typeparam name="T">El tipo del objeto a copiar. Debe ser serializable mediante DataContract.</typeparam>
+        /// <param name="theSource">El objeto fuente que se desea clonar.</param>
+        /// <returns>
+        /// Una nueva instancia de <typeparamref name="T"/> que representa una copia profunda del objeto original.
+        /// </returns>
+        /// <example>
+        /// Ejemplo de uso:
+        /// <code>
+        /// [DataContract]
+        /// public class Persona
+        /// {
+        ///     [DataMember]
+        ///     public string Nombre { get; set; }
+        ///
+        ///     [DataMember]
+        ///     public int Edad { get; set; }
+        /// }
+        ///
+        /// Persona original = new Persona { Nombre = "Ana", Edad = 30 };
+        /// Persona copia = original.DeepCopy();
+        ///
+        /// Console.WriteLine($"Original: {original.Nombre}, {original.Edad}");
+        /// Console.WriteLine($"Copia: {copia.Nombre}, {copia.Edad}");
+        /// // Salida: 
+        /// // Original: Ana, 30
+        /// // Copia: Ana, 30
+        /// </code>
+        /// </example>
+        public static T DeepCopy<T>(this T theSource) 
+            where T : class 
+        {
+            ArgumentNullException.ThrowIfNull(theSource);
+
+            var theDataContactSerializer = new DataContractSerializer(typeof(T));
+
+            using var memStream = new MemoryStream();
+
+            theDataContactSerializer.WriteObject(memStream, theSource);
+            memStream.Position = 0;
+            var theCopy = theDataContactSerializer.ReadObject(memStream) as T;
+
+            return theCopy ?? throw new SerializationException($"No se pudo deserializar el objeto como {typeof(T).Name}.");
+        }
+    }
+}
 ````
 
 ## File: Dominio/Core/Extensions/EnumerableExtensions.cs
@@ -11285,6 +11356,36 @@ namespace Aplicacion.DTOs.Seguridad
 }
 ````
 
+## File: WebServices/appsettings.json
+````json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+
+
+  "ConnectionStrings": {
+    "conectionDataBase": "Server=localhost; initial Catalog=test; Integrated Security=True; MultipleActiveResultSets=True;TrustServerCertificate=True;"
+  },
+
+  "JwtSettings": {
+    "Secret": "CHANGE_ME_TO_A_STRONG_SECRET",
+    "ExpirationInMinutes": 60,
+    "RefreshTokenExpirationInDays": 7,
+    "Issuer": "TemplateNetCore.Api",
+    "Audience": "TemplateNetCore"
+  },
+
+  "Cors": {
+    "AllowedOrigins": [ "https://localhost:5283" ]
+  }
+}
+````
+
 ## File: WebServices/WebServices.csproj
 ````
 <Project Sdk="Microsoft.NET.Sdk.Web">
@@ -11295,6 +11396,10 @@ namespace Aplicacion.DTOs.Seguridad
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Controllers\TestRestClient.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AutoMapper" Version="16.1.1" />
@@ -11673,7 +11778,6 @@ namespace Aplicacion.Services.Seguridad
             return new UsuarioDTO
             {
                 Apellido = qry.Apellido,
-                Contrasena = qry.Contrasena,
                 Nombre = qry.Nombre,
                 RolId = qry.RolId,
                 UsuarioId = qry.UsuarioId,
@@ -11721,7 +11825,7 @@ A production-ready, clean architecture **ASP.NET Core** backend template built w
 | 📋 **Audit Log** | Full transaction logging for all entity changes |
 | 🗺️ **AutoMapper 16** | Modern object mapping configuration |
 | 📖 **Scalar API Docs** | Modern OpenAPI 3.1 UI (replaces Swagger) |
-| ⚡ **DataSeeder** | Automatic seeding of default roles, users, and permissions |
+| ⚡ **DataSeeder** | Automatic seeding of default roles and permissions |
 | 🌐 **CORS** | Pre-configured for frontend integration |
 | 🛡️ **Global Exception Middleware** | Centralized error handling |
 
@@ -11794,11 +11898,11 @@ dotnet ef database update --context MyContext --project Infraestructura --startu
 ```
 
 ### Default Seed Data
-On first run, the `DataSeeder` automatically creates:
+On first run, the `DataSeeder` automatically creates base security data. The admin user is only created when `Seed:AdminPassword` is configured.
 
 | Type | Value |
 |---|---|
-| **Default Admin User** | `admin` / `admin123*` |
+| **Optional Admin User** | `admin` with password from `Seed:AdminPassword` |
 | **Roles** | `Admin`, `User` |
 | **Screen** | `Seguridad` |
 | **Permission** | Admin → Seguridad (Ver, Editar, Eliminar) |
@@ -11888,36 +11992,6 @@ This project is licensed under the **MIT License** — free to use, modify, and 
 <div align="center">
   Made with ❤️ by <a href="https://github.com/Alex16leiva">Alex16leiva</a>
 </div>
-````
-
-## File: WebServices/appsettings.json
-````json
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  },
-  "AllowedHosts": "*",
-
-
-  "ConnectionStrings": {
-    "conectionDataBase": "Server=localhost; initial Catalog=test; Integrated Security=True; MultipleActiveResultSets=True;TrustServerCertificate=True;"
-  },
-
-  "JwtSettings": {
-    "Secret": "CHANGE_ME_TO_A_STRONG_SECRET",
-    "ExpirationInMinutes": 60,
-    "RefreshTokenExpirationInDays": 7,
-    "Issuer": "TemplateNetCore.Api",
-    "Audience": "TemplateNetCore"
-  },
-
-  "Cors": {
-    "AllowedOrigins": [ "https://localhost:5283" ]
-  }
-}
 ````
 
 ## File: WebServices/Controllers/UserController.cs
@@ -12086,18 +12160,22 @@ builder.Services.AddCors(options =>
             .GetSection("Cors:AllowedOrigins")
             .Get<string[]>() ?? new string[0];
 
-        if (allowedOrigins.Length > 0)
+        if (allowedOrigins.Length == 0)
         {
-            policy.WithOrigins(allowedOrigins)
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
-        }
-        else
-        {
+            if (!builder.Environment.IsDevelopment())
+            {
+                throw new InvalidOperationException("Cors:AllowedOrigins must be configured outside Development.");
+            }
+
             policy.AllowAnyOrigin()
                   .AllowAnyHeader()
                   .AllowAnyMethod();
+            return;
         }
+
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod();
     });
 });
 
@@ -12114,8 +12192,8 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<MyContext>();
 
-    // Inserta datos iniciales solo si no existen
-    DataSeeder.Seed(context);
+    // Inserta datos iniciales solo si no existen. El usuario admin requiere contraseña configurada.
+    DataSeeder.Seed(context, app.Configuration["Seed:AdminPassword"]);
 }
 
 

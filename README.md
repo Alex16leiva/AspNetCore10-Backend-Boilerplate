@@ -48,7 +48,7 @@ The solution follows **Clean Architecture** principles, organized into four laye
 ```
 POST /api/User/login
 ```
-Returns an **Access Token** (short-lived) and a **Refresh Token** (long-lived, stored in DB).
+Returns an **Access Token** (short-lived) and a **Refresh Token** (long-lived). Only a SHA-256 hash of the refresh token is stored in DB.
 
 ### Refresh Token
 ```
@@ -111,7 +111,7 @@ On first run, the `DataSeeder` automatically creates base security data. The adm
 ```json
 {
   "ConnectionStrings": {
-    "conectionDataBase": "Server=YOUR_SERVER;Database=YOUR_DB;User Id=YOUR_USER;Password=YOUR_PASS;TrustServerCertificate=true"
+    "conectionDataBase": "Server=YOUR_SERVER;Database=YOUR_DB;Encrypt=True;TrustServerCertificate=False"
   },
   "JwtSettings": {
     "Secret": "YOUR_SUPER_SECRET_KEY_MIN_32_CHARS",
@@ -119,8 +119,20 @@ On first run, the `DataSeeder` automatically creates base security data. The adm
     "RefreshTokenExpirationInDays": 7,
     "Issuer": "YourIssuer",
     "Audience": "YourAudience"
+  },
+  "Cors": {
+    "AllowedOrigins": [ "https://your-frontend.example.com" ]
   }
 }
+```
+
+Prefer environment variables or a secret manager for production secrets:
+
+```bash
+JwtSettings__Secret=YOUR_SUPER_SECRET_KEY_MIN_32_BYTES
+ConnectionStrings__conectionDataBase=Server=YOUR_SERVER;Database=YOUR_DB;User Id=YOUR_USER;Password=YOUR_PASS;Encrypt=True;TrustServerCertificate=False
+Seed__AdminPassword=CHANGE_ME_ONLY_FOR_INITIAL_SEED
+Cors__AllowedOrigins__0=https://your-frontend.example.com
 ```
 
 ---
@@ -138,7 +150,7 @@ On first run, the `DataSeeder` automatically creates base security data. The adm
 git clone https://github.com/Alex16leiva/AspNetCore10-Backend-Boilerplate.git
 cd AspNetCore10-Backend-Boilerplate
 
-# 2. Configure your connection string in WebServices/appsettings.json
+# 2. Configure your connection string, JWT secret, and CORS origins using environment variables or Secret Manager
 
 # 3. Apply EF Core migrations
 dotnet ef database update --context MyContext --project Infraestructura --startup-project WebServices
@@ -161,7 +173,9 @@ https://localhost:7217/scalar/v1
 - ✅ **BCrypt** — Password hashing with automatic salt (replaces plain SHA-256)
 - ✅ **JWT Bearer** — Stateless authentication
 - ✅ **Refresh Token Rotation** — New refresh token issued on every renewal
+- ✅ **Hashed Refresh Tokens** — Database stores token hashes, not raw refresh tokens
 - ✅ **Refresh Token Expiry** — Configurable expiration (default: 7 days)
+- ✅ **Auth Rate Limiting** — Login and refresh endpoints are rate-limited
 - ✅ **Secure Dependencies** — All NuGet packages audited for known vulnerabilities
 
 ---

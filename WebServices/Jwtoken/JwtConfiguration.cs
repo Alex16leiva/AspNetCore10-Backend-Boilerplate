@@ -1,8 +1,6 @@
 ﻿using Dominio.Core.Jwtoken;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using System;
-using System.Configuration;
 using System.Text;
 
 namespace WebServices.Jwtoken
@@ -25,6 +23,21 @@ namespace WebServices.Jwtoken
             if (string.IsNullOrWhiteSpace(secret) || secret == "CHANGE_ME_TO_A_STRONG_SECRET")
             {
                 throw new InvalidOperationException("JwtSettings:Secret must be configured in production using an environment variable or a secret manager.");
+            }
+
+            if (Encoding.UTF8.GetByteCount(secret) < 32)
+            {
+                throw new InvalidOperationException("JwtSettings:Secret must be at least 32 bytes long.");
+            }
+
+            if (string.IsNullOrWhiteSpace(settings.Issuer) || string.IsNullOrWhiteSpace(settings.Audience))
+            {
+                throw new InvalidOperationException("JwtSettings:Issuer and JwtSettings:Audience must be configured.");
+            }
+
+            if (settings.ExpirationInMinutes <= 0 || settings.RefreshTokenExpirationInDays <= 0)
+            {
+                throw new InvalidOperationException("JwtSettings expiration values must be greater than zero.");
             }
 
             var key = Encoding.UTF8.GetBytes(secret);

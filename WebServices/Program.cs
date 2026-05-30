@@ -6,6 +6,8 @@ using WebServices.Jwtoken;
 using WebServices.Middleware;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,17 +24,11 @@ builder.Services.AddAutoMapper(cfg => cfg.AddMaps(typeof(AutoMapperProfile).Asse
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssembly(typeof(Aplicacion.Services.Seguridad.Validators.UsuarioDTOValidator).Assembly);
 
-const string AllowAllOriginsPolicy = "AllowAllOriginsPolicy";
 const string AllowSpecificOriginsPolicy = "AllowSpecificOriginsPolicy";
+const string AuthRateLimitPolicy = "AuthPolicy";
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(AllowAllOriginsPolicy,
-        x =>
-        {
-            x.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
-        });
-
     options.AddPolicy(AllowSpecificOriginsPolicy, policy =>
     {
         var allowedOrigins = builder.Configuration
@@ -41,20 +37,24 @@ builder.Services.AddCors(options =>
 
         if (allowedOrigins.Length == 0)
         {
-            if (!builder.Environment.IsDevelopment())
-            {
-                throw new InvalidOperationException("Cors:AllowedOrigins must be configured outside Development.");
-            }
-
-            policy.AllowAnyOrigin()
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
-            return;
+            throw new InvalidOperationException("Cors:AllowedOrigins must be configured.");
         }
 
         policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod();
+    });
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter(AuthRateLimitPolicy, limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 5;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 0;
     });
 });
 
@@ -83,14 +83,14 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
-app.UseCors(app.Environment.IsDevelopment() ? AllowAllOriginsPolicy : AllowSpecificOriginsPolicy);
+app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
+app.UseCors(AllowSpecificOriginsPolicy);
+app.UseRateLimiter();
 
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
-
-app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
 app.MapControllers();
 

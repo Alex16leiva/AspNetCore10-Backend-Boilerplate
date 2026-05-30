@@ -15,6 +15,8 @@ using Infraestructura.Core.Jwtoken;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Aplicacion.Services.Seguridad
 {
@@ -162,7 +164,7 @@ namespace Aplicacion.Services.Seguridad
                 var newAccessToken = _tokenService.Generate(usuario);
                 var newRefreshToken = _tokenService.GenerateRefreshToken();
 
-                usuario.RefreshToken = newRefreshToken;
+                usuario.RefreshToken = HashRefreshToken(newRefreshToken);
                 usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationInDays);
 
                 if (request.RequestUserInfo != null)
@@ -215,9 +217,10 @@ namespace Aplicacion.Services.Seguridad
                 return Task.FromResult(Result<UsuarioDTO>.Failure("Token de acceso inválido", "INVALID_ACCESS_TOKEN"));
             }
 
-            var usuario = _genericRepository.GetSingle<Usuario>(u => u.UsuarioId == userId && u.RefreshToken == request.RefreshToken, new List<string> { "Rol", "Rol.Permisos" });
+            string refreshTokenHash = HashRefreshToken(request.RefreshToken);
+            var usuario = _genericRepository.GetSingle<Usuario>(u => u.UsuarioId == userId && u.RefreshToken == refreshTokenHash, new List<string> { "Rol", "Rol.Permisos" });
 
-            if (usuario == null || usuario.RefreshTokenExpiryTime <= DateTime.UtcNow)
+            if (usuario == null || !usuario.Activo || usuario.RefreshTokenExpiryTime <= DateTime.UtcNow)
             { 
                 return Task.FromResult(Result<UsuarioDTO>.Failure("Token de refresco inválido o expirado", "INVALID_REFRESH_TOKEN"));
             }
@@ -225,7 +228,7 @@ namespace Aplicacion.Services.Seguridad
             var newAccessToken = _tokenService.Generate(usuario);
             var newRefreshToken = _tokenService.GenerateRefreshToken();
 
-            usuario.RefreshToken = newRefreshToken;
+            usuario.RefreshToken = HashRefreshToken(newRefreshToken);
             usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationInDays);
 
             TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("RefreshToken")
@@ -350,6 +353,13 @@ namespace Aplicacion.Services.Seguridad
                 FechaTransaccion = qry.FechaTransaccion,
                 Activo = qry.Activo
             };
+        }
+
+        private static string HashRefreshToken(string refreshToken)
+        {
+            var tokenBytes = Encoding.UTF8.GetBytes(refreshToken);
+            var hashBytes = SHA256.HashData(tokenBytes);
+            return Convert.ToBase64String(hashBytes);
         }
 
         protected override void Dispose(bool disposing)

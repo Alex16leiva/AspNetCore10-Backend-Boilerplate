@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using System.Linq.Dynamic;
 using System.Linq.Expressions;
+using System.Text.RegularExpressions;
 
 
 namespace Infraestructura.Context
@@ -16,6 +17,9 @@ namespace Infraestructura.Context
     {
         private readonly T _unitOfWork;
         private readonly IConfiguration _configuration;
+        private static readonly Regex SqlIdentifierRegex = new(@"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$", RegexOptions.Compiled);
+        private static readonly Regex SqlParameterNameRegex = new(@"^@[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.Compiled);
+        private static readonly string[] UnsafeSqlTokens = [";", "--", "/*", "*/"];
         public GenericRepository(T unitOfWork, IConfiguration configuration)
         {
             _unitOfWork = unitOfWork;
@@ -337,6 +341,7 @@ namespace Infraestructura.Context
 
         public IEnumerable<TType> ExecuteStoredProcedure<TType>(string storedProcedure, Dictionary<string, object> parameters)
         {
+            ValidateSqlIdentifier(storedProcedure, nameof(storedProcedure));
             SqlParameter[] sqlParameters = CreateSqlParameters(parameters);
             string paramNames = GetParamNames(parameters);
 
@@ -347,12 +352,14 @@ namespace Infraestructura.Context
 
         public IEnumerable<TType> ExecuteStoredProcedure<TType>(string storedProcedure, SqlParameter[] parameters)
         {
+            ValidateSqlIdentifier(storedProcedure, nameof(storedProcedure));
             string paramNames = GetParamNames(parameters);
             return _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0} {1}", storedProcedure, paramNames), parameters).ToList();
         }
 
         public TType ExecuteScalarFunction<TType>(string scalarFunction, Dictionary<string, object> parameters)
         {
+            ValidateSqlIdentifier(scalarFunction, nameof(scalarFunction));
             SqlParameter[] sqlParameters = CreateSqlParameters(parameters);
             string paramNames = GetParamNames(parameters);
 
@@ -365,6 +372,7 @@ namespace Infraestructura.Context
 
         private string GetParamNames(Dictionary<string, object> parameters)
         {
+            ValidateSqlParameterNames(parameters?.Keys);
             return (parameters != null && parameters.Any())
                 ? parameters.Select(p => p.Key).Aggregate((i, j) => i + ", " + j)
                 : string.Empty;
@@ -372,6 +380,7 @@ namespace Infraestructura.Context
 
         private string GetParamNames(SqlParameter[] parameters)
         {
+            ValidateSqlParameterNames(parameters?.Select(p => p.ParameterName));
             return (parameters != null && parameters.Any())
                 ? parameters.Select(p => p.ParameterName).Aggregate((i, j) => i + ", " + j)
                 : string.Empty;
@@ -379,6 +388,7 @@ namespace Infraestructura.Context
 
         public void ExecuteQuery(string sqlQuery, Dictionary<string, object> parameters)
         {
+            ValidateSqlCommand(sqlQuery);
             SqlParameter[] sqlParameters = CreateSqlParameters(parameters);
             _unitOfWork.ExecuteCommand(sqlQuery, sqlParameters);
         }
@@ -387,6 +397,7 @@ namespace Infraestructura.Context
         {
             if (parameters != null && parameters.Any())
             {
+                ValidateSqlParameterNames(parameters.Keys);
                 return (from qry in parameters select new SqlParameter(qry.Key, qry.Value)).ToArray();
             }
 
@@ -395,6 +406,8 @@ namespace Infraestructura.Context
 
         public void ExecuteQuery(SqlParameter[] parms, string sqlQuery)
         {
+            ValidateSqlCommand(sqlQuery);
+            ValidateSqlParameterNames(parms?.Select(p => p.ParameterName));
             _unitOfWork.ExecuteCommand(sqlQuery, parms);
         }
 
@@ -442,7 +455,43 @@ namespace Infraestructura.Context
 
         public IEnumerable<TEntity> ExecuteQuery<TEntity>(SqlParameter[] parms, string sqlQuery)
         {
+            ValidateSqlCommand(sqlQuery);
+            ValidateSqlParameterNames(parms?.Select(p => p.ParameterName));
             return _unitOfWork.ExecuteQuery<TEntity>(sqlQuery, parms).ToList();
+        }
+
+        private static void ValidateSqlIdentifier(string identifier, string argumentName)
+        {
+            if (string.IsNullOrWhiteSpace(identifier) || !SqlIdentifierRegex.IsMatch(identifier))
+            {
+                throw new ArgumentException("Only simple schema-qualified SQL identifiers are allowed.", argumentName);
+            }
+        }
+
+        private static void ValidateSqlParameterNames(IEnumerable<string>? parameterNames)
+        {
+            if (parameterNames == null) return;
+
+            foreach (var parameterName in parameterNames)
+            {
+                if (string.IsNullOrWhiteSpace(parameterName) || !SqlParameterNameRegex.IsMatch(parameterName))
+                {
+                    throw new ArgumentException("SQL parameter names must start with @ and contain only letters, numbers, or underscores.");
+                }
+            }
+        }
+
+        private static void ValidateSqlCommand(string sqlQuery)
+        {
+            if (string.IsNullOrWhiteSpace(sqlQuery))
+            {
+                throw new ArgumentException("SQL query cannot be empty.", nameof(sqlQuery));
+            }
+
+            if (UnsafeSqlTokens.Any(token => sqlQuery.Contains(token, StringComparison.Ordinal)))
+            {
+                throw new ArgumentException("SQL query contains unsupported multi-statement or comment syntax.", nameof(sqlQuery));
+            }
         }
     }
 }
