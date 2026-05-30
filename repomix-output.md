@@ -58,6 +58,7 @@ Aplicacion/Helpers/TransactionInfoExtensions.cs
 Aplicacion/Helpers/TransactionInfoHelper.cs
 Aplicacion/Services/ConfiguracionesApp/ConfiguracionesApplicationService.cs
 Aplicacion/Services/ConfiguracionesApp/IConfiguracionesApplicationService.cs
+Aplicacion/Services/Seguridad/ISecurityApplicationService.cs
 Aplicacion/Services/Seguridad/SecurityAplicationService.cs
 CrossCutting/Configuration/AppSettingsException.cs
 CrossCutting/Configuration/AppSettingsManager.cs
@@ -127,7 +128,6 @@ WebServices/appsettings.json
 WebServices/Controllers/ConfiguracionesController.cs
 WebServices/Controllers/TestRestClient.cs
 WebServices/Controllers/UserController.cs
-WebServices/Controllers/WeatherForecastController.cs
 WebServices/Extensions/DependencyInjectionRepository.cs
 WebServices/Jwtoken/JwtConfiguration.cs
 WebServices/Middleware/GlobalExceptionHandlingMiddleware.cs
@@ -1025,6 +1025,29 @@ namespace Aplicacion.Services.ConfiguracionesApp
         Task<ConfiguracionesDetalleDTO> CrearConfiguracionDetalle(ConfiguracionesRequest request);
         Task<ConfiguracionesDetalleDTO> EditarConfiguracionesDetalle(ConfiguracionesRequest request);
 
+    }
+}
+````
+
+## File: Aplicacion/Services/Seguridad/ISecurityApplicationService.cs
+````csharp
+using Aplicacion.DTOs;
+using Aplicacion.DTOs.Seguridad;
+
+namespace Aplicacion.Services.Seguridad
+{
+    public interface ISecurityApplicationService
+    {
+        UsuarioDTO EditarUsuario(EdicionUsuarioRequest request);
+        List<PantallaDTO> ObtenerPantallas();
+        RolDTO EdicionPermisos(EdicionPermisosRequest request);
+        UsuarioDTO CrearUsuario(EdicionUsuarioRequest request);
+        UsuarioDTO IniciarSesion(UserRequest request);
+        UsuarioDTO RefreshToken(TokenRequest request);
+        SearchResult<UsuarioDTO> ObtenerUsuario(GetUserRequest request);
+        RolDTO CrearRol(EdicionRolRequest request);
+        RolDTO EditarRol(EdicionRolRequest request);
+        List<RolDTO> ObtenerRoles();
     }
 }
 ````
@@ -6128,162 +6151,6 @@ namespace Infraestructura.Migrations
 }
 ````
 
-## File: WebServices/Controllers/ConfiguracionesController.cs
-````csharp
-using Aplicacion.DTOs.ConfiguracionesDTO;
-using Aplicacion.Services.ConfiguracionesApp;
-using Microsoft.AspNetCore.Mvc;
-
-namespace WebServices.Controllers
-{
-    [ApiController]
-    [Route("api/[controller]")]
-    public class ConfiguracionesController : ControllerBase
-    {
-        private readonly IConfiguracionesApplicationService _configuracionesAppService;
-
-        public ConfiguracionesController(IConfiguracionesApplicationService configuracionesAppService)
-        {
-            _configuracionesAppService = configuracionesAppService;
-        }
-
-        [HttpPost("crear-configuracion")]
-        public async Task<IActionResult> CrearConfiguracion(ConfiguracionesRequest request)
-        {
-            var configuracion = await _configuracionesAppService.CrearConfiguracion(request);
-            return Ok(configuracion);
-        }
-
-        [HttpPost("obtener-configuraciones")]
-        public async Task<IActionResult> GetConfiguraciones(ConfiguracionesRequest request)
-        {
-            var configuraciones = await _configuracionesAppService.ObtenerConfiguracionesPaginado(request);
-            return Ok(configuraciones);
-        }
-
-        [HttpPost("crear-configuracion-detalle")]
-        public async Task<IActionResult> CrearConfiguracionesDetalle(ConfiguracionesRequest request)
-        {
-            var configuracionesDetalle = await _configuracionesAppService.CrearConfiguracionDetalle(request);
-            return Ok(configuracionesDetalle);
-        }
-
-        [HttpPost("editar-configuracion-detalle")]
-        public async Task<IActionResult> EditarConfiguracionesDetalle(ConfiguracionesRequest request)
-        {
-            var configuracionesDetalle = await _configuracionesAppService.EditarConfiguracionesDetalle(request);
-            return Ok(configuracionesDetalle);
-        }
-
-        [HttpPost("editar-configuracion")]
-        public async Task<IActionResult> EditarConfiguracion(ConfiguracionesRequest request)
-        {
-            var configuracion = await _configuracionesAppService.EditarConfiguracion(request);
-            return Ok(configuracion);
-        }
-    }
-}
-````
-
-## File: WebServices/Jwtoken/JwtConfiguration.cs
-````csharp
-using Dominio.Core.Jwtoken;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using System.Configuration;
-using System.Text;
-
-namespace WebServices.Jwtoken
-{
-    public static class JwtConfiguration
-    {
-        public static void ConfigureJwt(this WebApplicationBuilder builder)
-        {
-            builder.Services.Configure<JwtSettings>(options => builder.Configuration.GetSection("JwtSettings").Bind(options));
-
-            AddAuthenticationJwt(builder.Services, builder.Configuration);
-        }
-
-        private static void AddAuthenticationJwt(IServiceCollection services, IConfiguration configuration)
-        {
-            var settings = configuration.GetSection("JwtSettings").Get<JwtSettings>();
-
-            services.AddAuthentication(options =>
-            {
-                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            })
-            .AddJwtBearer(options =>
-            {
-                options.RequireHttpsMetadata = true;
-                options.SaveToken = true;
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(settings.Secret)),
-                    ValidateLifetime = true,
-                    ValidateIssuer = true,
-                    ValidIssuer = settings.Issuer,
-                    ValidateAudience = true,
-                    ValidAudience = settings.Audience,
-                };
-            });
-        }
-    }
-}
-````
-
-## File: WebServices/Middleware/GlobalExceptionHandlingMiddleware.cs
-````csharp
-using Dominio.Core.Extensions;
-using Microsoft.AspNetCore.Mvc;
-using System.Net;
-using System.Text.Json;
-
-namespace WebServices.Middleware
-{
-    public class GlobalExceptionHandlingMiddleware : IMiddleware
-    {
-        private readonly ILogger<GlobalExceptionHandlingMiddleware> _logger;
-
-        public GlobalExceptionHandlingMiddleware(ILogger<GlobalExceptionHandlingMiddleware> logger)
-        {
-            _logger = logger;
-        }
-
-        public async Task InvokeAsync(HttpContext context, RequestDelegate next)
-        {
-            try
-            {
-                await next(context);
-            }
-            catch (Exception e)
-            {
-
-                _logger.LogError(e, e.Message);
-
-                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-
-                ProblemDetails problem = new()
-                {
-                    Status = (int)HttpStatusCode.InternalServerError,
-                    Type = "Server Error",
-                    Title = "Server Error",
-                    Detail = e.Message.HasValue() ? e.Message : "An internal server has occurred",
-                    Instance = e.StackTrace?.ValueOrEmpty()
-                };
-
-                string json = JsonSerializer.Serialize(problem);
-
-                context.Response.ContentType = "application/json";
-
-                await context.Response.WriteAsync(json);
-            }
-        }
-    }
-}
-````
-
 ## File: WebServices/WeatherForecast.cs
 ````csharp
 namespace WebServices
@@ -8731,6 +8598,65 @@ Global
 EndGlobal
 ````
 
+## File: WebServices/Controllers/ConfiguracionesController.cs
+````csharp
+using Aplicacion.DTOs.ConfiguracionesDTO;
+using Aplicacion.Services.ConfiguracionesApp;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace WebServices.Controllers
+{
+    [Authorize]
+    [ApiController]
+    [Route("api/[controller]")]
+    public class ConfiguracionesController : ControllerBase
+    {
+        private readonly IConfiguracionesApplicationService _configuracionesAppService;
+
+        public ConfiguracionesController(IConfiguracionesApplicationService configuracionesAppService)
+        {
+            _configuracionesAppService = configuracionesAppService;
+        }
+
+        [HttpPost("crear-configuracion")]
+        public async Task<IActionResult> CrearConfiguracion(ConfiguracionesRequest request)
+        {
+            var configuracion = await _configuracionesAppService.CrearConfiguracion(request);
+            return Ok(configuracion);
+        }
+
+        [HttpPost("obtener-configuraciones")]
+        public async Task<IActionResult> GetConfiguraciones(ConfiguracionesRequest request)
+        {
+            var configuraciones = await _configuracionesAppService.ObtenerConfiguracionesPaginado(request);
+            return Ok(configuraciones);
+        }
+
+        [HttpPost("crear-configuracion-detalle")]
+        public async Task<IActionResult> CrearConfiguracionesDetalle(ConfiguracionesRequest request)
+        {
+            var configuracionesDetalle = await _configuracionesAppService.CrearConfiguracionDetalle(request);
+            return Ok(configuracionesDetalle);
+        }
+
+        [HttpPost("editar-configuracion-detalle")]
+        public async Task<IActionResult> EditarConfiguracionesDetalle(ConfiguracionesRequest request)
+        {
+            var configuracionesDetalle = await _configuracionesAppService.EditarConfiguracionesDetalle(request);
+            return Ok(configuracionesDetalle);
+        }
+
+        [HttpPost("editar-configuracion")]
+        public async Task<IActionResult> EditarConfiguracion(ConfiguracionesRequest request)
+        {
+            var configuracion = await _configuracionesAppService.EditarConfiguracion(request);
+            return Ok(configuracion);
+        }
+    }
+}
+````
+
 ## File: WebServices/Controllers/TestRestClient.cs
 ````csharp
 using Infraestructura.Core.RestClient;
@@ -8819,101 +8745,105 @@ namespace WebServices.Controllers
 }
 ````
 
-## File: WebServices/Controllers/WeatherForecastController.cs
+## File: WebServices/Jwtoken/JwtConfiguration.cs
 ````csharp
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+using Dominio.Core.Jwtoken;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System;
+using System.Configuration;
+using System.Text;
 
-namespace WebServices.Controllers
+namespace WebServices.Jwtoken
 {
-    [ApiController]
-    [Route("[controller]")]
-    public class WeatherForecastController : ControllerBase
+    public static class JwtConfiguration
     {
-        private static readonly string[] Summaries = new[]
+        public static void ConfigureJwt(this WebApplicationBuilder builder)
         {
-            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-        };
+            builder.Services.Configure<JwtSettings>(options => builder.Configuration.GetSection("JwtSettings").Bind(options));
 
-        private readonly ILogger<WeatherForecastController> _logger;
-
-        public WeatherForecastController(ILogger<WeatherForecastController> logger)
-        {
-            _logger = logger;
+            AddAuthenticationJwt(builder.Services, builder.Configuration);
         }
 
-        [Authorize]
-        [HttpGet(Name = "GetWeatherForecast")]
-        public IEnumerable<WeatherForecast> Get()
+        private static void AddAuthenticationJwt(IServiceCollection services, IConfiguration configuration)
         {
-            return Enumerable.Range(1, 5).Select(index => new WeatherForecast
+            var settings = configuration.GetSection("JwtSettings").Get<JwtSettings>()
+                ?? throw new InvalidOperationException("JwtSettings section is missing.");
+
+            var secret = settings.Secret ?? throw new InvalidOperationException("JwtSettings:Secret must be configured.");
+            var key = Encoding.UTF8.GetBytes(secret);
+
+            services.AddAuthentication(options =>
             {
-                Date = DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                TemperatureC = Random.Shared.Next(-20, 55),
-                Summary = Summaries[Random.Shared.Next(Summaries.Length)]
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
             })
-            .ToArray();
+            .AddJwtBearer(options =>
+            {
+                options.RequireHttpsMetadata = true;
+                options.SaveToken = true;
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero,
+                    ValidateIssuer = true,
+                    ValidIssuer = settings.Issuer,
+                    ValidateAudience = true,
+                    ValidAudience = settings.Audience,
+                };
+            });
         }
     }
 }
 ````
 
-## File: WebServices/Extensions/DependencyInjectionRepository.cs
+## File: WebServices/Middleware/GlobalExceptionHandlingMiddleware.cs
 ````csharp
-using Aplicacion.Core;
-using Aplicacion.Services.ConfiguracionesApp;
-using Aplicacion.Services.Seguridad;
-using CrossCutting.Configuration;
-using Infraestructura.Context;
-using Infraestructura.Core.Jwtoken;
-using Infraestructura.Core.RestClient;
-using Microsoft.EntityFrameworkCore;
+using Dominio.Core.Extensions;
+using Microsoft.AspNetCore.Mvc;
+using System.Net;
+using System.Text.Json;
 
-namespace WebServices.Extensions
+namespace WebServices.Middleware
 {
-    public static class DependencyInjectionRepository
+    public class GlobalExceptionHandlingMiddleware : IMiddleware
     {
-        public static IServiceCollection AddPersistenceInfrastructure(this IServiceCollection services, IConfiguration configuration)
+        private readonly ILogger<GlobalExceptionHandlingMiddleware> _logger;
+
+        public GlobalExceptionHandlingMiddleware(ILogger<GlobalExceptionHandlingMiddleware> logger)
         {
-            string connectionString = configuration.GetConnectionString("conectionDataBase");
-
-            // Inicialización única de configuraciones
-            AppSettingsManager.Initialize(connectionString);
-
-            services.AddDbContext<MyContext>(dbContextOption =>
-                dbContextOption.UseSqlServer(connectionString),
-                ServiceLifetime.Transient
-            );
-
-            services.AddTransient<IDataContext, MyContext>();
-            services.AddTransient(typeof(IGenericRepository<>), typeof(GenericRepository<>));
-
-            return services;
+            _logger = logger;
         }
 
-        public static IServiceCollection AddApplicationServices(this IServiceCollection services)
+        public async Task InvokeAsync(HttpContext context, RequestDelegate next)
         {
-            // Servicios de Aplicación
-            services.AddScoped<SecurityAplicationService>();
-            services.AddScoped<IConfiguracionesApplicationService, ConfiguracionesApplicationService>();
+            try
+            {
+                await next(context);
+            }
+            catch (Exception e)
+            {
 
-            // AutoMapper
-            services.AddAutoMapper(cfg => cfg.AddMaps(typeof(AutoMapperProfile).Assembly));
+                _logger.LogError(e, "Unhandled exception");
 
-            return services;
-        }
+                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
 
-        public static IServiceCollection AddExternalAndSecurityServices(this IServiceCollection services)
-        {
-            // JWT
-            services.AddTransient<ITokenService, JwtTokenService>();
+                ProblemDetails problem = new()
+                {
+                    Status = (int)HttpStatusCode.InternalServerError,
+                    Type = "Server Error",
+                    Title = "An internal server error occurred.",
+                    Detail = "An internal server error occurred.",
+                };
 
-            // Rest Client
-            RestClientFactory.SetCurrent(new HttpRestClientFactory());
-            //services.AddTransient<IRestClient, HttpRestClient>();
-            //services.AddTransient<IRestClientFactory, HttpRestClientFactory>();
+                string json = JsonSerializer.Serialize(problem);
 
-            return services;
+                context.Response.ContentType = "application/json";
+
+                await context.Response.WriteAsync(json);
+            }
         }
     }
 }
@@ -9087,343 +9017,6 @@ namespace Aplicacion.DTOs
         }
 
 
-    }
-}
-````
-
-## File: Aplicacion/Services/Seguridad/SecurityAplicationService.cs
-````csharp
-using Aplicacion.Core;
-using Aplicacion.DTOs;
-using Aplicacion.DTOs.Seguridad;
-using Aplicacion.Helpers;
-using AutoMapper;
-using Dominio.Context.Entidades;
-using Dominio.Context.Entidades.Seguridad;
-using Dominio.Core;
-using Dominio.Core.Extensions;
-using Infraestructura.Context;
-using Infraestructura.Core.Jwtoken;
-
-namespace Aplicacion.Services.Seguridad
-{
-    public class SecurityAplicationService : BaseDisposable
-    {
-        private readonly IGenericRepository<IDataContext> _genericRepository;
-        private readonly ITokenService _tokenService;
-        private readonly IMapper _mapper;
-        public SecurityAplicationService(IGenericRepository<IDataContext> genericRepository, ITokenService tokenService, IMapper mapper)
-        {
-            _genericRepository = genericRepository;
-            _tokenService = tokenService;
-            _mapper = mapper;
-        }
-
-        public UsuarioDTO EditarUsuario(EdicionUsuarioRequest request)
-        {
-            string mensajeValidacion = request.Usuario.ValidarCampos();
-
-            if (mensajeValidacion.HasValue())
-            {
-                return new UsuarioDTO
-                {
-                    Message = mensajeValidacion,
-                };
-            }
-
-            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
-
-            if (usuarioExiste.IsNull())
-            {
-                return new UsuarioDTO
-                {
-                    Message = "El usuario no existe"
-                };
-            }
-
-            if (request.Usuario.EditarContrasena)
-            {
-                usuarioExiste.Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena);
-            }
-
-            usuarioExiste.Nombre = request.Usuario.Nombre.ValueOrEmpty();
-            usuarioExiste.Apellido = request.Usuario.Apellido.ValueOrEmpty();
-            usuarioExiste.RolId = request.Usuario.RolId.ValueOrEmpty();
-            usuarioExiste.Activo = request.Usuario.Activo;
-
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarUsuario");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return new UsuarioDTO();
-        }
-
-        public List<PantallaDTO> ObtenerPantallas()
-        {
-            var pantallas = _genericRepository.GetAll<Pantalla>();
-            return pantallas.Select(r => new PantallaDTO { Descripcion = r.Descripcion, PantallaId = r.PantallaId }).ToList();
-        }
-
-        public RolDTO EdicionPermisos(EdicionPermisosRequest request)
-        {
-            var permisos = _genericRepository.GetFiltered<Permisos>(r => r.RolId == request.RolId);
-
-            foreach (var item in request.Permisos)
-            {
-                var permiso = permisos.FirstOrDefault(r => r.PantallaId == item.PantallaId);
-                if (permiso.IsNotNull())
-                {
-                    permiso.Ver = item.Ver;
-                    permiso.Editar = item.Editar;
-                    permiso.Eliminar = item.Eliminar;
-
-                    if (!permiso.Ver)
-                    {
-                        _genericRepository.Remove(permiso);
-                    }
-                }
-                else
-                {
-                    var nuevoPermiso = new Permisos
-                    {
-                        Editar = item.Editar,
-                        Eliminar = item.Eliminar,
-                        PantallaId = item.PantallaId,
-                        RolId = item.RolId,
-                        Ver = item.Ver,
-                    };
-                    _genericRepository.Add(nuevoPermiso);
-                }
-
-
-                TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarUsuario");
-                _genericRepository.UnitOfWork.Commit(transactionInfo);
-            }
-            return new RolDTO { };
-        }
-
-        public UsuarioDTO CrearUsuario(EdicionUsuarioRequest request)
-        {
-            string mensajeValidacion = request.Usuario.ValidarCampos();
-
-            if (mensajeValidacion.HasValue())
-            {
-                return new UsuarioDTO
-                {
-                    Message = mensajeValidacion,
-                };
-            }
-
-            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
-
-            if (usuarioExiste.IsNotNull())
-            {
-                return new UsuarioDTO
-                {
-                    Message = "Usuario ya esta registrado"
-                };
-            }
-
-            var usuario = new Usuario
-            {
-                Apellido = request.Usuario.Apellido.ValueOrEmpty(),
-                Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena),
-                Nombre = request.Usuario.Nombre.ValueOrEmpty(),
-                RolId = request.Usuario.RolId.ValueOrEmpty(),
-                UsuarioId = request.Usuario.UsuarioId.ValueOrEmpty(),
-                Activo = request.Usuario.Activo
-            };
-
-            _genericRepository.Add(usuario);
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarUsuario");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return _mapper.Map<UsuarioDTO>(usuario);
-        }
-
-        public UsuarioDTO IniciarSesion(UserRequest request)
-        {
-            List<string> includes = ["Rol", "Rol.Permisos"];
-
-            Usuario usuario = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.UsuarioId, includes);
-
-            if (usuario.IsNotNull() && PasswordEncryptor.VerifyPassword(request?.Password, usuario.Contrasena))
-            {
-                if (!usuario.Activo)
-                {
-                    return new UsuarioDTO { Message = $"Usuario {usuario.UsuarioId} esta desactivado" };
-                }
-                var newAccessToken = _tokenService.Generate(usuario);
-                var newRefreshToken = _tokenService.GenerateRefreshToken();
-
-                usuario.RefreshToken = newRefreshToken;
-                usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
-
-                request.RequestUserInfo.UsuarioId = usuario.UsuarioId;
-
-                TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("IniciarSesion");
-                _genericRepository.UnitOfWork.Commit(transactionInfo);
-
-                return new UsuarioDTO
-                {
-                    Apellido = usuario.Apellido,
-                    Nombre = usuario.Nombre,
-                    RolId = usuario.RolId,
-                    Token = newAccessToken,
-                    RefreshToken = newRefreshToken,
-                    UsuarioAutenticado = true,
-                    UsuarioId = usuario.UsuarioId,
-                    Permisos = MapPermisosDto(usuario.Rol?.Permisos)
-                };
-            }
-
-            return new UsuarioDTO
-            {
-                Message = "Usuario o Contraseña no valido",
-                UsuarioAutenticado = false
-            };
-        }
-
-        public UsuarioDTO RefreshToken(TokenRequest request)
-        {
-            if (request == null || string.IsNullOrWhiteSpace(request.AccessToken) || string.IsNullOrWhiteSpace(request.RefreshToken))
-            {
-                return new UsuarioDTO { Message = "Solicitud de token inválida", UsuarioAutenticado = false };
-            }
-            
-            var usuario = _genericRepository.GetSingle<Usuario>(u => u.RefreshToken == request.RefreshToken, ["Rol", "Rol.Permisos"]);
-
-            if (usuario == null || usuario.RefreshToken != request.RefreshToken || usuario.RefreshTokenExpiryTime <= DateTime.UtcNow)
-            {
-                return new UsuarioDTO { Message = "Token de refresco inválido o expirado", UsuarioAutenticado = false };
-            }
-
-            var newAccessToken = _tokenService.Generate(usuario);
-            var newRefreshToken = _tokenService.GenerateRefreshToken();
-
-            usuario.RefreshToken = newRefreshToken;
-            usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
-
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("RefreshToken");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-
-            return new UsuarioDTO
-            {
-                Apellido = usuario.Apellido,
-                Nombre = usuario.Nombre,
-                RolId = usuario.RolId,
-                Token = newAccessToken,
-                RefreshToken = newRefreshToken,
-                UsuarioAutenticado = true,
-                UsuarioId = usuario.UsuarioId,
-                Permisos = MapPermisosDto(usuario.Rol?.Permisos)
-            };
-        }
-
-        public SearchResult<UsuarioDTO> ObtenerUsuario(GetUserRequest request)
-        {
-            var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(request.QueryInfo);
-            var usuarios = _genericRepository.GetPagedAndFiltered<Usuario>(dynamicFilter);
-
-            return new SearchResult<UsuarioDTO>
-            {
-                PageCount = usuarios.PageCount,
-                ItemCount = usuarios.ItemCount,
-                TotalItems = usuarios.TotalItems,
-                PageIndex = usuarios.PageIndex,
-                Items = (from qry in usuarios.Items as IEnumerable<Usuario> select MapUsuarioDto(qry)).ToList(),
-            };
-        }
-
-        public RolDTO CrearRol(EdicionRolRequest request)
-        {
-            var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
-            if (rol.IsNotNull())
-            {
-                return new RolDTO
-                {
-                    Message = $"El rol {request.Rol.RolId} ya existe"
-                };
-            }
-
-            var nuevoRol = new Rol
-            {
-                Descripcion = request.Rol.Descripcion,
-                RolId = request.Rol.RolId
-            };
-
-            _genericRepository.Add(nuevoRol);
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarRol");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-
-            return new RolDTO();
-        }
-
-        public RolDTO EditarRol(EdicionRolRequest request)
-        {
-            var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
-
-            if (rol.IsNull())
-            {
-                return new RolDTO
-                {
-                    Message = $"El Rol {request.Rol.RolId} no existe"
-                };
-            }
-
-            rol.Descripcion = request.Rol.Descripcion;
-            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarRol");
-            _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return new RolDTO();
-        }
-
-        public List<RolDTO> ObtenerRoles()
-        {
-            var includes = new List<string> { "Permisos" };
-            var roles = _genericRepository.GetAll<Rol>(includes);
-
-            return roles.Select(qry =>
-            new RolDTO
-            {
-                Descripcion = qry.Descripcion,
-                RolId = qry.RolId,
-                Permisos = MapPermisosDto(qry?.Permisos),
-            }).ToList();
-        }
-
-        private static List<PermisosDTO> MapPermisosDto(List<Permisos>? permisos)
-        {
-            return permisos.Select(r => new PermisosDTO
-            {
-                Editar = r.Editar,
-                Eliminar = r.Eliminar,
-                PantallaId = r.PantallaId,
-                RolId = r.RolId,
-                Ver = r.Ver,
-            }).ToList();
-        }
-
-        private static UsuarioDTO MapUsuarioDto(Usuario qry)
-        {
-            return new UsuarioDTO
-            {
-                Apellido = qry.Apellido,
-                Contrasena = qry.Contrasena,
-                Nombre = qry.Nombre,
-                RolId = qry.RolId,
-                UsuarioId = qry.UsuarioId,
-                FechaTransaccion = qry.FechaTransaccion,
-                Activo = qry.Activo
-            };
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                if (_genericRepository.IsNotNull()) _genericRepository.Dispose();
-
-            }
-
-            base.Dispose(disposing);
-        }
     }
 }
 ````
@@ -10722,6 +10315,370 @@ namespace Infraestructura.Core
 }
 ````
 
+## File: Aplicacion/Services/Seguridad/SecurityAplicationService.cs
+````csharp
+using Aplicacion.Core;
+using Aplicacion.DTOs;
+using Aplicacion.DTOs.Seguridad;
+using Aplicacion.Helpers;
+using AutoMapper;
+using Dominio.Context.Entidades;
+using Dominio.Context.Entidades.Seguridad;
+using Dominio.Core;
+using Dominio.Core.Extensions;
+using Dominio.Core.Jwtoken;
+using Infraestructura.Context;
+using Infraestructura.Core.Jwtoken;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
+
+namespace Aplicacion.Services.Seguridad
+{
+    public class SecurityAplicationService : BaseDisposable
+    {
+        private readonly IGenericRepository<IDataContext> _genericRepository;
+        private readonly ITokenService _tokenService;
+        private readonly IMapper _mapper;
+        private readonly JwtSettings _jwtSettings;
+        public SecurityAplicationService(IGenericRepository<IDataContext> genericRepository, ITokenService tokenService, IMapper mapper, IOptions<JwtSettings> jwtSettings)
+        {
+            _genericRepository = genericRepository;
+            _tokenService = tokenService;
+            _mapper = mapper;
+            _jwtSettings = jwtSettings.Value;
+        }
+
+        public UsuarioDTO EditarUsuario(EdicionUsuarioRequest request)
+        {
+            string mensajeValidacion = request.Usuario.ValidarCampos();
+
+            if (mensajeValidacion.HasValue())
+            {
+                return new UsuarioDTO
+                {
+                    Message = mensajeValidacion,
+                };
+            }
+
+            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
+
+            if (usuarioExiste.IsNull())
+            {
+                return new UsuarioDTO
+                {
+                    Message = "El usuario no existe"
+                };
+            }
+
+            if (request.Usuario.EditarContrasena)
+            {
+                usuarioExiste.Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena);
+            }
+
+            usuarioExiste.Nombre = request.Usuario.Nombre.ValueOrEmpty();
+            usuarioExiste.Apellido = request.Usuario.Apellido.ValueOrEmpty();
+            usuarioExiste.RolId = request.Usuario.RolId.ValueOrEmpty();
+            usuarioExiste.Activo = request.Usuario.Activo;
+
+            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarUsuario");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+            return new UsuarioDTO();
+        }
+
+        public List<PantallaDTO> ObtenerPantallas()
+        {
+            var pantallas = _genericRepository.GetAll<Pantalla>();
+            return pantallas.Select(r => new PantallaDTO { Descripcion = r.Descripcion, PantallaId = r.PantallaId }).ToList();
+        }
+
+        public RolDTO EdicionPermisos(EdicionPermisosRequest request)
+        {
+            var permisos = _genericRepository.GetFiltered<Permisos>(r => r.RolId == request.RolId);
+
+            foreach (var item in request.Permisos)
+            {
+                var permiso = permisos.FirstOrDefault(r => r.PantallaId == item.PantallaId);
+                if (permiso.IsNotNull())
+                {
+                    permiso.Ver = item.Ver;
+                    permiso.Editar = item.Editar;
+                    permiso.Eliminar = item.Eliminar;
+
+                    if (!permiso.Ver)
+                    {
+                        _genericRepository.Remove(permiso);
+                    }
+                }
+                else
+                {
+                    var nuevoPermiso = new Permisos
+                    {
+                        Editar = item.Editar,
+                        Eliminar = item.Eliminar,
+                        PantallaId = item.PantallaId,
+                        RolId = item.RolId,
+                        Ver = item.Ver,
+                    };
+                    _genericRepository.Add(nuevoPermiso);
+                }
+
+
+                TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarUsuario");
+                _genericRepository.UnitOfWork.Commit(transactionInfo);
+            }
+            return new RolDTO { };
+        }
+
+        public UsuarioDTO CrearUsuario(EdicionUsuarioRequest request)
+        {
+            string mensajeValidacion = request.Usuario.ValidarCampos();
+
+            if (mensajeValidacion.HasValue())
+            {
+                return new UsuarioDTO
+                {
+                    Message = mensajeValidacion,
+                };
+            }
+
+            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
+
+            if (usuarioExiste.IsNotNull())
+            {
+                return new UsuarioDTO
+                {
+                    Message = "Usuario ya esta registrado"
+                };
+            }
+
+            var usuario = new Usuario
+            {
+                Apellido = request.Usuario.Apellido.ValueOrEmpty(),
+                Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena),
+                Nombre = request.Usuario.Nombre.ValueOrEmpty(),
+                RolId = request.Usuario.RolId.ValueOrEmpty(),
+                UsuarioId = request.Usuario.UsuarioId.ValueOrEmpty(),
+                Activo = request.Usuario.Activo
+            };
+
+            _genericRepository.Add(usuario);
+            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarUsuario");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+            return _mapper.Map<UsuarioDTO>(usuario);
+        }
+
+        public UsuarioDTO IniciarSesion(UserRequest request)
+        {
+            List<string> includes = new List<string> { "Rol", "Rol.Permisos" };
+
+            Usuario usuario = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.UsuarioId, includes);
+
+            if (usuario.IsNotNull() && PasswordEncryptor.VerifyPassword(request?.Password, usuario.Contrasena))
+            {
+                if (!usuario.Activo)
+                {
+                    return new UsuarioDTO { Message = $"Usuario {usuario.UsuarioId} esta desactivado" };
+                }
+                var newAccessToken = _tokenService.Generate(usuario);
+                var newRefreshToken = _tokenService.GenerateRefreshToken();
+
+                usuario.RefreshToken = newRefreshToken;
+                usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationInDays);
+
+                if (request.RequestUserInfo != null)
+                {
+                    request.RequestUserInfo.UsuarioId = usuario.UsuarioId;
+                }
+
+                TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("IniciarSesion")
+                    ?? new TransactionInfo { GenerateTransaction = false };
+                _genericRepository.UnitOfWork.Commit(transactionInfo);
+
+                return new UsuarioDTO
+                {
+                    Apellido = usuario.Apellido,
+                    Nombre = usuario.Nombre,
+                    RolId = usuario.RolId,
+                    Token = newAccessToken,
+                    RefreshToken = newRefreshToken,
+                    UsuarioAutenticado = true,
+                    UsuarioId = usuario.UsuarioId,
+                    Permisos = MapPermisosDto(usuario.Rol?.Permisos)
+                };
+            }
+
+            return new UsuarioDTO
+            {
+                Message = "Usuario o Contraseña no valido",
+                UsuarioAutenticado = false
+            };
+        }
+
+        public UsuarioDTO RefreshToken(TokenRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.AccessToken) || string.IsNullOrWhiteSpace(request.RefreshToken))
+            {
+                return new UsuarioDTO { Message = "Solicitud de token inválida", UsuarioAutenticado = false };
+            }
+
+            ClaimsPrincipal principal;
+            try
+            {
+                principal = _tokenService.GetPrincipalFromExpiredToken(request.AccessToken);
+            }
+            catch (SecurityTokenException)
+            {
+                return new UsuarioDTO { Message = "Token de acceso inválido", UsuarioAutenticado = false };
+            }
+
+            string? userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return new UsuarioDTO { Message = "Token de acceso inválido", UsuarioAutenticado = false };
+            }
+
+            var usuario = _genericRepository.GetSingle<Usuario>(u => u.UsuarioId == userId && u.RefreshToken == request.RefreshToken, new List<string> { "Rol", "Rol.Permisos" });
+
+            if (usuario == null || usuario.RefreshTokenExpiryTime <= DateTime.UtcNow)
+            {
+                return new UsuarioDTO { Message = "Token de refresco inválido o expirado", UsuarioAutenticado = false };
+            }
+
+            var newAccessToken = _tokenService.Generate(usuario);
+            var newRefreshToken = _tokenService.GenerateRefreshToken();
+
+            usuario.RefreshToken = newRefreshToken;
+            usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationInDays);
+
+            TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("RefreshToken")
+                ?? new TransactionInfo { GenerateTransaction = false };
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+
+            return new UsuarioDTO
+            {
+                Apellido = usuario.Apellido,
+                Nombre = usuario.Nombre,
+                RolId = usuario.RolId,
+                Token = newAccessToken,
+                RefreshToken = newRefreshToken,
+                UsuarioAutenticado = true,
+                UsuarioId = usuario.UsuarioId,
+                Permisos = MapPermisosDto(usuario.Rol?.Permisos)
+            };
+        }
+
+        public SearchResult<UsuarioDTO> ObtenerUsuario(GetUserRequest request)
+        {
+            var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(request.QueryInfo);
+            var usuarios = _genericRepository.GetPagedAndFiltered<Usuario>(dynamicFilter);
+
+            return new SearchResult<UsuarioDTO>
+            {
+                PageCount = usuarios.PageCount,
+                ItemCount = usuarios.ItemCount,
+                TotalItems = usuarios.TotalItems,
+                PageIndex = usuarios.PageIndex,
+                Items = (from qry in usuarios.Items as IEnumerable<Usuario> select MapUsuarioDto(qry)).ToList(),
+            };
+        }
+
+        public RolDTO CrearRol(EdicionRolRequest request)
+        {
+            var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
+            if (rol.IsNotNull())
+            {
+                return new RolDTO
+                {
+                    Message = $"El rol {request.Rol.RolId} ya existe"
+                };
+            }
+
+            var nuevoRol = new Rol
+            {
+                Descripcion = request.Rol.Descripcion,
+                RolId = request.Rol.RolId
+            };
+
+            _genericRepository.Add(nuevoRol);
+            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("AgregarRol");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+
+            return new RolDTO();
+        }
+
+        public RolDTO EditarRol(EdicionRolRequest request)
+        {
+            var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
+
+            if (rol.IsNull())
+            {
+                return new RolDTO
+                {
+                    Message = $"El Rol {request.Rol.RolId} no existe"
+                };
+            }
+
+            rol.Descripcion = request.Rol.Descripcion;
+            TransactionInfo transactionInfo = request.RequestUserInfo.CrearTransactionInfo("EditarRol");
+            _genericRepository.UnitOfWork.Commit(transactionInfo);
+            return new RolDTO();
+        }
+
+        public List<RolDTO> ObtenerRoles()
+        {
+            var includes = new List<string> { "Permisos" };
+            var roles = _genericRepository.GetAll<Rol>(includes);
+
+            return roles.Select(qry =>
+            new RolDTO
+            {
+                Descripcion = qry.Descripcion,
+                RolId = qry.RolId,
+                Permisos = MapPermisosDto(qry?.Permisos),
+            }).ToList();
+        }
+
+        private static List<PermisosDTO> MapPermisosDto(List<Permisos>? permisos)
+        {
+            return permisos.Select(r => new PermisosDTO
+            {
+                Editar = r.Editar,
+                Eliminar = r.Eliminar,
+                PantallaId = r.PantallaId,
+                RolId = r.RolId,
+                Ver = r.Ver,
+            }).ToList();
+        }
+
+        private static UsuarioDTO MapUsuarioDto(Usuario qry)
+        {
+            return new UsuarioDTO
+            {
+                Apellido = qry.Apellido,
+                Contrasena = qry.Contrasena,
+                Nombre = qry.Nombre,
+                RolId = qry.RolId,
+                UsuarioId = qry.UsuarioId,
+                FechaTransaccion = qry.FechaTransaccion,
+                Activo = qry.Activo
+            };
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                if (_genericRepository.IsNotNull()) _genericRepository.Dispose();
+
+            }
+
+            base.Dispose(disposing);
+        }
+    }
+}
+````
+
 ## File: Infraestructura/Context/Mapping/Seguridad/UsuarioMap.cs
 ````csharp
 using Dominio.Context.Entidades.Seguridad;
@@ -10783,6 +10740,63 @@ namespace Infraestructura.Context.Mapping.Seguridad
   </ItemGroup>
 
 </Project>
+````
+
+## File: WebServices/Extensions/DependencyInjectionRepository.cs
+````csharp
+using Aplicacion.Core;
+using Aplicacion.Services.ConfiguracionesApp;
+using Aplicacion.Services.Seguridad;
+using CrossCutting.Configuration;
+using Infraestructura.Context;
+using Infraestructura.Core.Jwtoken;
+using Infraestructura.Core.RestClient;
+using Microsoft.EntityFrameworkCore;
+
+namespace WebServices.Extensions
+{
+    public static class DependencyInjectionRepository
+    {
+        public static IServiceCollection AddPersistenceInfrastructure(this IServiceCollection services, IConfiguration configuration)
+        {
+            string connectionString = configuration.GetConnectionString("conectionDataBase");
+
+            // Inicialización única de configuraciones
+            AppSettingsManager.Initialize(connectionString);
+
+            services.AddDbContext<MyContext>(dbContextOption =>
+                dbContextOption.UseSqlServer(connectionString)
+            );
+
+            services.AddScoped<IDataContext, MyContext>();
+            services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+
+            return services;
+        }
+
+        public static IServiceCollection AddApplicationServices(this IServiceCollection services)
+        {
+            // Servicios de Aplicación
+            services.AddScoped<ISecurityApplicationService, SecurityAplicationService>();
+            services.AddScoped<IConfiguracionesApplicationService, ConfiguracionesApplicationService>();
+
+            return services;
+        }
+
+        public static IServiceCollection AddExternalAndSecurityServices(this IServiceCollection services)
+        {
+            // JWT
+            services.AddTransient<ITokenService, JwtTokenService>();
+
+            // Rest Client
+            RestClientFactory.SetCurrent(new HttpRestClientFactory());
+            //services.AddTransient<IRestClient, HttpRestClient>();
+            //services.AddTransient<IRestClientFactory, HttpRestClientFactory>();
+
+            return services;
+        }
+    }
+}
 ````
 
 ## File: Aplicacion/DTOs/Seguridad/UserRequest.cs
@@ -10931,31 +10945,6 @@ namespace Aplicacion.DTOs.Seguridad
             return mensajeValidacion.ToString();
         }
     }
-}
-````
-
-## File: WebServices/appsettings.json
-````json
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  },
-  "AllowedHosts": "*",
-
-
-  "ConnectionStrings": {
-    "conectionDataBase": "Server=localhost; initial Catalog=test; Integrated Security=True; MultipleActiveResultSets=True;TrustServerCertificate=True;"
-  },
-
-  "JwtSettings": {
-    "Secret": "BDYT0tJ8eT^V#l187TR2vv!L^x33^I%zdf09$Oya$58NhxLQWY",
-    "ExpirationInMinutes": 60,
-    "Issuer": "TemplateNetCore.Api",
-    "Audience": "TemplateNetCore"
-  }
 }
 ````
 
@@ -11153,6 +11142,36 @@ This project is licensed under the **MIT License** — free to use, modify, and 
 </div>
 ````
 
+## File: WebServices/appsettings.json
+````json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+
+
+  "ConnectionStrings": {
+    "conectionDataBase": "Server=localhost; initial Catalog=test; Integrated Security=True; MultipleActiveResultSets=True;TrustServerCertificate=True;"
+  },
+
+  "JwtSettings": {
+    "Secret": "CHANGE_ME_TO_A_STRONG_SECRET",
+    "ExpirationInMinutes": 60,
+    "RefreshTokenExpirationInDays": 7,
+    "Issuer": "TemplateNetCore.Api",
+    "Audience": "TemplateNetCore"
+  },
+
+  "Cors": {
+    "AllowedOrigins": [ "https://localhost:5283" ]
+  }
+}
+````
+
 ## File: WebServices/Controllers/UserController.cs
 ````csharp
 using Aplicacion.DTOs;
@@ -11167,8 +11186,8 @@ namespace WebServices.Controllers
     [ApiController]
     public class UserController : ControllerBase
     {
-        private readonly SecurityAplicationService _securityAppService;
-        public UserController(SecurityAplicationService securityAppService)
+        private readonly ISecurityApplicationService _securityAppService;
+        public UserController(ISecurityApplicationService securityAppService)
         {
             _securityAppService = securityAppService;
         }
@@ -11176,7 +11195,7 @@ namespace WebServices.Controllers
         [AllowAnonymous]
         [Route("login")]
         [HttpPost]
-        public UsuarioDTO Login([FromForm] UserRequest request)
+        public UsuarioDTO Login([FromBody] UserRequest request)
         {
             UsuarioDTO usuario = _securityAppService.IniciarSesion(request);
 
@@ -11280,6 +11299,7 @@ builder.ConfigureJwt();
 builder.Services.AddAutoMapper(cfg => cfg.AddMaps(typeof(AutoMapperProfile).Assembly));
 
 const string AllowAllOriginsPolicy = "AllowAllOriginsPolicy";
+const string AllowSpecificOriginsPolicy = "AllowSpecificOriginsPolicy";
 
 builder.Services.AddCors(options =>
 {
@@ -11288,6 +11308,26 @@ builder.Services.AddCors(options =>
         {
             x.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
         });
+
+    options.AddPolicy(AllowSpecificOriginsPolicy, policy =>
+    {
+        var allowedOrigins = builder.Configuration
+            .GetSection("Cors:AllowedOrigins")
+            .Get<string[]>() ?? new string[0];
+
+        if (allowedOrigins.Length > 0)
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        }
+        else
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        }
+    });
 });
 
 builder.Services.AddPersistenceInfrastructure(builder.Configuration);
@@ -11315,7 +11355,7 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
-app.UseCors(policy => policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+app.UseCors(app.Environment.IsDevelopment() ? AllowAllOriginsPolicy : AllowSpecificOriginsPolicy);
 
 
 app.UseHttpsRedirection();

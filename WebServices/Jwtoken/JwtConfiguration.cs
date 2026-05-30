@@ -21,7 +21,12 @@ namespace WebServices.Jwtoken
             var settings = configuration.GetSection("JwtSettings").Get<JwtSettings>()
                 ?? throw new InvalidOperationException("JwtSettings section is missing.");
 
-            var secret = settings.Secret ?? throw new InvalidOperationException("JwtSettings:Secret must be configured.");
+            var secret = settings.Secret;
+            if (string.IsNullOrWhiteSpace(secret) || secret == "CHANGE_ME_TO_A_STRONG_SECRET")
+            {
+                throw new InvalidOperationException("JwtSettings:Secret must be configured in production using an environment variable or a secret manager.");
+            }
+
             var key = Encoding.UTF8.GetBytes(secret);
 
             services.AddAuthentication(options =>
