@@ -7413,457 +7413,6 @@ namespace Dominio.Core.Result
 </Project>
 ````
 
-## File: Infraestructura/Context/GenericRepository.cs
-````csharp
-using Dominio.Core;
-using Dominio.Core.Extensions;
-using Infraestructura.Core;
-using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using System.Linq.Dynamic;
-using System.Linq.Expressions;
-
-
-namespace Infraestructura.Context
-{
-    public class GenericRepository<T> : IGenericRepository<T>
-        where T : IQueryableUnitOfWork
-    {
-        private readonly T _unitOfWork;
-        private readonly IConfiguration _configuration;
-        public GenericRepository(T unitOfWork, IConfiguration configuration)
-        {
-            _unitOfWork = unitOfWork;
-            _configuration = configuration;
-        }
-
-
-        private DbSet<TEntity> GetSet<TEntity>() where TEntity : class
-        {
-            return _unitOfWork.CreateSet<TEntity>();
-        }
-
-        public IUnitOfWork UnitOfWork
-        { 
-            get { return _unitOfWork; } 
-        }
-
-        /// <inheritdoc/>
-        public void Add<TEntity>(TEntity entity) where TEntity : Entity
-        {
-            if (entity.IsNotNull())
-            {
-                entity.FechaTransaccion = DateTime.Now;
-                entity.DescripcionTransaccion = "Insert";
-                entity.RowVersion = Array.Empty<Byte>();
-                GetSet<TEntity>().Add(entity); //Add new item in this set
-            }
-        }
-
-        /// <inheritdoc/>
-        public async Task AddAsync<TEntity>(TEntity entity) where TEntity : Entity
-        {
-            if (entity.IsNotNull())
-            {
-                entity.FechaTransaccion = DateTime.Now;
-                entity.DescripcionTransaccion = "Insert";
-                entity.RowVersion = Array.Empty<Byte>();
-                await GetSet<TEntity>().AddAsync(entity); //Add new item in this set
-            }
-        }
-
-        /// <inheritdoc/>
-        public void AddRange<TEntity>(IEnumerable<TEntity> entities)
-            where TEntity : Entity
-        {
-            if (entities.HasItems())
-            {
-                GetSet<TEntity>().AddRange(entities);
-            }
-        }
-
-        /// <inheritdoc/>
-        public async Task AddRangeAsync<TEntity>(IEnumerable<TEntity> entities) 
-            where TEntity : Entity
-        {
-            if (entities.HasItems())
-            {
-                await GetSet<TEntity>().AddRangeAsync(entities);
-            }
-        }
-
-        public void Dispose()
-        {
-            if (_unitOfWork.IsNotNull())
-            {
-                _unitOfWork.Dispose();
-            }
-        }
-
-        /// <inheritdoc/>
-        public IEnumerable<TEntity> GetAll<TEntity>() 
-            where TEntity : Entity
-        {
-            return GetSet<TEntity>().ToList();
-        }
-
-        /// <inheritdoc/>
-        public async Task<IEnumerable<TEntity>> GetAllAsync<TEntity>()
-            where TEntity : Entity
-        {
-            return await GetSet<TEntity>().ToListAsync();
-        }
-        
-        /// <inheritdoc/>
-        public IEnumerable<TEntity> GetAll<TEntity>(List<string> includes) 
-            where TEntity : Entity
-        {
-            IQueryable<TEntity> items = GetSet<TEntity>();
-
-            if (includes.HasItems())
-            {
-                //Adding Includes to filter.
-                items = includes.Aggregate(items, (current, include) => current.Include(include));
-            }
-
-            return items.ToList();
-        }
-
-        /// <inheritdoc/>
-        public async Task<IEnumerable<TEntity>> GetAllAsync<TEntity>(List<string> includes)
-            where TEntity : Entity
-        {
-            IQueryable<TEntity> items = GetSet<TEntity>();
-
-            if (includes.HasItems())
-            {
-                //Adding Includes to filter.
-                items = includes.Aggregate(items, (current, include) => current.Include(include));
-            }
-
-            return await items.ToListAsync();
-        }
-
-        /// <inheritdoc/>
-        public TEntity GetSingle<TEntity>(Expression<Func<TEntity, bool>> predicate) 
-            where TEntity : Entity
-        {
-            return GetSet<TEntity>().FirstOrDefault(predicate);
-        }
-
-        /// <inheritdoc/>
-        public async Task<TEntity> GetSingleAsync<TEntity>(Expression<Func<TEntity, bool>> predicate) 
-            where TEntity : Entity
-        {
-            return await GetSet<TEntity>().FirstOrDefaultAsync(predicate);
-        }
-
-
-        /// <inheritdoc/>
-        public TEntity GetSingle<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
-            where TEntity : Entity
-        {
-            IQueryable<TEntity> items = GetSet<TEntity>();
-
-            if (includes.HasItems())
-            {
-                //Adding include to the filter.
-                items = includes.Aggregate(items, (current, include) => current.Include(include));
-            }
-
-            return items.FirstOrDefault(predicate);
-        }
-
-        /// <inheritdoc/>
-        public async Task<TEntity> GetSingleAsync<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
-            where TEntity : Entity
-        {
-            IQueryable<TEntity> items = GetSet<TEntity>();
-
-            if (includes.HasItems())
-            {
-                //Adding include to the filter.
-                items = includes.Aggregate(items, (current, include) => current.Include(include));
-            }
-
-            return await items.FirstOrDefaultAsync(predicate);
-        }
-
-        /// <inheritdoc/>
-        public IEnumerable<TEntity> GetFiltered<TEntity>(Expression<Func<TEntity, bool>> predicate)
-            where TEntity : Entity
-        {
-            return GetSet<TEntity>().Where(predicate).ToList();
-        }
-
-        /// <inheritdoc/>
-        public async Task<IEnumerable<TEntity>> GetFilteredAsync<TEntity>(Expression<Func<TEntity, bool>> predicate)
-            where TEntity : Entity
-        {
-            return await GetSet<TEntity>().Where(predicate).ToListAsync();
-        }
-
-        /// <inheritdoc/>
-        public IEnumerable<TEntity> GetFiltered<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
-            where TEntity : Entity
-        {
-            IQueryable<TEntity> items = GetSet<TEntity>();
-            if (includes.HasItems())
-            {
-                //Adding includes to filter
-                items = includes.Aggregate(items, (current, include) => current.Include(include));
-            }
-
-            return items.Where(predicate).ToList();
-        }
-
-        /// <inheritdoc/>
-        public async Task<IEnumerable<TEntity>> GetFilteredAsync<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
-            where TEntity : Entity
-        {
-            IQueryable<TEntity> items = GetSet<TEntity>();
-            if (includes.HasItems())
-            {
-                //Adding includes to filter
-                items = includes.Aggregate(items, (current, include) => current.Include(include));
-            }
-
-            return await items.Where(predicate).ToListAsync();
-        }
-
-        public PagedCollection GetPagedAndFiltered<TEntity>(DynamicFilter filterDef)
-            where TEntity : Entity
-        {
-            IQueryable<TEntity> items = !string.IsNullOrWhiteSpace(filterDef.Filtro)
-                                            ? GetSet<TEntity>().Where(filterDef.Filtro, filterDef.Valores)
-                                            : GetSet<TEntity>();
-
-            if (filterDef.Includes.HasItems())
-            {
-                //Adding Includes to the filter
-                items = filterDef.Includes.Aggregate(items, (current, include) => current.Include(include));
-            }
-
-            int totalItems = items.Count();
-
-            if (filterDef.PageSize != 0)
-            {
-                //Adding sort criteria.
-                if (filterDef.SortFields.HasItems())
-                {
-                    string orderKey = filterDef.Ascending ? "ASC" : "DESC";
-
-                    var order = string.Join(" " + orderKey + ", ", filterDef.SortFields.ToArray());
-
-                    if (!order.EndsWith(orderKey))
-                    {
-                        order += " " + orderKey;
-                    }
-
-                    items = items.OrderBy(order);
-
-                    items = items.Skip(filterDef.PageSize * filterDef.PageIndex);
-                }
-
-                items = items.Take(filterDef.PageSize);
-            }
-
-            var pagedItems = items.ToList();
-
-            return new PagedCollection(filterDef.PageIndex, filterDef.PageSize, pagedItems, totalItems, pagedItems.Count());
-        }
-
-        public async Task<PagedCollection> GetPagedAndFilteredAsync<TEntity>(DynamicFilter filterDef)
-            where TEntity : Entity
-        {
-            IQueryable<TEntity> items = !string.IsNullOrWhiteSpace(filterDef.Filtro)
-                                            ? GetSet<TEntity>().Where(filterDef.Filtro, filterDef.Valores)
-                                            : GetSet<TEntity>();
-
-            if (filterDef.Includes.HasItems())
-            {
-                //Adding Includes to the filter
-                items = filterDef.Includes.Aggregate(items, (current, include) => current.Include(include));
-            }
-
-            int totalItems = items.Count();
-
-            if (filterDef.PageSize != 0)
-            {
-                //Adding sort criteria.
-                if (filterDef.SortFields.HasItems())
-                {
-                    string orderKey = filterDef.Ascending ? "ASC" : "DESC";
-
-                    var order = string.Join(" " + orderKey + ", ", filterDef.SortFields.ToArray());
-
-                    if (!order.EndsWith(orderKey))
-                    {
-                        order += " " + orderKey;
-                    }
-
-                    items = items.OrderBy(order);
-
-                    items = items.Skip(filterDef.PageSize * filterDef.PageIndex);
-                }
-
-                items = items.Take(filterDef.PageSize);
-            }
-
-            var pagedItems = await items.ToListAsync();
-
-            return new PagedCollection(filterDef.PageIndex, filterDef.PageSize, pagedItems, totalItems, pagedItems.Count());
-        }
-
-        /// <inheritdoc/>
-        public void Remove<TEntity>(TEntity entity)
-            where TEntity : Entity
-        {
-            if (entity.IsNotNull())
-            {
-                //Attach item if not exist
-                _unitOfWork.Attach(entity);
-
-                //set as "Remove"
-                GetSet<TEntity>().Remove(entity);
-            }
-        }
-
-        /// <inheritdoc/>
-        public void RemoveRange<TEntity>(IEnumerable<TEntity> entities) 
-            where TEntity : Entity
-        {
-            if (entities.HasItems())
-            {
-                //set as removed
-                GetSet<TEntity>().RemoveRange(entities);
-            }
-        }
-
-        /// <inheritdoc/>
-        public void Modify<TEntity>(TEntity item)
-            where TEntity : Entity
-        {
-            if (item.IsNotNull())
-            {
-                _unitOfWork.SetModified(item);
-            }
-        }
-
-        public IEnumerable<TType> ExecuteStoredProcedure<TType>(string storedProcedure, Dictionary<string, object> parameters)
-        {
-            SqlParameter[] sqlParameters = CreateSqlParameters(parameters);
-            string paramNames = GetParamNames(parameters);
-
-            return (string.IsNullOrWhiteSpace(paramNames))
-                ? _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0}", storedProcedure), sqlParameters).ToList()
-                : _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0} {1}", storedProcedure, paramNames), sqlParameters).ToList();
-        }
-
-        public IEnumerable<TType> ExecuteStoredProcedure<TType>(string storedProcedure, SqlParameter[] parameters)
-        {
-            string paramNames = GetParamNames(parameters);
-            return _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0} {1}", storedProcedure, paramNames), parameters).ToList();
-        }
-
-        public TType ExecuteScalarFunction<TType>(string scalarFunction, Dictionary<string, object> parameters)
-        {
-            SqlParameter[] sqlParameters = CreateSqlParameters(parameters);
-            string paramNames = GetParamNames(parameters);
-
-            var result = (string.IsNullOrWhiteSpace(paramNames))
-                ? _unitOfWork.ExecuteScalarFunction<TType>(string.Format("SELECT {0}();", scalarFunction), sqlParameters)
-                : _unitOfWork.ExecuteScalarFunction<TType>(string.Format("SELECT {0}({1});", scalarFunction, paramNames), sqlParameters);
-
-            return result;
-        }
-
-        private string GetParamNames(Dictionary<string, object> parameters)
-        {
-            return (parameters != null && parameters.Any())
-                ? parameters.Select(p => p.Key).Aggregate((i, j) => i + ", " + j)
-                : string.Empty;
-        }
-
-        private string GetParamNames(SqlParameter[] parameters)
-        {
-            return (parameters != null && parameters.Any())
-                ? parameters.Select(p => p.ParameterName).Aggregate((i, j) => i + ", " + j)
-                : string.Empty;
-        }
-
-        public void ExecuteQuery(string sqlQuery, Dictionary<string, object> parameters)
-        {
-            SqlParameter[] sqlParameters = CreateSqlParameters(parameters);
-            _unitOfWork.ExecuteCommand(sqlQuery, sqlParameters);
-        }
-
-        private SqlParameter[] CreateSqlParameters(Dictionary<string, object> parameters)
-        {
-            if (parameters != null && parameters.Any())
-            {
-                return (from qry in parameters select new SqlParameter(qry.Key, qry.Value)).ToArray();
-            }
-
-            return new SqlParameter[0];
-        }
-
-        public void ExecuteQuery(SqlParameter[] parms, string sqlQuery)
-        {
-            _unitOfWork.ExecuteCommand(sqlQuery, parms);
-        }
-
-        public async Task<bool> IsRunningJobsAsync(string jobName)
-        {
-            if (string.IsNullOrWhiteSpace(jobName))
-            {
-                return false;
-            }
-
-            string connectionString = _configuration.GetConnectionString("conectionDataBase")
-                ?? throw new InvalidOperationException("Connection string 'conectionDataBase' not found in configuration.");
-            bool result = false;
-
-            try
-            {
-                using (SqlConnection connection = new SqlConnection(connectionString))
-                {
-                    await connection.OpenAsync();
-
-                    string query = "SELECT COUNT(*) FROM msdb.dbo.sysjobs j " +
-                        "INNER JOIN msdb.dbo.sysjobactivity a " +
-                        "  ON j.job_id = a.job_id " +
-                        "WHERE j.name = @jobName AND a.run_requested_date IS NOT NULL AND a.stop_execution_date IS NULL";
-
-                    using (SqlCommand command = new SqlCommand(query, connection))
-                    {
-                        command.Parameters.Add(new SqlParameter("@jobName", jobName));
-                        int runningJobCount = (int)(await command.ExecuteScalarAsync() ?? 0);
-
-                        if (runningJobCount > 0)
-                        {
-                            result = true;
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error: { ex.Message }");
-            }
-
-            return result;
-        }
-
-        public IEnumerable<TEntity> ExecuteQuery<TEntity>(SqlParameter[] parms, string sqlQuery)
-        {
-            return _unitOfWork.ExecuteQuery<TEntity>(sqlQuery, parms).ToList();
-        }
-    }
-}
-````
-
 ## File: Infraestructura/Context/Mapping/EntityMap.cs
 ````csharp
 using Dominio.Core;
@@ -7923,87 +7472,6 @@ namespace Infraestructura.Core.Jwtoken
         string Generate(Usuario user);
         string GenerateRefreshToken();
         System.Security.Claims.ClaimsPrincipal GetPrincipalFromExpiredToken(string token);
-    }
-}
-````
-
-## File: Infraestructura/Core/Jwtoken/JwtTokenService.cs
-````csharp
-using Dominio.Context.Entidades.Seguridad;
-using Dominio.Core.Extensions;
-using Dominio.Core.Jwtoken;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
-using System.Configuration;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
-
-namespace Infraestructura.Core.Jwtoken
-{
-    public class JwtTokenService : ITokenService
-    {
-        private readonly JwtSettings _jwtSettings;
-
-        public JwtTokenService(IOptions<JwtSettings> options)
-        {
-            _jwtSettings = options.Value;
-        }
-
-        public string Generate(Usuario user)
-        {
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.Name, user.Nombre ?? string.Empty),
-                new Claim(ClaimTypes.Email, user.UsuarioId ?? string.Empty),
-                new Claim(ClaimTypes.NameIdentifier, user.UsuarioId ?? string.Empty)
-            };
-            // Add role claims if available
-            if (!string.IsNullOrWhiteSpace(user.RolId))
-            {
-                claims.Add(new Claim(ClaimTypes.Role, user.RolId));
-            }
-            var tokenDescriptor = new SecurityTokenDescriptor
-            {
-                Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpirationInMinutes),
-                Issuer = _jwtSettings.Issuer,
-                Audience = _jwtSettings.Audience,
-                SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature)
-            };
-            var token = tokenHandler.CreateToken(tokenDescriptor);
-            return tokenHandler.WriteToken(token);
-        }
-
-        public string GenerateRefreshToken()
-        {
-            var randomNumber = new byte[64];
-            using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
-            rng.GetBytes(randomNumber);
-            return Convert.ToBase64String(randomNumber);
-        }
-
-        public ClaimsPrincipal GetPrincipalFromExpiredToken(string token)
-        {
-            var tokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateAudience = false,
-                ValidateIssuer = false,
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret)),
-                ValidateLifetime = false 
-            };
-
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out SecurityToken securityToken);
-            if (securityToken is not JwtSecurityToken jwtSecurityToken || !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
-                throw new SecurityTokenException("Invalid token");
-
-            return principal;
-        }
     }
 }
 ````
@@ -9949,6 +9417,506 @@ namespace Infraestructura.Context
 }
 ````
 
+## File: Infraestructura/Context/GenericRepository.cs
+````csharp
+using Dominio.Core;
+using Dominio.Core.Extensions;
+using Infraestructura.Core;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using System.Linq.Dynamic;
+using System.Linq.Expressions;
+using System.Text.RegularExpressions;
+
+
+namespace Infraestructura.Context
+{
+    public class GenericRepository<T> : IGenericRepository<T>
+        where T : IQueryableUnitOfWork
+    {
+        private readonly T _unitOfWork;
+        private readonly IConfiguration _configuration;
+        private static readonly Regex SqlIdentifierRegex = new(@"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$", RegexOptions.Compiled);
+        private static readonly Regex SqlParameterNameRegex = new(@"^@[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.Compiled);
+        private static readonly string[] UnsafeSqlTokens = [";", "--", "/*", "*/"];
+        public GenericRepository(T unitOfWork, IConfiguration configuration)
+        {
+            _unitOfWork = unitOfWork;
+            _configuration = configuration;
+        }
+
+
+        private DbSet<TEntity> GetSet<TEntity>() where TEntity : class
+        {
+            return _unitOfWork.CreateSet<TEntity>();
+        }
+
+        public IUnitOfWork UnitOfWork
+        { 
+            get { return _unitOfWork; } 
+        }
+
+        /// <inheritdoc/>
+        public void Add<TEntity>(TEntity entity) where TEntity : Entity
+        {
+            if (entity.IsNotNull())
+            {
+                entity.FechaTransaccion = DateTime.Now;
+                entity.DescripcionTransaccion = "Insert";
+                entity.RowVersion = Array.Empty<Byte>();
+                GetSet<TEntity>().Add(entity); //Add new item in this set
+            }
+        }
+
+        /// <inheritdoc/>
+        public async Task AddAsync<TEntity>(TEntity entity) where TEntity : Entity
+        {
+            if (entity.IsNotNull())
+            {
+                entity.FechaTransaccion = DateTime.Now;
+                entity.DescripcionTransaccion = "Insert";
+                entity.RowVersion = Array.Empty<Byte>();
+                await GetSet<TEntity>().AddAsync(entity); //Add new item in this set
+            }
+        }
+
+        /// <inheritdoc/>
+        public void AddRange<TEntity>(IEnumerable<TEntity> entities)
+            where TEntity : Entity
+        {
+            if (entities.HasItems())
+            {
+                GetSet<TEntity>().AddRange(entities);
+            }
+        }
+
+        /// <inheritdoc/>
+        public async Task AddRangeAsync<TEntity>(IEnumerable<TEntity> entities) 
+            where TEntity : Entity
+        {
+            if (entities.HasItems())
+            {
+                await GetSet<TEntity>().AddRangeAsync(entities);
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_unitOfWork.IsNotNull())
+            {
+                _unitOfWork.Dispose();
+            }
+        }
+
+        /// <inheritdoc/>
+        public IEnumerable<TEntity> GetAll<TEntity>() 
+            where TEntity : Entity
+        {
+            return GetSet<TEntity>().ToList();
+        }
+
+        /// <inheritdoc/>
+        public async Task<IEnumerable<TEntity>> GetAllAsync<TEntity>()
+            where TEntity : Entity
+        {
+            return await GetSet<TEntity>().ToListAsync();
+        }
+        
+        /// <inheritdoc/>
+        public IEnumerable<TEntity> GetAll<TEntity>(List<string> includes) 
+            where TEntity : Entity
+        {
+            IQueryable<TEntity> items = GetSet<TEntity>();
+
+            if (includes.HasItems())
+            {
+                //Adding Includes to filter.
+                items = includes.Aggregate(items, (current, include) => current.Include(include));
+            }
+
+            return items.ToList();
+        }
+
+        /// <inheritdoc/>
+        public async Task<IEnumerable<TEntity>> GetAllAsync<TEntity>(List<string> includes)
+            where TEntity : Entity
+        {
+            IQueryable<TEntity> items = GetSet<TEntity>();
+
+            if (includes.HasItems())
+            {
+                //Adding Includes to filter.
+                items = includes.Aggregate(items, (current, include) => current.Include(include));
+            }
+
+            return await items.ToListAsync();
+        }
+
+        /// <inheritdoc/>
+        public TEntity GetSingle<TEntity>(Expression<Func<TEntity, bool>> predicate) 
+            where TEntity : Entity
+        {
+            return GetSet<TEntity>().FirstOrDefault(predicate);
+        }
+
+        /// <inheritdoc/>
+        public async Task<TEntity> GetSingleAsync<TEntity>(Expression<Func<TEntity, bool>> predicate) 
+            where TEntity : Entity
+        {
+            return await GetSet<TEntity>().FirstOrDefaultAsync(predicate);
+        }
+
+
+        /// <inheritdoc/>
+        public TEntity GetSingle<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
+            where TEntity : Entity
+        {
+            IQueryable<TEntity> items = GetSet<TEntity>();
+
+            if (includes.HasItems())
+            {
+                //Adding include to the filter.
+                items = includes.Aggregate(items, (current, include) => current.Include(include));
+            }
+
+            return items.FirstOrDefault(predicate);
+        }
+
+        /// <inheritdoc/>
+        public async Task<TEntity> GetSingleAsync<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
+            where TEntity : Entity
+        {
+            IQueryable<TEntity> items = GetSet<TEntity>();
+
+            if (includes.HasItems())
+            {
+                //Adding include to the filter.
+                items = includes.Aggregate(items, (current, include) => current.Include(include));
+            }
+
+            return await items.FirstOrDefaultAsync(predicate);
+        }
+
+        /// <inheritdoc/>
+        public IEnumerable<TEntity> GetFiltered<TEntity>(Expression<Func<TEntity, bool>> predicate)
+            where TEntity : Entity
+        {
+            return GetSet<TEntity>().Where(predicate).ToList();
+        }
+
+        /// <inheritdoc/>
+        public async Task<IEnumerable<TEntity>> GetFilteredAsync<TEntity>(Expression<Func<TEntity, bool>> predicate)
+            where TEntity : Entity
+        {
+            return await GetSet<TEntity>().Where(predicate).ToListAsync();
+        }
+
+        /// <inheritdoc/>
+        public IEnumerable<TEntity> GetFiltered<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
+            where TEntity : Entity
+        {
+            IQueryable<TEntity> items = GetSet<TEntity>();
+            if (includes.HasItems())
+            {
+                //Adding includes to filter
+                items = includes.Aggregate(items, (current, include) => current.Include(include));
+            }
+
+            return items.Where(predicate).ToList();
+        }
+
+        /// <inheritdoc/>
+        public async Task<IEnumerable<TEntity>> GetFilteredAsync<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
+            where TEntity : Entity
+        {
+            IQueryable<TEntity> items = GetSet<TEntity>();
+            if (includes.HasItems())
+            {
+                //Adding includes to filter
+                items = includes.Aggregate(items, (current, include) => current.Include(include));
+            }
+
+            return await items.Where(predicate).ToListAsync();
+        }
+
+        public PagedCollection GetPagedAndFiltered<TEntity>(DynamicFilter filterDef)
+            where TEntity : Entity
+        {
+            IQueryable<TEntity> items = !string.IsNullOrWhiteSpace(filterDef.Filtro)
+                                            ? GetSet<TEntity>().Where(filterDef.Filtro, filterDef.Valores)
+                                            : GetSet<TEntity>();
+
+            if (filterDef.Includes.HasItems())
+            {
+                //Adding Includes to the filter
+                items = filterDef.Includes.Aggregate(items, (current, include) => current.Include(include));
+            }
+
+            int totalItems = items.Count();
+
+            if (filterDef.PageSize != 0)
+            {
+                //Adding sort criteria.
+                if (filterDef.SortFields.HasItems())
+                {
+                    string orderKey = filterDef.Ascending ? "ASC" : "DESC";
+
+                    var order = string.Join(" " + orderKey + ", ", filterDef.SortFields.ToArray());
+
+                    if (!order.EndsWith(orderKey))
+                    {
+                        order += " " + orderKey;
+                    }
+
+                    items = items.OrderBy(order);
+
+                    items = items.Skip(filterDef.PageSize * filterDef.PageIndex);
+                }
+
+                items = items.Take(filterDef.PageSize);
+            }
+
+            var pagedItems = items.ToList();
+
+            return new PagedCollection(filterDef.PageIndex, filterDef.PageSize, pagedItems, totalItems, pagedItems.Count());
+        }
+
+        public async Task<PagedCollection> GetPagedAndFilteredAsync<TEntity>(DynamicFilter filterDef)
+            where TEntity : Entity
+        {
+            IQueryable<TEntity> items = !string.IsNullOrWhiteSpace(filterDef.Filtro)
+                                            ? GetSet<TEntity>().Where(filterDef.Filtro, filterDef.Valores)
+                                            : GetSet<TEntity>();
+
+            if (filterDef.Includes.HasItems())
+            {
+                //Adding Includes to the filter
+                items = filterDef.Includes.Aggregate(items, (current, include) => current.Include(include));
+            }
+
+            int totalItems = items.Count();
+
+            if (filterDef.PageSize != 0)
+            {
+                //Adding sort criteria.
+                if (filterDef.SortFields.HasItems())
+                {
+                    string orderKey = filterDef.Ascending ? "ASC" : "DESC";
+
+                    var order = string.Join(" " + orderKey + ", ", filterDef.SortFields.ToArray());
+
+                    if (!order.EndsWith(orderKey))
+                    {
+                        order += " " + orderKey;
+                    }
+
+                    items = items.OrderBy(order);
+
+                    items = items.Skip(filterDef.PageSize * filterDef.PageIndex);
+                }
+
+                items = items.Take(filterDef.PageSize);
+            }
+
+            var pagedItems = await items.ToListAsync();
+
+            return new PagedCollection(filterDef.PageIndex, filterDef.PageSize, pagedItems, totalItems, pagedItems.Count());
+        }
+
+        /// <inheritdoc/>
+        public void Remove<TEntity>(TEntity entity)
+            where TEntity : Entity
+        {
+            if (entity.IsNotNull())
+            {
+                //Attach item if not exist
+                _unitOfWork.Attach(entity);
+
+                //set as "Remove"
+                GetSet<TEntity>().Remove(entity);
+            }
+        }
+
+        /// <inheritdoc/>
+        public void RemoveRange<TEntity>(IEnumerable<TEntity> entities) 
+            where TEntity : Entity
+        {
+            if (entities.HasItems())
+            {
+                //set as removed
+                GetSet<TEntity>().RemoveRange(entities);
+            }
+        }
+
+        /// <inheritdoc/>
+        public void Modify<TEntity>(TEntity item)
+            where TEntity : Entity
+        {
+            if (item.IsNotNull())
+            {
+                _unitOfWork.SetModified(item);
+            }
+        }
+
+        public IEnumerable<TType> ExecuteStoredProcedure<TType>(string storedProcedure, Dictionary<string, object> parameters)
+        {
+            ValidateSqlIdentifier(storedProcedure, nameof(storedProcedure));
+            SqlParameter[] sqlParameters = CreateSqlParameters(parameters);
+            string paramNames = GetParamNames(parameters);
+
+            return (string.IsNullOrWhiteSpace(paramNames))
+                ? _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0}", storedProcedure), sqlParameters).ToList()
+                : _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0} {1}", storedProcedure, paramNames), sqlParameters).ToList();
+        }
+
+        public IEnumerable<TType> ExecuteStoredProcedure<TType>(string storedProcedure, SqlParameter[] parameters)
+        {
+            ValidateSqlIdentifier(storedProcedure, nameof(storedProcedure));
+            string paramNames = GetParamNames(parameters);
+            return _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0} {1}", storedProcedure, paramNames), parameters).ToList();
+        }
+
+        public TType ExecuteScalarFunction<TType>(string scalarFunction, Dictionary<string, object> parameters)
+        {
+            ValidateSqlIdentifier(scalarFunction, nameof(scalarFunction));
+            SqlParameter[] sqlParameters = CreateSqlParameters(parameters);
+            string paramNames = GetParamNames(parameters);
+
+            var result = (string.IsNullOrWhiteSpace(paramNames))
+                ? _unitOfWork.ExecuteScalarFunction<TType>(string.Format("SELECT {0}();", scalarFunction), sqlParameters)
+                : _unitOfWork.ExecuteScalarFunction<TType>(string.Format("SELECT {0}({1});", scalarFunction, paramNames), sqlParameters);
+
+            return result;
+        }
+
+        private string GetParamNames(Dictionary<string, object> parameters)
+        {
+            ValidateSqlParameterNames(parameters?.Keys);
+            return (parameters != null && parameters.Any())
+                ? parameters.Select(p => p.Key).Aggregate((i, j) => i + ", " + j)
+                : string.Empty;
+        }
+
+        private string GetParamNames(SqlParameter[] parameters)
+        {
+            ValidateSqlParameterNames(parameters?.Select(p => p.ParameterName));
+            return (parameters != null && parameters.Any())
+                ? parameters.Select(p => p.ParameterName).Aggregate((i, j) => i + ", " + j)
+                : string.Empty;
+        }
+
+        public void ExecuteQuery(string sqlQuery, Dictionary<string, object> parameters)
+        {
+            ValidateSqlCommand(sqlQuery);
+            SqlParameter[] sqlParameters = CreateSqlParameters(parameters);
+            _unitOfWork.ExecuteCommand(sqlQuery, sqlParameters);
+        }
+
+        private SqlParameter[] CreateSqlParameters(Dictionary<string, object> parameters)
+        {
+            if (parameters != null && parameters.Any())
+            {
+                ValidateSqlParameterNames(parameters.Keys);
+                return (from qry in parameters select new SqlParameter(qry.Key, qry.Value)).ToArray();
+            }
+
+            return new SqlParameter[0];
+        }
+
+        public void ExecuteQuery(SqlParameter[] parms, string sqlQuery)
+        {
+            ValidateSqlCommand(sqlQuery);
+            ValidateSqlParameterNames(parms?.Select(p => p.ParameterName));
+            _unitOfWork.ExecuteCommand(sqlQuery, parms);
+        }
+
+        public async Task<bool> IsRunningJobsAsync(string jobName)
+        {
+            if (string.IsNullOrWhiteSpace(jobName))
+            {
+                return false;
+            }
+
+            string connectionString = _configuration.GetConnectionString("conectionDataBase")
+                ?? throw new InvalidOperationException("Connection string 'conectionDataBase' not found in configuration.");
+            bool result = false;
+
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    await connection.OpenAsync();
+
+                    string query = "SELECT COUNT(*) FROM msdb.dbo.sysjobs j " +
+                        "INNER JOIN msdb.dbo.sysjobactivity a " +
+                        "  ON j.job_id = a.job_id " +
+                        "WHERE j.name = @jobName AND a.run_requested_date IS NOT NULL AND a.stop_execution_date IS NULL";
+
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.Add(new SqlParameter("@jobName", jobName));
+                        int runningJobCount = (int)(await command.ExecuteScalarAsync() ?? 0);
+
+                        if (runningJobCount > 0)
+                        {
+                            result = true;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: { ex.Message }");
+            }
+
+            return result;
+        }
+
+        public IEnumerable<TEntity> ExecuteQuery<TEntity>(SqlParameter[] parms, string sqlQuery)
+        {
+            ValidateSqlCommand(sqlQuery);
+            ValidateSqlParameterNames(parms?.Select(p => p.ParameterName));
+            return _unitOfWork.ExecuteQuery<TEntity>(sqlQuery, parms).ToList();
+        }
+
+        private static void ValidateSqlIdentifier(string identifier, string argumentName)
+        {
+            if (string.IsNullOrWhiteSpace(identifier) || !SqlIdentifierRegex.IsMatch(identifier))
+            {
+                throw new ArgumentException("Only simple schema-qualified SQL identifiers are allowed.", argumentName);
+            }
+        }
+
+        private static void ValidateSqlParameterNames(IEnumerable<string>? parameterNames)
+        {
+            if (parameterNames == null) return;
+
+            foreach (var parameterName in parameterNames)
+            {
+                if (string.IsNullOrWhiteSpace(parameterName) || !SqlParameterNameRegex.IsMatch(parameterName))
+                {
+                    throw new ArgumentException("SQL parameter names must start with @ and contain only letters, numbers, or underscores.");
+                }
+            }
+        }
+
+        private static void ValidateSqlCommand(string sqlQuery)
+        {
+            if (string.IsNullOrWhiteSpace(sqlQuery))
+            {
+                throw new ArgumentException("SQL query cannot be empty.", nameof(sqlQuery));
+            }
+
+            if (UnsafeSqlTokens.Any(token => sqlQuery.Contains(token, StringComparison.Ordinal)))
+            {
+                throw new ArgumentException("SQL query contains unsupported multi-statement or comment syntax.", nameof(sqlQuery));
+            }
+        }
+    }
+}
+````
+
 ## File: Infraestructura/Context/MyContext.cs
 ````csharp
 using Dominio.Context.Entidades.ConfiguracionesAgg;
@@ -10477,6 +10445,87 @@ namespace Infraestructura.Core
 }
 ````
 
+## File: Infraestructura/Core/Jwtoken/JwtTokenService.cs
+````csharp
+using Dominio.Context.Entidades.Seguridad;
+using Dominio.Core.Jwtoken;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+
+namespace Infraestructura.Core.Jwtoken
+{
+    public class JwtTokenService : ITokenService
+    {
+        private readonly JwtSettings _jwtSettings;
+
+        public JwtTokenService(IOptions<JwtSettings> options)
+        {
+            _jwtSettings = options.Value;
+        }
+
+        public string Generate(Usuario user)
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, user.Nombre ?? string.Empty),
+                new Claim(ClaimTypes.Email, user.UsuarioId ?? string.Empty),
+                new Claim(ClaimTypes.NameIdentifier, user.UsuarioId ?? string.Empty)
+            };
+            // Add role claims if available
+            if (!string.IsNullOrWhiteSpace(user.RolId))
+            {
+                claims.Add(new Claim(ClaimTypes.Role, user.RolId));
+            }
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(claims),
+                Expires = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpirationInMinutes),
+                Issuer = _jwtSettings.Issuer,
+                Audience = _jwtSettings.Audience,
+                SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature)
+            };
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            return tokenHandler.WriteToken(token);
+        }
+
+        public string GenerateRefreshToken()
+        {
+            var randomNumber = new byte[64];
+            using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+            rng.GetBytes(randomNumber);
+            return Convert.ToBase64String(randomNumber);
+        }
+
+        public ClaimsPrincipal GetPrincipalFromExpiredToken(string token)
+        {
+            var tokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateAudience = true,
+                ValidAudience = _jwtSettings.Audience,
+                ValidateIssuer = true,
+                ValidIssuer = _jwtSettings.Issuer,
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret)),
+                ValidateLifetime = false,
+                ClockSkew = TimeSpan.Zero
+            };
+
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out SecurityToken securityToken);
+            if (securityToken is not JwtSecurityToken jwtSecurityToken || !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
+                throw new SecurityTokenException("Invalid token");
+
+            return principal;
+        }
+    }
+}
+````
+
 ## File: WebServices/Controllers/ConfiguracionesController.cs
 ````csharp
 using Aplicacion.DTOs.ConfiguracionesDTO;
@@ -10553,92 +10602,6 @@ namespace WebServices.Controllers
         }
     }
 }
-````
-
-## File: WebServices/Jwtoken/JwtConfiguration.cs
-````csharp
-using Dominio.Core.Jwtoken;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using System;
-using System.Configuration;
-using System.Text;
-
-namespace WebServices.Jwtoken
-{
-    public static class JwtConfiguration
-    {
-        public static void ConfigureJwt(this WebApplicationBuilder builder)
-        {
-            builder.Services.Configure<JwtSettings>(options => builder.Configuration.GetSection("JwtSettings").Bind(options));
-
-            AddAuthenticationJwt(builder.Services, builder.Configuration);
-        }
-
-        private static void AddAuthenticationJwt(IServiceCollection services, IConfiguration configuration)
-        {
-            var settings = configuration.GetSection("JwtSettings").Get<JwtSettings>()
-                ?? throw new InvalidOperationException("JwtSettings section is missing.");
-
-            var secret = settings.Secret;
-            if (string.IsNullOrWhiteSpace(secret) || secret == "CHANGE_ME_TO_A_STRONG_SECRET")
-            {
-                throw new InvalidOperationException("JwtSettings:Secret must be configured in production using an environment variable or a secret manager.");
-            }
-
-            var key = Encoding.UTF8.GetBytes(secret);
-
-            services.AddAuthentication(options =>
-            {
-                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            })
-            .AddJwtBearer(options =>
-            {
-                options.RequireHttpsMetadata = true;
-                options.SaveToken = true;
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(key),
-                    ValidateLifetime = true,
-                    ClockSkew = TimeSpan.Zero,
-                    ValidateIssuer = true,
-                    ValidIssuer = settings.Issuer,
-                    ValidateAudience = true,
-                    ValidAudience = settings.Audience,
-                };
-            });
-        }
-    }
-}
-````
-
-## File: Aplicacion/Aplicacion.csproj
-````
-<Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="AutoMapper" Version="16.1.1" />
-    <!-- Add safe packages for identity and caching -->
-    <PackageReference Include="Microsoft.Identity.Client" Version="4.84.1" />
-    <PackageReference Include="Azure.Identity" Version="1.21.0" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.0" />
-    <PackageReference Include="FluentValidation" Version="11.3.1" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Dominio\Dominio.csproj" />
-    <ProjectReference Include="..\Infraestructura\Infraestructura.csproj" />
-  </ItemGroup>
-
-</Project>
 ````
 
 ## File: Dominio/Core/Extensions/EntidadExtension.cs
@@ -11187,6 +11150,105 @@ namespace Infraestructura.Context.Mapping.Seguridad
 </Project>
 ````
 
+## File: WebServices/Jwtoken/JwtConfiguration.cs
+````csharp
+using Dominio.Core.Jwtoken;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+
+namespace WebServices.Jwtoken
+{
+    public static class JwtConfiguration
+    {
+        public static void ConfigureJwt(this WebApplicationBuilder builder)
+        {
+            builder.Services.Configure<JwtSettings>(options => builder.Configuration.GetSection("JwtSettings").Bind(options));
+
+            AddAuthenticationJwt(builder.Services, builder.Configuration);
+        }
+
+        private static void AddAuthenticationJwt(IServiceCollection services, IConfiguration configuration)
+        {
+            var settings = configuration.GetSection("JwtSettings").Get<JwtSettings>()
+                ?? throw new InvalidOperationException("JwtSettings section is missing.");
+
+            var secret = settings.Secret;
+            if (string.IsNullOrWhiteSpace(secret) || secret == "CHANGE_ME_TO_A_STRONG_SECRET")
+            {
+                throw new InvalidOperationException("JwtSettings:Secret must be configured in production using an environment variable or a secret manager.");
+            }
+
+            if (Encoding.UTF8.GetByteCount(secret) < 32)
+            {
+                throw new InvalidOperationException("JwtSettings:Secret must be at least 32 bytes long.");
+            }
+
+            if (string.IsNullOrWhiteSpace(settings.Issuer) || string.IsNullOrWhiteSpace(settings.Audience))
+            {
+                throw new InvalidOperationException("JwtSettings:Issuer and JwtSettings:Audience must be configured.");
+            }
+
+            if (settings.ExpirationInMinutes <= 0 || settings.RefreshTokenExpirationInDays <= 0)
+            {
+                throw new InvalidOperationException("JwtSettings expiration values must be greater than zero.");
+            }
+
+            var key = Encoding.UTF8.GetBytes(secret);
+
+            services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+            .AddJwtBearer(options =>
+            {
+                options.RequireHttpsMetadata = true;
+                options.SaveToken = true;
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero,
+                    ValidateIssuer = true,
+                    ValidIssuer = settings.Issuer,
+                    ValidateAudience = true,
+                    ValidAudience = settings.Audience,
+                };
+            });
+        }
+    }
+}
+````
+
+## File: Aplicacion/Aplicacion.csproj
+````
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoMapper" Version="16.1.1" />
+    <!-- Add safe packages for identity and caching -->
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.84.1" />
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.0" />
+    <PackageReference Include="FluentValidation" Version="11.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dominio\Dominio.csproj" />
+    <ProjectReference Include="..\Infraestructura\Infraestructura.csproj" />
+  </ItemGroup>
+
+</Project>
+````
+
 ## File: Aplicacion/DTOs/Seguridad/UserRequest.cs
 ````csharp
 namespace Aplicacion.DTOs.Seguridad
@@ -11410,7 +11472,6 @@ namespace Aplicacion.DTOs.Seguridad
     </PackageReference>
     <PackageReference Include="Microsoft.Identity.Client" Version="4.84.1" />
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.0" />
     <PackageReference Include="EntityFramework" Version="6.4.4" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.4" />
@@ -11449,6 +11510,8 @@ using Infraestructura.Core.Jwtoken;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Aplicacion.Services.Seguridad
 {
@@ -11596,7 +11659,7 @@ namespace Aplicacion.Services.Seguridad
                 var newAccessToken = _tokenService.Generate(usuario);
                 var newRefreshToken = _tokenService.GenerateRefreshToken();
 
-                usuario.RefreshToken = newRefreshToken;
+                usuario.RefreshToken = HashRefreshToken(newRefreshToken);
                 usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationInDays);
 
                 if (request.RequestUserInfo != null)
@@ -11649,9 +11712,10 @@ namespace Aplicacion.Services.Seguridad
                 return Task.FromResult(Result<UsuarioDTO>.Failure("Token de acceso inválido", "INVALID_ACCESS_TOKEN"));
             }
 
-            var usuario = _genericRepository.GetSingle<Usuario>(u => u.UsuarioId == userId && u.RefreshToken == request.RefreshToken, new List<string> { "Rol", "Rol.Permisos" });
+            string refreshTokenHash = HashRefreshToken(request.RefreshToken);
+            var usuario = _genericRepository.GetSingle<Usuario>(u => u.UsuarioId == userId && u.RefreshToken == refreshTokenHash, new List<string> { "Rol", "Rol.Permisos" });
 
-            if (usuario == null || usuario.RefreshTokenExpiryTime <= DateTime.UtcNow)
+            if (usuario == null || !usuario.Activo || usuario.RefreshTokenExpiryTime <= DateTime.UtcNow)
             { 
                 return Task.FromResult(Result<UsuarioDTO>.Failure("Token de refresco inválido o expirado", "INVALID_REFRESH_TOKEN"));
             }
@@ -11659,7 +11723,7 @@ namespace Aplicacion.Services.Seguridad
             var newAccessToken = _tokenService.Generate(usuario);
             var newRefreshToken = _tokenService.GenerateRefreshToken();
 
-            usuario.RefreshToken = newRefreshToken;
+            usuario.RefreshToken = HashRefreshToken(newRefreshToken);
             usuario.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationInDays);
 
             TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("RefreshToken")
@@ -11786,6 +11850,13 @@ namespace Aplicacion.Services.Seguridad
             };
         }
 
+        private static string HashRefreshToken(string refreshToken)
+        {
+            var tokenBytes = Encoding.UTF8.GetBytes(refreshToken);
+            var hashBytes = SHA256.HashData(tokenBytes);
+            return Convert.ToBase64String(hashBytes);
+        }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing)
@@ -11852,7 +11923,7 @@ The solution follows **Clean Architecture** principles, organized into four laye
 ```
 POST /api/User/login
 ```
-Returns an **Access Token** (short-lived) and a **Refresh Token** (long-lived, stored in DB).
+Returns an **Access Token** (short-lived) and a **Refresh Token** (long-lived). Only a SHA-256 hash of the refresh token is stored in DB.
 
 ### Refresh Token
 ```
@@ -11915,7 +11986,7 @@ On first run, the `DataSeeder` automatically creates base security data. The adm
 ```json
 {
   "ConnectionStrings": {
-    "conectionDataBase": "Server=YOUR_SERVER;Database=YOUR_DB;User Id=YOUR_USER;Password=YOUR_PASS;TrustServerCertificate=true"
+    "conectionDataBase": "Server=YOUR_SERVER;Database=YOUR_DB;Encrypt=True;TrustServerCertificate=False"
   },
   "JwtSettings": {
     "Secret": "YOUR_SUPER_SECRET_KEY_MIN_32_CHARS",
@@ -11923,8 +11994,20 @@ On first run, the `DataSeeder` automatically creates base security data. The adm
     "RefreshTokenExpirationInDays": 7,
     "Issuer": "YourIssuer",
     "Audience": "YourAudience"
+  },
+  "Cors": {
+    "AllowedOrigins": [ "https://your-frontend.example.com" ]
   }
 }
+```
+
+Prefer environment variables or a secret manager for production secrets:
+
+```bash
+JwtSettings__Secret=YOUR_SUPER_SECRET_KEY_MIN_32_BYTES
+ConnectionStrings__conectionDataBase=Server=YOUR_SERVER;Database=YOUR_DB;User Id=YOUR_USER;Password=YOUR_PASS;Encrypt=True;TrustServerCertificate=False
+Seed__AdminPassword=CHANGE_ME_ONLY_FOR_INITIAL_SEED
+Cors__AllowedOrigins__0=https://your-frontend.example.com
 ```
 
 ---
@@ -11942,7 +12025,7 @@ On first run, the `DataSeeder` automatically creates base security data. The adm
 git clone https://github.com/Alex16leiva/AspNetCore10-Backend-Boilerplate.git
 cd AspNetCore10-Backend-Boilerplate
 
-# 2. Configure your connection string in WebServices/appsettings.json
+# 2. Configure your connection string, JWT secret, and CORS origins using environment variables or Secret Manager
 
 # 3. Apply EF Core migrations
 dotnet ef database update --context MyContext --project Infraestructura --startup-project WebServices
@@ -11965,7 +12048,9 @@ https://localhost:7217/scalar/v1
 - ✅ **BCrypt** — Password hashing with automatic salt (replaces plain SHA-256)
 - ✅ **JWT Bearer** — Stateless authentication
 - ✅ **Refresh Token Rotation** — New refresh token issued on every renewal
+- ✅ **Hashed Refresh Tokens** — Database stores token hashes, not raw refresh tokens
 - ✅ **Refresh Token Expiry** — Configurable expiration (default: 7 days)
+- ✅ **Auth Rate Limiting** — Login and refresh endpoints are rate-limited
 - ✅ **Secure Dependencies** — All NuGet packages audited for known vulnerabilities
 
 ---
@@ -12002,6 +12087,7 @@ using Aplicacion.Services.Seguridad;
 using Dominio.Core.Result;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace WebServices.Controllers
 {
@@ -12016,6 +12102,7 @@ namespace WebServices.Controllers
         }
 
         [AllowAnonymous]
+        [EnableRateLimiting("AuthPolicy")]
         [Route("login")]
         [HttpPost]
         public async Task<IActionResult> Login([FromBody] UserRequest request)
@@ -12025,6 +12112,7 @@ namespace WebServices.Controllers
         }
 
         [AllowAnonymous]
+        [EnableRateLimiting("AuthPolicy")]
         [HttpPost("refresh-token")]
         public async Task<IActionResult> RefreshToken([FromBody] TokenRequest request)
         {
@@ -12127,6 +12215,8 @@ using WebServices.Jwtoken;
 using WebServices.Middleware;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12143,17 +12233,11 @@ builder.Services.AddAutoMapper(cfg => cfg.AddMaps(typeof(AutoMapperProfile).Asse
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssembly(typeof(Aplicacion.Services.Seguridad.Validators.UsuarioDTOValidator).Assembly);
 
-const string AllowAllOriginsPolicy = "AllowAllOriginsPolicy";
 const string AllowSpecificOriginsPolicy = "AllowSpecificOriginsPolicy";
+const string AuthRateLimitPolicy = "AuthPolicy";
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(AllowAllOriginsPolicy,
-        x =>
-        {
-            x.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
-        });
-
     options.AddPolicy(AllowSpecificOriginsPolicy, policy =>
     {
         var allowedOrigins = builder.Configuration
@@ -12162,20 +12246,24 @@ builder.Services.AddCors(options =>
 
         if (allowedOrigins.Length == 0)
         {
-            if (!builder.Environment.IsDevelopment())
-            {
-                throw new InvalidOperationException("Cors:AllowedOrigins must be configured outside Development.");
-            }
-
-            policy.AllowAnyOrigin()
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
-            return;
+            throw new InvalidOperationException("Cors:AllowedOrigins must be configured.");
         }
 
         policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod();
+    });
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter(AuthRateLimitPolicy, limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 5;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 0;
     });
 });
 
@@ -12204,14 +12292,14 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
-app.UseCors(app.Environment.IsDevelopment() ? AllowAllOriginsPolicy : AllowSpecificOriginsPolicy);
+app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
+app.UseCors(AllowSpecificOriginsPolicy);
+app.UseRateLimiter();
 
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
-
-app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
 app.MapControllers();
 
