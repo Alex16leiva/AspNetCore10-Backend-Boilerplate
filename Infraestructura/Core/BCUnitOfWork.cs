@@ -18,7 +18,7 @@ namespace Infraestructura.Core
         public BCUnitOfWork(DbContextOptions<MyContext>? context)
             : base(context)
         {
-            Database.SetCommandTimeout((int)TimeSpan.FromSeconds(1).TotalSeconds);
+            // Command timeout is configured at the concrete DbContext level.
         }
 
         public virtual void Commit()

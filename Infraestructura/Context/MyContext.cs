@@ -5,15 +5,31 @@ using Infraestructura.Context.Mapping.ConfiguracionesMap;
 using Infraestructura.Context.Mapping.Seguridad;
 using Infraestructura.Core;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace Infraestructura.Context
 {
     public class MyContext : BCUnitOfWork, IDataContext
     {
-        public MyContext(DbContextOptions<MyContext> context)
+        private const int DefaultCommandTimeoutSeconds = 30;
+
+        public MyContext(DbContextOptions<MyContext> context, IConfiguration configuration)
             : base(context)
         {
-            Database.SetCommandTimeout((int)TimeSpan.FromSeconds(1).TotalSeconds);
+            int commandTimeoutSeconds = DefaultCommandTimeoutSeconds;
+
+            if (configuration != null)
+            {
+                var configuredTimeout = configuration["DatabaseSettings:CommandTimeoutSeconds"];
+                if (!string.IsNullOrWhiteSpace(configuredTimeout)
+                    && int.TryParse(configuredTimeout, out var parsedTimeout)
+                    && parsedTimeout > 0)
+                {
+                    commandTimeoutSeconds = parsedTimeout;
+                }
+            }
+
+            Database.SetCommandTimeout(commandTimeoutSeconds);
         }
 
         public virtual DbSet<Usuario> Usuarios { get; set; }
