@@ -1,11 +1,21 @@
 namespace Dominio.Core.Result
 {
+    /// <summary>
+    /// Representa el estado semántico del resultado de la operación.
+    /// Mapea de forma limpia a los códigos de estado lógicos (ej. HTTP).
+    /// </summary>
     public enum ResultStatus
     {
-        Success,
-        ValidationError,
-        ApplicationError,
-        Exception
+        Success = 200,
+        Created = 201,
+        NoContent = 204,
+        ValidationError = 400,
+        Unauthorized = 401,
+        Forbidden = 403,
+        NotFound = 404,
+        Conflict = 409,
+        ApplicationError = 422, // Unprocessable Entity (Reglas de negocio rotas)
+        Exception = 500
     }
 
     /// <summary>

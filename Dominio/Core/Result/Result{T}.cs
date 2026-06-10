@@ -32,6 +32,12 @@ namespace Dominio.Core.Result
             return new Result<T>(true, data, message, null, null, ResultStatus.Success);
         }
 
+        // Fábrica explícita para No Autorizado (401)
+        public static new Result<T> Unauthorized(string message = "No autorizado", string? errorCode = "UNAUTHORIZED")
+        {
+            return new Result<T>(false, default, message, errorCode, null, ResultStatus.Unauthorized);
+        }
+
         /// <summary>
         /// Crea un resultado fallido sin datos.
         /// </summary>
