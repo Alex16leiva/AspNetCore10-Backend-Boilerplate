@@ -25,7 +25,7 @@ namespace WebServices.Controllers
         public async Task<IActionResult> Login([FromBody] UserRequest request)
         {
             var usuario = await _securityAppService.IniciarSesion(request);
-            return MapResult(usuario);
+            return Ok(usuario);
         }
 
         [AllowAnonymous]
@@ -34,7 +34,7 @@ namespace WebServices.Controllers
         public async Task<IActionResult> RefreshToken([FromBody] TokenRequest request)
         {
             var usuario = await _securityAppService.RefreshToken(request);
-            return MapResult(usuario);
+            return Ok(usuario);
         }
 
         [Authorize]
@@ -42,7 +42,7 @@ namespace WebServices.Controllers
         public async Task<IActionResult> CreateUser(EdicionUsuarioRequest request)
         {
             var usuario = await _securityAppService.CrearUsuario(request);
-            return MapResult(usuario);
+            return Ok(usuario);
         }
 
         [Authorize]
@@ -50,7 +50,7 @@ namespace WebServices.Controllers
         public async Task<IActionResult> EditarUsuario(EdicionUsuarioRequest request)
         {
             var usuario = await _securityAppService.EditarUsuario(request);
-            return MapResult(usuario);
+            return Ok(usuario);
         }
 
         [Authorize]
@@ -58,7 +58,7 @@ namespace WebServices.Controllers
         public async Task<IActionResult> ObtenerUsuarios(GetUserRequest request)
         {
             var usuarios = await _securityAppService.ObtenerUsuario(request);
-            return MapResult(usuarios);
+            return Ok(usuarios);
         }
 
         [Authorize]
@@ -66,7 +66,7 @@ namespace WebServices.Controllers
         public async Task<IActionResult> ObtenerRoles()
         {
             var roles = await _securityAppService.ObtenerRoles();
-            return MapResult(roles);
+            return Ok(roles);
         }
 
         [Authorize]
@@ -74,7 +74,7 @@ namespace WebServices.Controllers
         public async Task<IActionResult> CrearRol(EdicionRolRequest request)
         {
             var rol = await _securityAppService.CrearRol(request);
-            return MapResult(rol);
+            return Ok(rol);
         }
 
         [Authorize]
@@ -82,7 +82,7 @@ namespace WebServices.Controllers
         public async Task<IActionResult> EditarRol(EdicionRolRequest request)
         {
             var rol = await _securityAppService.EditarRol(request);
-            return MapResult(rol);
+            return Ok(rol);
         }
 
         [Authorize]
@@ -90,7 +90,7 @@ namespace WebServices.Controllers
         public async Task<IActionResult> ObtenerPantalla()
         {
             var pantallas = await _securityAppService.ObtenerPantallas();
-            return MapResult(pantallas);
+            return Ok(pantallas);
         }
 
         [Authorize]
@@ -98,25 +98,7 @@ namespace WebServices.Controllers
         public async Task<IActionResult> EdicionPermisos(EdicionPermisosRequest request)
         {
             var rol = await _securityAppService.EdicionPermisos(request);
-            return MapResult(rol);
-        }
-
-        private IActionResult MapResult<T>(Result<T> result)
-        {
-            if (result == null) return StatusCode(500);
-
-            if (result.IsSuccess)
-            {
-                return Ok(result.Data);
-            }
-
-            return result.Status switch
-            {
-                ResultStatus.ValidationError => BadRequest(result),
-                ResultStatus.ApplicationError => Conflict(result),
-                ResultStatus.Exception => StatusCode(500, result),
-                _ => BadRequest(result),
-            };
+            return Ok(rol);
         }
     }
 }
