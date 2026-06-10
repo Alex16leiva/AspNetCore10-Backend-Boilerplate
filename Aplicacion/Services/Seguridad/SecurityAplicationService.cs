@@ -149,7 +149,7 @@ namespace Aplicacion.Services.Seguridad
 
             if (string.IsNullOrWhiteSpace(request?.Password) || string.IsNullOrWhiteSpace(request?.UsuarioId))
             { 
-                return Task.FromResult(Result<UsuarioDTO>.Failure("Usuario o Contraseña no valido", "INVALID_CREDENTIALS"));
+                return Task.FromResult(Result<UsuarioDTO>.Unauthorized("Usuario o Contraseña no valido", "INVALID_CREDENTIALS"));
             }
 
             Usuario usuario = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.UsuarioId, includes);
@@ -158,7 +158,7 @@ namespace Aplicacion.Services.Seguridad
             {
                 if (!usuario.Activo)
                 { 
-                    return Task.FromResult(Result<UsuarioDTO>.Failure($"Usuario {usuario.UsuarioId} esta desactivado", "USER_INACTIVE"));
+                    return Task.FromResult(Result<UsuarioDTO>.Unauthorized($"Usuario {usuario.UsuarioId} esta desactivado", "USER_INACTIVE"));
                 }
 
                 var newAccessToken = _tokenService.Generate(usuario);
@@ -171,9 +171,15 @@ namespace Aplicacion.Services.Seguridad
                 {
                     request.RequestUserInfo.UsuarioId = usuario.UsuarioId;
                 }
+                else
+                {
+                    request.RequestUserInfo = new RequestUserInfo
+                    {
+                        UsuarioId = usuario.UsuarioId,
+                    };
+                }
 
-                TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("IniciarSesion")
-                    ?? new TransactionInfo { GenerateTransaction = false };
+                TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("IniciarSesion");
                 _genericRepository.UnitOfWork.Commit(transactionInfo);
 
                 var resultDto = new UsuarioDTO
