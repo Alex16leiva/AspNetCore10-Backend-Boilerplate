@@ -1,18 +1,33 @@
-using Aplicacion.Core;
-using Infraestructura.Context;
-using Scalar.AspNetCore;
 using WebServices.Extensions;
 using WebServices.Jwtoken;
 using WebServices.Middleware;
-using FluentValidation;
-using FluentValidation.AspNetCore;
-using Microsoft.AspNetCore.RateLimiting;
-using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 
 builder.Services.AddControllers();
+
+// Customize automatic model validation responses to return ProblemDetails with errors and traceId
+builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var problemDetails = new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(context.ModelState)
+        {
+            Type = "https://httpstatuses.com/400",
+            Title = "One or more validation errors occurred.",
+            Status = StatusCodes.Status400BadRequest,
+            Instance = context.HttpContext.Request.Path
+        };
+
+        problemDetails.Extensions["traceId"] = System.Diagnostics.Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;
+
+        return new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(problemDetails)
+        {
+            ContentTypes = { "application/problem+json" }
+        };
+    };
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 
