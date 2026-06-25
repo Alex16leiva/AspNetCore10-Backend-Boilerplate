@@ -1,12 +1,13 @@
 using Aplicacion.Core;
-using System;
 using Aplicacion.Services.ConfiguracionesApp;
+using Aplicacion.Services.ExcepcionLogServices;
 using Aplicacion.Services.Seguridad;
 using CrossCutting.Configuration;
 using Infraestructura.Context;
 using Infraestructura.Core.Jwtoken;
 using Infraestructura.Core.RestClient;
 using Microsoft.EntityFrameworkCore;
+using System;
 
 namespace WebServices.Extensions
 {
@@ -35,6 +36,7 @@ namespace WebServices.Extensions
             // Servicios de Aplicación
             services.AddScoped<ISecurityApplicationService, SecurityAplicationService>();
             services.AddScoped<IConfiguracionesApplicationService, ConfiguracionesApplicationService>();
+            services.AddScoped<IExcepcionLogAppService, ExcepcionLogAppService>();
 
             return services;
         }

@@ -1,28 +1,26 @@
-﻿using System.Diagnostics;
-using System.Net;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+﻿using Aplicacion.Services.ExcepcionLogServices;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using System.Diagnostics;
+using System.Net;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace WebServices.Middleware
 {
     public class GlobalExceptionHandlingMiddleware : IMiddleware
     {
         private readonly ILogger<GlobalExceptionHandlingMiddleware> _logger;
-        private readonly IWebHostEnvironment _env;
-        private readonly IConfiguration _configuration;
+        private readonly IServiceScopeFactory _scopeFactory;
 
         public GlobalExceptionHandlingMiddleware(
             ILogger<GlobalExceptionHandlingMiddleware> logger,
-            IWebHostEnvironment env,
-            IConfiguration configuration)
+            IServiceScopeFactory scopeFactory)
         {
             _logger = logger;
-            _env = env;
-            _configuration = configuration;
+            _scopeFactory = scopeFactory;
         }
 
         public async Task InvokeAsync(HttpContext context, RequestDelegate next)
@@ -31,93 +29,74 @@ namespace WebServices.Middleware
             {
                 await next(context);
             }
-            catch (Exception ex)
+            catch (Exception e)
             {
-                await HandleExceptionAsync(context, ex);
+                // 1. Identificar si es una excepción provocada por nuestras cláusulas de guarda (Error del Cliente)
+                if (e is ArgumentNullException || e is ArgumentException)
+                {
+                    _logger.LogWarning($"Petición inválida detectada: {e.Message}");
+
+                    context.Response.StatusCode = (int)HttpStatusCode.BadRequest; // HTTP 400
+                    context.Response.ContentType = "application/json";
+
+                    var badRequestResponse = new
+                    {
+                        status = (int)HttpStatusCode.BadRequest,
+                        title = "Bad Request",
+                        ValidationErrorMessage = e.Message // Le mostramos exactamente qué campo falló
+                    };
+
+                    await context.Response.WriteAsync(JsonSerializer.Serialize(badRequestResponse));
+                    return; // Detenemos la ejecución aquí sin registrar en la BD de excepciones críticas
+                }
+
+                // =========================================================================
+                // 2. Si llega aquí, es un error real del servidor (HTTP 500 - Bug o Caída de BD)
+                // =========================================================================
+                _logger.LogError(e, e.Message);
+
+                var referenciaError = await GuardarExcepcionEnBD(e, context);
+
+                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError; // HTTP 500
+                context.Response.ContentType = "application/json";
+
+                var errorResponse = new
+                {
+                    status = (int)HttpStatusCode.InternalServerError,
+                    title = "Server Error",
+                    ValidationErrorMessage = "Ha ocurrido un error interno en el servidor. Por favor contacte al soporte si el problema persiste.",
+                    referenciaError
+                };
+
+                await context.Response.WriteAsync(JsonSerializer.Serialize(errorResponse));
             }
         }
 
-        private async Task HandleExceptionAsync(HttpContext context, Exception exception)
+        private async Task<int?> GuardarExcepcionEnBD(Exception e, HttpContext context)
         {
-            if (context.Response.HasStarted)
+            try
             {
-                _logger.LogWarning("The response has already started, the global exception middleware will not write the response (TraceId: {TraceId}).", context.TraceIdentifier);
-                throw exception;
+                using var scope = _scopeFactory.CreateScope();
+                var service = scope.ServiceProvider.GetRequiredService<IExcepcionLogAppService>();
+
+                var usuario = context.User?.Identity?.Name ?? "Anónimo";
+                var ruta = context.Request?.Path.Value;
+                var metodo = context.Request?.Method;
+
+                return await service.RegistrarExcepcion(
+                    mensaje: e.Message,
+                    detalle: e.ToString(),
+                    tipoExcepcion: e.GetType().FullName ?? "Exception",
+                    ruta: ruta,
+                    metodoHttp: metodo,
+                    usuario: usuario
+                );
             }
-
-            var traceId = Activity.Current?.Id ?? context.TraceIdentifier;
-
-            int statusCode = StatusCodes.Status500InternalServerError;
-            string title = "An error occurred while processing your request.";
-            object? errors = null;
-
-            if (exception is ValidationException fvEx)
+            catch (Exception logEx)
             {
-                statusCode = StatusCodes.Status400BadRequest;
-                title = "One or more validation errors occurred.";
-
-                var errorDict = fvEx.Errors
-                    .GroupBy(e => e.PropertyName)
-                    .ToDictionary(g => g.Key, g => g.Select(x => x.ErrorMessage).ToArray());
-
-                errors = errorDict;
+                _logger.LogError(logEx, "Error al registrar excepción en base de datos");
+                return null;
             }
-            else if (exception is JsonException jsonEx)
-            {
-                statusCode = StatusCodes.Status400BadRequest;
-                title = "Malformed JSON payload.";
-                errors = new { message = jsonEx.Message };
-            }
-            else if (exception is OperationCanceledException || exception is TaskCanceledException)
-            {
-                statusCode = StatusCodes.Status499ClientClosedRequest; // non-standard - client closed
-                title = "Request was cancelled.";
-            }
-
-            bool includeExceptionDetails = _env.IsDevelopment() || _configuration.GetValue<bool?>("ApiSettings:IncludeExceptionDetails") == true;
-
-            var problem = new ProblemDetails
-            {
-                Type = $"https://httpstatuses.com/{statusCode}",
-                Title = title,
-                Status = statusCode,
-                Instance = context.Request.Path
-            };
-
-            var payload = new Dictionary<string, object?>
-            {
-                ["type"] = problem.Type,
-                ["title"] = problem.Title,
-                ["status"] = problem.Status,
-                ["instance"] = problem.Instance,
-                ["traceId"] = traceId,
-                ["timestampUtc"] = DateTime.UtcNow
-            };
-
-            if (errors != null)
-            {
-                payload["errors"] = errors;
-            }
-
-            if (includeExceptionDetails)
-            {
-                payload["detail"] = exception.ToString();
-            }
-
-            _logger.LogError(exception, "Unhandled exception occurred while processing request {Method} {Path} (TraceId: {TraceId})",
-                context.Request?.Method, context.Request?.Path, traceId);
-
-            context.Response.Clear();
-            context.Response.StatusCode = statusCode;
-            context.Response.ContentType = "application/problem+json";
-
-            var options = new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-            };
-
-            await context.Response.WriteAsync(JsonSerializer.Serialize(payload, options));
         }
     }
 }
