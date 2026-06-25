@@ -1,4 +1,5 @@
 using Dominio.Core;
+using Dominio.Core.Extensions;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -20,5 +21,23 @@ namespace Dominio.Context.Entidades.Seguridad
         public string? Token { get; set; }
         [ForeignKey("RolId")]
         public virtual Rol? Rol { get; set; }
+
+        public bool EstaDesactivado()
+        {
+            return !Activo;
+        }
+
+        public bool TienePermisoEditar(string pantalla)
+        {
+            // Si el Rol es nulo o la colección de permisos está vacía/nula, no tiene permisos
+            if (Rol.IsNull() || Rol.Permisos.IsNull())
+            {
+                return false;
+            }
+
+            // Usamos Any para comprobar directamente la existencia del permiso con la condición requerida.
+            // Esto es más limpio y directo que usar FirstOrDefault.
+            return Rol.Permisos.Any(x => x.PantallaId == pantalla && x.Editar);
+        }
     }
 }

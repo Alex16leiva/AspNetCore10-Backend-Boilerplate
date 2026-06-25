@@ -34,18 +34,18 @@ namespace Aplicacion.Services.Seguridad
             _jwtSettings = jwtSettings.Value;
         }
 
-        public Task<Result<UsuarioDTO>> EditarUsuario(EdicionUsuarioRequest request)
+        public async Task<Result<UsuarioDTO>> EditarUsuario(EdicionUsuarioRequest request)
         {
             if (request.IsNull() || request.Usuario.IsNull())
             { 
-                return Task.FromResult(Result<UsuarioDTO>.Failure("Usuario es obligatorio", "NULL_USUARIO"));
+                return await Task.FromResult(Result<UsuarioDTO>.Failure("Usuario es obligatorio", "NULL_USUARIO"));
             }
 
-            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
+            Usuario usuarioExiste = await _genericRepository.GetSingleAsync<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
 
             if (usuarioExiste.IsNull())
             { 
-                return Task.FromResult(Result<UsuarioDTO>.Failure("El usuario no existe", "USER_NOT_FOUND"));
+                return await Task.FromResult(Result<UsuarioDTO>.Failure("El usuario no existe", "USER_NOT_FOUND"));
             }
 
             if (request.Usuario.EditarContrasena)
@@ -62,19 +62,19 @@ namespace Aplicacion.Services.Seguridad
                 ?? new TransactionInfo { GenerateTransaction = false }; 
             _genericRepository.UnitOfWork.Commit(transactionInfo);
 
-            return Task.FromResult(Result<UsuarioDTO>.Success(_mapper.Map<UsuarioDTO>(usuarioExiste), "Usuario actualizado exitosamente"));
+            return await Task.FromResult(Result<UsuarioDTO>.Success(_mapper.Map<UsuarioDTO>(usuarioExiste), "Usuario actualizado exitosamente"));
         }
 
-        public Task<Result<List<PantallaDTO>>> ObtenerPantallas()
+        public async Task<Result<List<PantallaDTO>>> ObtenerPantallas()
         {
-            var pantallas = _genericRepository.GetAll<Pantalla>();
+            var pantallas = await _genericRepository.GetAllAsync<Pantalla>();
             var lista = pantallas.Select(r => new PantallaDTO { Descripcion = r.Descripcion, PantallaId = r.PantallaId }).ToList(); 
-            return Task.FromResult(Result<List<PantallaDTO>>.Success(lista));
+            return await Task.FromResult(Result<List<PantallaDTO>>.Success(lista));
         }
 
-        public Task<Result<RolDTO>> EdicionPermisos(EdicionPermisosRequest request)
+        public async Task<Result<RolDTO>> EdicionPermisos(EdicionPermisosRequest request)
         {
-            var permisos = _genericRepository.GetFiltered<Permisos>(r => r.RolId == request.RolId);
+            var permisos = await _genericRepository.GetFilteredAsync<Permisos>(r => r.RolId == request.RolId);
 
             foreach (var item in request.Permisos) 
             {
@@ -107,23 +107,23 @@ namespace Aplicacion.Services.Seguridad
             TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("AgregarUsuario")
                 ?? new TransactionInfo { GenerateTransaction = false };
             _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return Task.FromResult(Result<RolDTO>.Success(new RolDTO())); 
+            return await Task.FromResult(Result<RolDTO>.Success(new RolDTO())); 
         }
 
-        public Task<Result<UsuarioDTO>> CrearUsuario(EdicionUsuarioRequest request)
+        public async Task<Result<UsuarioDTO>> CrearUsuario(EdicionUsuarioRequest request)
         {
             if (request.IsNull() || request.Usuario.IsNull())
             { 
-                return Task.FromResult(Result<UsuarioDTO>.Failure("Usuario es obligatorio", "NULL_USUARIO"));
+                return await Task.FromResult(Result<UsuarioDTO>.Failure("Usuario es obligatorio", "NULL_USUARIO"));
             }
 
             var usuarioRequest = request.Usuario;
 
-            Usuario usuarioExiste = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == usuarioRequest.UsuarioId);
+            Usuario usuarioExiste = await _genericRepository.GetSingleAsync<Usuario>(r => r.UsuarioId == usuarioRequest.UsuarioId);
 
             if (usuarioExiste.IsNotNull())
             { 
-                return Task.FromResult(Result<UsuarioDTO>.Failure("Usuario ya esta registrado", "USER_EXISTS"));
+                return await Task.FromResult(Result<UsuarioDTO>.Failure("Usuario ya esta registrado", "USER_EXISTS"));
             }
 
             var usuario = new Usuario
@@ -140,25 +140,25 @@ namespace Aplicacion.Services.Seguridad
             TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("AgregarUsuario")
                 ?? new TransactionInfo { GenerateTransaction = false };
             _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return Task.FromResult(Result<UsuarioDTO>.Success(_mapper.Map<UsuarioDTO>(usuario), "Usuario creado exitosamente"));
+            return await Task.FromResult(Result<UsuarioDTO>.Success(_mapper.Map<UsuarioDTO>(usuario), "Usuario creado exitosamente"));
         }
 
-        public Task<Result<UsuarioDTO>> IniciarSesion(UserRequest request)
+        public async Task<Result<UsuarioDTO>> IniciarSesion(UserRequest request)
         {
             var includes = new List<string> { "Rol", "Rol.Permisos" };
 
             if (string.IsNullOrWhiteSpace(request?.Password) || string.IsNullOrWhiteSpace(request?.UsuarioId))
             { 
-                return Task.FromResult(Result<UsuarioDTO>.Unauthorized("Usuario o Contraseña no valido", "INVALID_CREDENTIALS"));
+                return await Task.FromResult(Result<UsuarioDTO>.Unauthorized("Usuario o Contraseña no valido", "INVALID_CREDENTIALS"));
             }
 
-            Usuario usuario = _genericRepository.GetSingle<Usuario>(r => r.UsuarioId == request.UsuarioId, includes);
+            Usuario usuario = await _genericRepository.GetSingleAsync<Usuario>(r => r.UsuarioId == request.UsuarioId, includes);
 
             if (usuario.IsNotNull() && PasswordEncryptor.VerifyPassword(request.Password, usuario.Contrasena))
             {
                 if (!usuario.Activo)
                 { 
-                    return Task.FromResult(Result<UsuarioDTO>.Unauthorized($"Usuario {usuario.UsuarioId} esta desactivado", "USER_INACTIVE"));
+                    return await Task.FromResult(Result<UsuarioDTO>.Unauthorized($"Usuario {usuario.UsuarioId} esta desactivado", "USER_INACTIVE"));
                 }
 
                 var newAccessToken = _tokenService.Generate(usuario);
@@ -194,10 +194,10 @@ namespace Aplicacion.Services.Seguridad
                     Permisos = MapPermisosDto(usuario.Rol?.Permisos)
                 };
 
-                return Task.FromResult(Result<UsuarioDTO>.Success(resultDto, "Inicio de sesión exitoso"));
+                return await Task.FromResult(Result<UsuarioDTO>.Success(resultDto, "Inicio de sesión exitoso"));
             }
 
-            return Task.FromResult(Result<UsuarioDTO>.Failure("Usuario o Contraseña no valido", "INVALID_CREDENTIALS"));
+            return await Task.FromResult(Result<UsuarioDTO>.Failure("Usuario o Contraseña no valido", "INVALID_CREDENTIALS"));
         }
 
         public Task<Result<UsuarioDTO>> RefreshToken(TokenRequest request)
@@ -224,7 +224,7 @@ namespace Aplicacion.Services.Seguridad
             }
 
             string refreshTokenHash = HashRefreshToken(request.RefreshToken);
-            var usuario = _genericRepository.GetSingle<Usuario>(u => u.UsuarioId == userId && u.RefreshToken == refreshTokenHash, new List<string> { "Rol", "Rol.Permisos" });
+            var usuario = _genericRepository.GetSingle<Usuario>(u => u.UsuarioId == userId && u.RefreshToken == refreshTokenHash, ["Rol", "Rol.Permisos"]);
 
             if (usuario == null || !usuario.Activo || usuario.RefreshTokenExpiryTime <= DateTime.UtcNow)
             { 
@@ -256,34 +256,34 @@ namespace Aplicacion.Services.Seguridad
             return Task.FromResult(Result<UsuarioDTO>.Success(resultDto, "Token renovado correctamente"));
         }
 
-        public Task<Result<SearchResult<UsuarioDTO>>> ObtenerUsuario(GetUserRequest request)
+        public async Task<Result<SearchResult<UsuarioDTO>>> ObtenerUsuario(GetUserRequest request)
         {
             var queryInfo = request.QueryInfo ?? new QueryInfo();
             var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(queryInfo);
-            var usuarios = _genericRepository.GetPagedAndFiltered<Usuario>(dynamicFilter);
+            var usuarios = await _genericRepository.GetPagedAndFilteredAsync<Usuario>(dynamicFilter);
             var result = new SearchResult<UsuarioDTO>
             {
                 PageCount = usuarios.PageCount,
                 ItemCount = usuarios.ItemCount,
                 TotalItems = usuarios.TotalItems,
                 PageIndex = usuarios.PageIndex,
-                Items = (from qry in usuarios.Items as IEnumerable<Usuario> select MapUsuarioDto(qry)).ToList(),
+                Items = [.. (from qry in usuarios.Items as IEnumerable<Usuario> select MapUsuarioDto(qry))],
             };
 
-            return Task.FromResult(Result<SearchResult<UsuarioDTO>>.Success(result));
+            return await Task.FromResult(Result<SearchResult<UsuarioDTO>>.Success(result));
         }
 
-        public Task<Result<RolDTO>> CrearRol(EdicionRolRequest request)
+        public async Task<Result<RolDTO>> CrearRol(EdicionRolRequest request)
         {
-            if (request.Rol is null)
+            if (request.Rol.IsNull())
             {
-                return Task.FromResult(Result<RolDTO>.Failure("El rol es obligatorio", "NULL_ROLE"));
+                return await Task.FromResult(Result<RolDTO>.Failure("El rol es obligatorio", "NULL_ROLE"));
             }
 
-            var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
+            var rol = await _genericRepository.GetSingleAsync<Rol>(r => r.RolId == request.Rol.RolId);
             if (rol.IsNotNull())
             {
-                return Task.FromResult(Result<RolDTO>.Failure($"El rol {request.Rol.RolId} ya existe", "ROLE_EXISTS"));
+                return await Task.FromResult(Result<RolDTO>.Failure($"El rol {request.Rol.RolId} ya existe", "ROLE_EXISTS"));
             }
 
             var nuevoRol = new Rol
@@ -297,34 +297,34 @@ namespace Aplicacion.Services.Seguridad
                 ?? new TransactionInfo { GenerateTransaction = false };
             _genericRepository.UnitOfWork.Commit(transactionInfo);
 
-            return Task.FromResult(Result<RolDTO>.Success(new RolDTO()));
+            return await Task.FromResult(Result<RolDTO>.Success(new RolDTO()));
         }
 
-        public Task<Result<RolDTO>> EditarRol(EdicionRolRequest request)
+        public async Task<Result<RolDTO>> EditarRol(EdicionRolRequest request)
         {
             if (request.Rol is null)
             {
-                return Task.FromResult(Result<RolDTO>.Failure("El rol es obligatorio", "NULL_ROLE"));
+                return await Task.FromResult(Result<RolDTO>.Failure("El rol es obligatorio", "NULL_ROLE"));
             }
 
-            var rol = _genericRepository.GetSingle<Rol>(r => r.RolId == request.Rol.RolId);
+            var rol = await _genericRepository.GetSingleAsync<Rol>(r => r.RolId == request.Rol.RolId);
 
             if (rol.IsNull())
             {
-                return Task.FromResult(Result<RolDTO>.Failure($"El Rol {request.Rol.RolId} no existe", "ROLE_NOT_FOUND"));
+                return await Task.FromResult(Result<RolDTO>.Failure($"El Rol {request.Rol.RolId} no existe", "ROLE_NOT_FOUND"));
             }
 
             rol.Descripcion = request.Rol.Descripcion;
             TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("EditarRol")
                 ?? new TransactionInfo { GenerateTransaction = false };
             _genericRepository.UnitOfWork.Commit(transactionInfo);
-            return Task.FromResult(Result<RolDTO>.Success(new RolDTO()));
+            return await Task.FromResult(Result<RolDTO>.Success(new RolDTO()));
         }
 
-        public Task<Result<List<RolDTO>>> ObtenerRoles()
+        public async Task<Result<List<RolDTO>>> ObtenerRoles()
         {
             var includes = new List<string> { "Permisos" };
-            var roles = _genericRepository.GetAll<Rol>(includes);
+            var roles = await _genericRepository.GetAllAsync<Rol>(includes);
             var lista = roles.Select(qry =>
             new RolDTO
             {
@@ -333,7 +333,7 @@ namespace Aplicacion.Services.Seguridad
                 Permisos = MapPermisosDto(qry?.Permisos),
             }).ToList();
 
-            return Task.FromResult(Result<List<RolDTO>>.Success(lista));
+            return await Task.FromResult(Result<List<RolDTO>>.Success(lista));
         }
 
         private static List<PermisosDTO> MapPermisosDto(List<Permisos>? permisos)
@@ -377,6 +377,29 @@ namespace Aplicacion.Services.Seguridad
             }
 
             base.Dispose(disposing);
+        }
+
+        public async Task<bool> TienePermisoEditarAsync(string usuarioId, string pantallaId)
+        {
+            // 1. Validar parámetros de entrada usando tus helpers de extensión
+            if (usuarioId.IsMissingValue() || pantallaId.IsMissingValue())
+            {
+                return false;
+            }
+            List<string> includes = ["Rol", "Rol.Permisos"];
+            // Usamos el nuevo método GetSingleAsync pasando las expresiones lambda de Include
+            // Navegamos de Usuario -> Rol e incluyendo los Permisos del Rol
+            var usuario = await _genericRepository.GetSingleAsync<Usuario>(
+                u => u.UsuarioId == usuarioId, includes);
+
+            // Validamos la existencia y estado activo del usuario
+            if (usuario.IsNull() || usuario.EstaDesactivado() || usuario.Rol.IsNull())
+            {
+                return false;
+            }
+
+            // Retorna True únicamente si el registro existe y la propiedad Editar es verdadera
+            return usuario.TienePermisoEditar(pantallaId);
         }
     }
 }

@@ -16,5 +16,6 @@ namespace Aplicacion.Services.Seguridad
         Task<Result<RolDTO>> CrearRol(EdicionRolRequest request);
         Task<Result<RolDTO>> EditarRol(EdicionRolRequest request);
         Task<Result<List<RolDTO>>> ObtenerRoles();
+        Task<bool> TienePermisoEditarAsync(string usuarioId, string pantallaId);
     }
 }
