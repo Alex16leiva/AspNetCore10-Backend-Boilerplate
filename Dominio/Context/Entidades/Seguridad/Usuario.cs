@@ -15,7 +15,7 @@ namespace Dominio.Context.Entidades.Seguridad
         public required bool Activo { get; set; }
         public string? RolId { get; set; }
         public string? RefreshToken { get; set; }
-        public DateTime? RefreshTokenExpiryTime { get; set; }
+        public DateTime? RefreshTokenExpiraEn { get; set; }
 
         [NotMapped]
         public string? Token { get; set; }

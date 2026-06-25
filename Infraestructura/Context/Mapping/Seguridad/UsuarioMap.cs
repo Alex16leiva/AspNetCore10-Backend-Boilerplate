@@ -17,7 +17,7 @@ namespace Infraestructura.Context.Mapping.Seguridad
             builder.Property(r => r.RolId).HasColumnName("RolId").IsRequired().IsUnicode(false).HasMaxLength(25);
             builder.Property(r => r.Activo).HasColumnName("Activo").IsRequired();
             builder.Property(r => r.RefreshToken).HasColumnName("RefreshToken");
-            builder.Property(r => r.RefreshTokenExpiryTime).HasColumnType("RefreshTokenExpiryTime");
+            builder.Property(r => r.RefreshTokenExpiraEn).HasColumnType("RefreshTokenExpiraEn");
 
             builder.HasOne(x => x.Rol).WithMany(r => r.Usuarios).HasForeignKey(x => x.RolId);
 
