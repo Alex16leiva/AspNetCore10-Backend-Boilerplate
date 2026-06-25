@@ -13,14 +13,8 @@ using System.Transactions;
 
 namespace Infraestructura.Core
 {
-    public class BCUnitOfWork : DbContext
+    public class BCUnitOfWork(DbContextOptions<MyContext> context) : DbContext(context)
     {
-        public BCUnitOfWork(DbContextOptions<MyContext> context)
-            : base(context)
-        {
-            // Command timeout is configured at the concrete DbContext level.
-        }
-
         public virtual void Commit()
         {
             base.SaveChanges();
@@ -44,71 +38,69 @@ namespace Infraestructura.Core
                 //Reseteando el detalle de las transacciones.
                 transaction.TransactionDetail = [];
 
-                using (var scope = TransactionScopeFactory.GetTransactionScope())
+                using var scope = TransactionScopeFactory.GetTransactionScope();
+                var changedEntities = new List<ModifiedEntityEntry>();
+                var tableMapping = new List<EntityMapping>();
+                var sqlCommandInfos = new List<SqlCommandInfo>();
+
+                IEnumerable<EntityEntry> changeDbEntityEntries = GetChangedDbEntityEntries();
+
+                foreach (EntityEntry entry in changeDbEntityEntries)
                 {
-                    var changedEntities = new List<ModifiedEntityEntry>();
-                    var tableMapping = new List<EntityMapping>();
-                    var sqlCommandInfos = new List<SqlCommandInfo>();
-
-                    IEnumerable<EntityEntry> changeDbEntityEntries = GetChangedDbEntityEntries();
-
-                    foreach (EntityEntry entry in changeDbEntityEntries)
-                    {
-                        ApplyTransactionInfo(transaction, entry);
-
-                        if (!generateTransaction)
-                        {
-                            // Get the deleted records info first
-                            if (entry.State == EntityState.Deleted)
-                            {
-                                EntityMapping? entityMapping = GetEntityMappingConfiguration(tableMapping, entry);
-                                if (entityMapping.IsNull())
-                                {
-                                    throw new NullReferenceException($"No se pudo encontrar el mapeo de la entidad para el tipo: {entry.Entity.GetType().Name}");
-                                }
-                                SqlCommandInfo? sqlCommandInfo = GetSqlCommandInfo(transaction, entry, entityMapping);
-                                if (sqlCommandInfo != null) sqlCommandInfos.Add(sqlCommandInfo);
-
-                                transaction.AddDetail(entityMapping.TableName, entry.State.ToString(), transaction.TransactionType);
-                            }
-                            else
-                            {
-                                changedEntities.Add(new ModifiedEntityEntry(entry, entry.State.ToString()));
-                            }
-                        }
-
-                    }
-                    base.SaveChanges();
+                    ApplyTransactionInfo(transaction, entry);
 
                     if (!generateTransaction)
                     {
-                        // Get the Added and Mdified records after changes, that way we will be able to get the generated .
-                        foreach (ModifiedEntityEntry entry in changedEntities)
+                        // Get the deleted records info first
+                        if (entry.State == EntityState.Deleted)
                         {
-                            EntityMapping? entityMapping = GetEntityMappingConfiguration(tableMapping, entry.EntityEntry);
+                            EntityMapping? entityMapping = GetEntityMappingConfiguration(tableMapping, entry);
                             if (entityMapping.IsNull())
                             {
-                                throw new NullReferenceException($"No se pudo encontrar el mapeo de la entidad para el tipo: {entry.EntityEntry.Entity.GetType().Name}");
+                                throw new NullReferenceException($"No se pudo encontrar el mapeo de la entidad para el tipo: {entry.Entity.GetType().Name}");
                             }
-                            SqlCommandInfo? sqlCommandInfo = GetSqlCommandInfo(transaction, entry.EntityEntry, entityMapping);
+                            SqlCommandInfo? sqlCommandInfo = GetSqlCommandInfo(transaction, entry, entityMapping);
                             if (sqlCommandInfo != null) sqlCommandInfos.Add(sqlCommandInfo);
-                            
-                            transaction.AddDetail(entityMapping.TableName, entry.State, transaction.TransactionType);
+
+                            transaction.AddDetail(entityMapping.TableName, entry.State.ToString(), transaction.TransactionType);
                         }
-
-                        // Adding Audit Detail Transaction CommandInfo.
-                        sqlCommandInfos.AddRange(GetAuditRecords(transaction));
-
-                        // Insert Transaction and audit records.
-                        foreach (SqlCommandInfo sqlCommandInfo in sqlCommandInfos)
+                        else
                         {
-                            Database.ExecuteSqlRaw(sqlCommandInfo.Sql, sqlCommandInfo.Parameters);
+                            changedEntities.Add(new ModifiedEntityEntry(entry, entry.State.ToString()));
                         }
-
                     }
 
-                    scope.Complete();
                 }
+                base.SaveChanges();
+
+                if (!generateTransaction)
+                {
+                    // Get the Added and Mdified records after changes, that way we will be able to get the generated .
+                    foreach (ModifiedEntityEntry entry in changedEntities)
+                    {
+                        EntityMapping? entityMapping = GetEntityMappingConfiguration(tableMapping, entry.EntityEntry);
+                        if (entityMapping.IsNull())
+                        {
+                            throw new NullReferenceException($"No se pudo encontrar el mapeo de la entidad para el tipo: {entry.EntityEntry.Entity.GetType().Name}");
+                        }
+                        SqlCommandInfo? sqlCommandInfo = GetSqlCommandInfo(transaction, entry.EntityEntry, entityMapping);
+                        if (sqlCommandInfo != null) sqlCommandInfos.Add(sqlCommandInfo);
+
+                        transaction.AddDetail(entityMapping.TableName, entry.State, transaction.TransactionType);
+                    }
+
+                    // Adding Audit Detail Transaction CommandInfo.
+                    sqlCommandInfos.AddRange(GetAuditRecords(transaction));
+
+                    // Insert Transaction and audit records.
+                    foreach (SqlCommandInfo sqlCommandInfo in sqlCommandInfos)
+                    {
+                        Database.ExecuteSqlRaw(sqlCommandInfo.Sql, sqlCommandInfo.Parameters);
+                    }
+
+                }
+
+                scope.Complete();
             }
             finally
             {
@@ -117,7 +109,7 @@ namespace Infraestructura.Core
             }
         }
 
-        private IEnumerable<SqlCommandInfo> GetAuditRecords(Logging.Transaction transaction)
+        private static List<SqlCommandInfo> GetAuditRecords(Logging.Transaction transaction)
         {
             var auditCommands = new List<SqlCommandInfo>
             {
@@ -134,7 +126,7 @@ namespace Infraestructura.Core
             return auditCommands;
         }
 
-        private SqlCommandInfo GetAuditDetailCommandInfo(TransactionDetail transactionDetail)
+        private static SqlCommandInfo GetAuditDetailCommandInfo(TransactionDetail transactionDetail)
         {
             const string sqlInsert =
                 "insert into  Comunes.LogTransaccionesDetalle(TransaccionUId,TipoTransaccion, EntidadDominio, DescripcionTransaccion) " +
@@ -148,7 +140,7 @@ namespace Infraestructura.Core
             return new SqlCommandInfo(sqlInsert, param);
         }
 
-        private SqlCommandInfo GetAuditHeaderCommandInfo(Logging.Transaction transaction)
+        private static SqlCommandInfo GetAuditHeaderCommandInfo(Logging.Transaction transaction)
         {
             const string sqlInsert =
                 "insert into  Comunes.LogTransacciones(TransaccionUId, TipoTransaccion, FechaTransaccion, ModificadoPor, OrigenTransaccion) " +
@@ -163,22 +155,20 @@ namespace Infraestructura.Core
             return new SqlCommandInfo(sqlInsert, param);
         }
 
-        private SqlCommandInfo? GetSqlCommandInfo(Logging.Transaction transaction, EntityEntry entry, EntityMapping entityMapping)
+        private static SqlCommandInfo? GetSqlCommandInfo(Logging.Transaction transaction, EntityEntry entry, EntityMapping entityMapping)
         {
             if (entityMapping.TableName.Contains("_Transacciones"))
             {
                 return null;
             }
 
-            string sqlInsert;
-            object[] param;
-            CreateTransactionInsertStatement(entityMapping, entry, transaction, out sqlInsert, out param);
+            CreateTransactionInsertStatement(entityMapping, entry, transaction, out string sqlInsert, out object[] param);
 
             var sqlCommandInfo = new SqlCommandInfo(sqlInsert, param);
             return sqlCommandInfo;
         }
 
-        private void CreateTransactionInsertStatement(EntityMapping entityMapping, EntityEntry entry,
+        private static void CreateTransactionInsertStatement(EntityMapping entityMapping, EntityEntry entry,
                                                       Logging.Transaction transaction, out string sqlInsert, out object[] objects)
         {
             var insert = new StringBuilder();
@@ -190,8 +180,8 @@ namespace Infraestructura.Core
 
             int index = 0;
             IEnumerable<string> propertyNames = entry.State == EntityState.Deleted
-                                                    ? GetPropertiesEntity(entry, entry.OriginalValues)
-                                                    : GetPropertiesEntity(entry, entry.CurrentValues);
+                                                    ? GetPropertiesEntity(entry)
+                                                    : GetPropertiesEntity(entry);
 
             foreach (string property in propertyNames)
             {
@@ -224,10 +214,10 @@ namespace Infraestructura.Core
             insert.AppendLine(paramNames.ToString());
 
             sqlInsert = insert.ToString();
-            objects = values.ToArray();
+            objects = [.. values];
         }
 
-        private object? GetEntityPropertyValue(EntityEntry? entry, string? prop, Logging.Transaction? transaction)
+        private static object? GetEntityPropertyValue(EntityEntry? entry, string? prop, Logging.Transaction? transaction)
         {
             // 1. Validación defensiva de parámetros
             if (entry.IsNull() || prop.IsMissingValue() || transaction.IsNull())
@@ -265,41 +255,26 @@ namespace Infraestructura.Core
                 return false;
             }
 
-            switch (property)
+            value = property switch
             {
-                case "TransaccionUId":
-                    value = transaction.TransactionId;
-                    break;
-
-                case "TipoTransaccion":
-                    value = transaction.TransactionType;
-                    break;
-
-                case "FechaTransaccion":
-                    value = transaction.TransactionDate;
-                    break;
-
-                case "ModificadoPor":
-                    value = transaction.ModifiedBy;
-                    break;
-
-                default:
-                    value = null;
-                    break;
-            }
-
+                "TransaccionUId" => transaction.TransactionId,
+                "TipoTransaccion" => transaction.TransactionType,
+                "FechaTransaccion" => transaction.TransactionDate,
+                "ModificadoPor" => transaction.ModifiedBy,
+                _ => null,
+            };
             return value.IsNotNull();
         }
 
-        private List<string> GetPropertiesEntity(EntityEntry? entry, PropertyValues? originalValues)
+        private static List<string> GetPropertiesEntity(EntityEntry? entry)
         {
             // 1. Guardar contra entry nulo
             if (entry.IsNull() || entry.OriginalValues.IsNull())
             {
-                return new List<string>();
+                return [];
             }
 
-            List<string> propertyNames = new();
+            List<string> propertyNames = [];
             var entity = entry.Entity;
             var entityType = entity.GetType();
             var properties = entry.OriginalValues.Properties;

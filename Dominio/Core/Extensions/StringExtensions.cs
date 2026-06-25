@@ -29,7 +29,7 @@ namespace Dominio.Core.Extensions
         /// </example>
         public static object[] ToObject(this string? value)
         {
-            return new object[] { value.ValueOrEmpty() };
+            return [value.ValueOrEmpty()];
         }
 
         /// <summary>
@@ -61,7 +61,7 @@ namespace Dominio.Core.Extensions
             decimal decimalValue = 0;
             if (decimalStringValue.HasValue())
             {
-                Decimal.TryParse(decimalStringValue, out decimalValue);
+                _ = decimal.TryParse(decimalStringValue, out decimalValue);
             }
             return decimalValue;
         }
@@ -130,7 +130,7 @@ namespace Dominio.Core.Extensions
             string output = string.Empty;
             if (decimalStringValue.HasValue())
             {
-                output = new string(decimalStringValue.ToCharArray().Where(c => char.IsDigit(c)).ToArray());
+                output = new string([.. decimalStringValue.ToCharArray().Where(c => char.IsDigit(c))]);
             }
             return output;
         }
@@ -219,7 +219,7 @@ namespace Dominio.Core.Extensions
         /// </example>
         public static string ToStringValue(this object? stringValue)
         {
-            return item?.ToString()?.Trim() ?? string.Empty;
+            return stringValue?.ToString()?.Trim() ?? string.Empty;
         }
 
         /// <summary>
@@ -286,13 +286,13 @@ namespace Dominio.Core.Extensions
             {
                 var firstSeparator = separators.First();
                 var messagesKeys = value.Split(firstSeparator);
-                return messagesKeys.ToList();
+                return [.. messagesKeys];
             }
             else
             {
                 var observaciones = value.Replace("\r\n", "\n");
                 var messagesKeys = observaciones.Split('\n');
-                return messagesKeys.ToList();
+                return [.. messagesKeys];
             }
         }
 

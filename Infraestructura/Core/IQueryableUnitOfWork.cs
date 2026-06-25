@@ -68,7 +68,7 @@ namespace Infraestructura.Core
         /// </returns>
         IEnumerable<TEntity> ExecuteQuery<TEntity>(string sqlCommand, params object[] parameters);
 
-        TType ExecuteScalarFunction<TType>(string scalarFunction, params object[] parameters);
+        TType? ExecuteScalarFunction<TType>(string scalarFunction, params object[] parameters);
 
         /// <summary>
         /// Execute specific query with underliying persistence store

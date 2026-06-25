@@ -1,6 +1,7 @@
 ﻿using Dominio.Context.Entidades.ConfiguracionesAgg;
 using Dominio.Context.Entidades.Seguridad;
 using Dominio.Core;
+using Dominio.Core.Extensions;
 using Infraestructura.Context.Mapping.ConfiguracionesMap;
 using Infraestructura.Context.Mapping.Seguridad;
 using Infraestructura.Core;
@@ -51,7 +52,7 @@ namespace Infraestructura.Context
         }
 
 
-        public override void Commit(TransactionInfo transactionInfo)
+        public override void Commit(TransactionInfo? transactionInfo)
         {
             base.Commit(transactionInfo);
         }

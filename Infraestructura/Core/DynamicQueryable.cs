@@ -15,25 +15,26 @@ namespace System.Linq.Dynamic
 
         public static IQueryable Where(this IQueryable source, string predicate, params object[] values)
         {
-            if (source == null) throw new ArgumentNullException("source");
-            if (predicate == null) throw new ArgumentNullException("predicate");
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(predicate);
+
             LambdaExpression lambda = DynamicExpression.ParseLambda(source.ElementType, typeof(bool), predicate, values);
             return source.Provider.CreateQuery(
                 Expression.Call(
                     typeof(Queryable), "Where",
-                    new Type[] { source.ElementType },
+                    [source.ElementType],
                     source.Expression, Expression.Quote(lambda)));
         }
 
         public static IQueryable Select(this IQueryable source, string selector, params object[] values)
         {
-            if (source == null) throw new ArgumentNullException("source");
-            if (selector == null) throw new ArgumentNullException("selector");
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(selector);
             LambdaExpression lambda = DynamicExpression.ParseLambda(source.ElementType, null, selector, values);
             return source.Provider.CreateQuery(
                 Expression.Call(
                     typeof(Queryable), "Select",
-                    new Type[] { source.ElementType, lambda.Body.Type },
+                    [source.ElementType, lambda.Body.Type],
                     source.Expression, Expression.Quote(lambda)));
         }
 
@@ -44,8 +45,8 @@ namespace System.Linq.Dynamic
 
         public static IQueryable OrderBy(this IQueryable source, string ordering, params object[] values)
         {
-            if (source == null) throw new ArgumentNullException("source");
-            if (ordering == null) throw new ArgumentNullException("ordering");
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(ordering);
             ParameterExpression[] parameters = new ParameterExpression[] {
                 Expression.Parameter(source.ElementType, "") };
             ExpressionParser parser = new ExpressionParser(parameters, ordering, values);
@@ -67,7 +68,7 @@ namespace System.Linq.Dynamic
 
         public static IQueryable Take(this IQueryable source, int count)
         {
-            if (source == null) throw new ArgumentNullException("source");
+            ArgumentNullException.ThrowIfNull(source);
             return source.Provider.CreateQuery(
                 Expression.Call(
                     typeof(Queryable), "Take",
@@ -77,7 +78,7 @@ namespace System.Linq.Dynamic
 
         public static IQueryable Skip(this IQueryable source, int count)
         {
-            if (source == null) throw new ArgumentNullException("source");
+            ArgumentNullException.ThrowIfNull(source);
             return source.Provider.CreateQuery(
                 Expression.Call(
                     typeof(Queryable), "Skip",
@@ -87,9 +88,9 @@ namespace System.Linq.Dynamic
 
         public static IQueryable GroupBy(this IQueryable source, string keySelector, string elementSelector, params object[] values)
         {
-            if (source == null) throw new ArgumentNullException("source");
-            if (keySelector == null) throw new ArgumentNullException("keySelector");
-            if (elementSelector == null) throw new ArgumentNullException("elementSelector");
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(keySelector);
+            ArgumentNullException.ThrowIfNull(elementSelector);
             LambdaExpression keyLambda = DynamicExpression.ParseLambda(source.ElementType, null, keySelector, values);
             LambdaExpression elementLambda = DynamicExpression.ParseLambda(source.ElementType, null, elementSelector, values);
             return source.Provider.CreateQuery(
@@ -101,7 +102,7 @@ namespace System.Linq.Dynamic
 
         public static bool Any(this IQueryable source)
         {
-            if (source == null) throw new ArgumentNullException("source");
+            ArgumentNullException.ThrowIfNull(source);
             return (bool)source.Provider.Execute(
                 Expression.Call(
                     typeof(Queryable), "Any",
@@ -110,7 +111,7 @@ namespace System.Linq.Dynamic
 
         public static int Count(this IQueryable source)
         {
-            if (source == null) throw new ArgumentNullException("source");
+            ArgumentNullException.ThrowIfNull(source);
             return (int)source.Provider.Execute(
                 Expression.Call(
                     typeof(Queryable), "Count",
@@ -144,8 +145,8 @@ namespace System.Linq.Dynamic
 
         public DynamicProperty(string name, Type type)
         {
-            if (name == null) throw new ArgumentNullException("name");
-            if (type == null) throw new ArgumentNullException("type");
+            ArgumentNullException.ThrowIfNull(name);
+            ArgumentNullException.ThrowIfNull(type);
             this.name = name;
             this.type = type;
         }
@@ -697,7 +698,7 @@ namespace System.Linq.Dynamic
 
         public ExpressionParser(ParameterExpression[] parameters, string expression, object[] values)
         {
-            if (expression == null) throw new ArgumentNullException("expression");
+            ArgumentNullException.ThrowIfNull(expression);
             if (keywords == null) keywords = CreateKeywords();
             symbols = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
             literals = new Dictionary<Expression, string>();

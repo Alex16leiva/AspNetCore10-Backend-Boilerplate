@@ -33,7 +33,7 @@ namespace Dominio.Core.Result
         }
 
         // Fábrica explícita para No Autorizado (401)
-        public static new Result<T> Unauthorized(string message = "No autorizado", string? errorCode = "UNAUTHORIZED")
+        public static Result<T> Unauthorized(string message = "No autorizado", string? errorCode = "UNAUTHORIZED")
         {
             return new Result<T>(false, default, message, errorCode, null, ResultStatus.Unauthorized);
         }
@@ -56,7 +56,7 @@ namespace Dominio.Core.Result
         /// <param name="errors">Colección de errores detallados.</param>
         /// <param name="errorCode">Código de error opcional.</param>
         /// <returns>Un <see cref="Result{T}"/> con errores de validación.</returns>
-        public static Result<T> ValidationFailure(string message, IEnumerable<string> errors, string? errorCode = null)
+        public static new Result<T> ValidationFailure(string message, IEnumerable<string> errors, string? errorCode = null)
         {
             return new Result<T>(false, default, message, errorCode, errors, ResultStatus.ValidationError);
         }
