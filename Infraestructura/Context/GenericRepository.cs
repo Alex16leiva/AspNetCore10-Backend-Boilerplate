@@ -12,20 +12,15 @@ using System.Text.RegularExpressions;
 
 namespace Infraestructura.Context
 {
-    public class GenericRepository<T> : IGenericRepository<T>
+    public class GenericRepository<T>(T unitOfWork, IConfiguration configuration) : IGenericRepository<T>
         where T : IQueryableUnitOfWork
     {
-        private readonly T _unitOfWork;
-        private readonly IConfiguration _configuration;
+        private readonly T _unitOfWork = unitOfWork;
+        private readonly IConfiguration _configuration = configuration;
+
         private static readonly Regex SqlIdentifierRegex = new(@"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$", RegexOptions.Compiled);
         private static readonly Regex SqlParameterNameRegex = new(@"^@[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.Compiled);
         private static readonly string[] UnsafeSqlTokens = [";", "--", "/*", "*/"];
-        public GenericRepository(T unitOfWork, IConfiguration configuration)
-        {
-            _unitOfWork = unitOfWork;
-            _configuration = configuration;
-        }
-
 
         private DbSet<TEntity> GetSet<TEntity>() where TEntity : class
         {
@@ -44,7 +39,7 @@ namespace Infraestructura.Context
             {
                 entity.FechaTransaccion = DateTime.Now;
                 entity.DescripcionTransaccion = "Insert";
-                entity.RowVersion = Array.Empty<Byte>();
+                entity.RowVersion = [];
                 GetSet<TEntity>().Add(entity); //Add new item in this set
             }
         }
@@ -56,7 +51,7 @@ namespace Infraestructura.Context
             {
                 entity.FechaTransaccion = DateTime.Now;
                 entity.DescripcionTransaccion = "Insert";
-                entity.RowVersion = Array.Empty<Byte>();
+                entity.RowVersion = [];
                 await GetSet<TEntity>().AddAsync(entity); //Add new item in this set
             }
         }
@@ -93,7 +88,7 @@ namespace Infraestructura.Context
         public IEnumerable<TEntity> GetAll<TEntity>() 
             where TEntity : Entity
         {
-            return GetSet<TEntity>().ToList();
+            return [.. GetSet<TEntity>()];
         }
 
         /// <inheritdoc/>
@@ -115,7 +110,7 @@ namespace Infraestructura.Context
                 items = includes.Aggregate(items, (current, include) => current.Include(include));
             }
 
-            return items.ToList();
+            return [.. items];
         }
 
         /// <inheritdoc/>
@@ -182,7 +177,7 @@ namespace Infraestructura.Context
         public IEnumerable<TEntity> GetFiltered<TEntity>(Expression<Func<TEntity, bool>> predicate)
             where TEntity : Entity
         {
-            return GetSet<TEntity>().Where(predicate).ToList();
+            return [.. GetSet<TEntity>().Where(predicate)];
         }
 
         /// <inheritdoc/>
@@ -203,7 +198,7 @@ namespace Infraestructura.Context
                 items = includes.Aggregate(items, (current, include) => current.Include(include));
             }
 
-            return items.Where(predicate).ToList();
+            return [.. items.Where(predicate)];
         }
 
         /// <inheritdoc/>
@@ -259,7 +254,7 @@ namespace Infraestructura.Context
 
             var pagedItems = items.ToList();
 
-            return new PagedCollection(filterDef.PageIndex, filterDef.PageSize, pagedItems, totalItems, pagedItems.Count());
+            return new PagedCollection(filterDef.PageIndex, filterDef.PageSize, pagedItems, totalItems, count: pagedItems.Count);
         }
 
         public async Task<PagedCollection> GetPagedAndFilteredAsync<TEntity>(DynamicFilter filterDef)
@@ -301,7 +296,7 @@ namespace Infraestructura.Context
 
             var pagedItems = await items.ToListAsync();
 
-            return new PagedCollection(filterDef.PageIndex, filterDef.PageSize, pagedItems, totalItems, pagedItems.Count());
+            return new PagedCollection(filterDef.PageIndex, filterDef.PageSize, pagedItems, totalItems, pagedItems.Count);
         }
 
         /// <inheritdoc/>
@@ -342,26 +337,26 @@ namespace Infraestructura.Context
         public IEnumerable<TType> ExecuteStoredProcedure<TType>(string storedProcedure, Dictionary<string, object> parameters)
         {
             ValidateSqlIdentifier(storedProcedure, nameof(storedProcedure));
-            SqlParameter[] sqlParameters = CreateSqlParameters(parameters);
-            string paramNames = GetParamNames(parameters);
+            SqlParameter[] sqlParameters = GenericRepository<T>.CreateSqlParameters(parameters);
+            string paramNames = GenericRepository<T>.GetParamNames(parameters);
 
             return (string.IsNullOrWhiteSpace(paramNames))
-                ? _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0}", storedProcedure), sqlParameters).ToList()
-                : _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0} {1}", storedProcedure, paramNames), sqlParameters).ToList();
+                ? [.. _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0}", storedProcedure), sqlParameters)]
+                : [.. _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0} {1}", storedProcedure, paramNames), sqlParameters)];
         }
 
         public IEnumerable<TType> ExecuteStoredProcedure<TType>(string storedProcedure, SqlParameter[] parameters)
         {
             ValidateSqlIdentifier(storedProcedure, nameof(storedProcedure));
-            string paramNames = GetParamNames(parameters);
-            return _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0} {1}", storedProcedure, paramNames), parameters).ToList();
+            string paramNames = GenericRepository<T>.GetParamNames(parameters);
+            return [.. _unitOfWork.ExecuteQuery<TType>(string.Format("EXEC {0} {1}", storedProcedure, paramNames), parameters)];
         }
 
         public TType ExecuteScalarFunction<TType>(string scalarFunction, Dictionary<string, object> parameters)
         {
             ValidateSqlIdentifier(scalarFunction, nameof(scalarFunction));
-            SqlParameter[] sqlParameters = CreateSqlParameters(parameters);
-            string paramNames = GetParamNames(parameters);
+            SqlParameter[] sqlParameters = GenericRepository<T>.CreateSqlParameters(parameters);
+            string paramNames = GenericRepository<T>.GetParamNames(parameters);
 
             var result = (string.IsNullOrWhiteSpace(paramNames))
                 ? _unitOfWork.ExecuteScalarFunction<TType>(string.Format("SELECT {0}();", scalarFunction), sqlParameters)
@@ -370,18 +365,18 @@ namespace Infraestructura.Context
             return result;
         }
 
-        private string GetParamNames(Dictionary<string, object> parameters)
+        private static string GetParamNames(Dictionary<string, object> parameters)
         {
             ValidateSqlParameterNames(parameters?.Keys);
-            return (parameters != null && parameters.Any())
+            return (parameters.IsNotNull() && parameters.HasItems())
                 ? parameters.Select(p => p.Key).Aggregate((i, j) => i + ", " + j)
                 : string.Empty;
         }
 
-        private string GetParamNames(SqlParameter[] parameters)
+        private static string GetParamNames(SqlParameter[] parameters)
         {
             ValidateSqlParameterNames(parameters?.Select(p => p.ParameterName));
-            return (parameters != null && parameters.Any())
+            return (parameters.IsNotNull() && parameters.HasItems())
                 ? parameters.Select(p => p.ParameterName).Aggregate((i, j) => i + ", " + j)
                 : string.Empty;
         }
@@ -389,25 +384,25 @@ namespace Infraestructura.Context
         public void ExecuteQuery(string sqlQuery, Dictionary<string, object> parameters)
         {
             ValidateSqlCommand(sqlQuery);
-            SqlParameter[] sqlParameters = CreateSqlParameters(parameters);
+            SqlParameter[] sqlParameters = GenericRepository<T>.CreateSqlParameters(parameters);
             _unitOfWork.ExecuteCommand(sqlQuery, sqlParameters);
         }
 
-        private SqlParameter[] CreateSqlParameters(Dictionary<string, object> parameters)
+        private static SqlParameter[] CreateSqlParameters(Dictionary<string, object> parameters)
         {
-            if (parameters != null && parameters.Any())
+            if (parameters.IsNotNull() && parameters.HasItems())
             {
                 ValidateSqlParameterNames(parameters.Keys);
-                return (from qry in parameters select new SqlParameter(qry.Key, qry.Value)).ToArray();
+                return [.. (from qry in parameters select new SqlParameter(qry.Key, qry.Value))];
             }
 
-            return new SqlParameter[0];
+            return [];
         }
 
         public void ExecuteQuery(SqlParameter[] parms, string sqlQuery)
         {
             // Si parms es nulo, usamos un array vacío para satisfacer el contrato
-            var safeParams = parms ?? Array.Empty<SqlParameter>();
+            var safeParams = parms ?? [];
             ValidateSqlCommand(sqlQuery);
             ValidateSqlParameterNames(safeParams.Select(p => p.ParameterName));
             _unitOfWork.ExecuteCommand(sqlQuery, safeParams);
@@ -426,25 +421,21 @@ namespace Infraestructura.Context
 
             try
             {
-                using (SqlConnection connection = new SqlConnection(connectionString))
+                using SqlConnection connection = new(connectionString);
+                await connection.OpenAsync();
+
+                string query = "SELECT COUNT(*) FROM msdb.dbo.sysjobs j " +
+                    "INNER JOIN msdb.dbo.sysjobactivity a " +
+                    "  ON j.job_id = a.job_id " +
+                    "WHERE j.name = @jobName AND a.run_requested_date IS NOT NULL AND a.stop_execution_date IS NULL";
+
+                using SqlCommand command = new(query, connection);
+                command.Parameters.Add(new SqlParameter("@jobName", jobName));
+                int runningJobCount = (int)(await command.ExecuteScalarAsync() ?? 0);
+
+                if (runningJobCount > 0)
                 {
-                    await connection.OpenAsync();
-
-                    string query = "SELECT COUNT(*) FROM msdb.dbo.sysjobs j " +
-                        "INNER JOIN msdb.dbo.sysjobactivity a " +
-                        "  ON j.job_id = a.job_id " +
-                        "WHERE j.name = @jobName AND a.run_requested_date IS NOT NULL AND a.stop_execution_date IS NULL";
-
-                    using (SqlCommand command = new SqlCommand(query, connection))
-                    {
-                        command.Parameters.Add(new SqlParameter("@jobName", jobName));
-                        int runningJobCount = (int)(await command.ExecuteScalarAsync() ?? 0);
-
-                        if (runningJobCount > 0)
-                        {
-                            result = true;
-                        }
-                    }
+                    result = true;
                 }
             }
             catch (Exception ex)
@@ -458,11 +449,11 @@ namespace Infraestructura.Context
         public IEnumerable<TEntity> ExecuteQuery<TEntity>(SqlParameter[] parms, string sqlQuery)
         {
             // Si parms es nulo, usamos un array vacío para satisfacer el contrato
-            var safeParams = parms ?? Array.Empty<SqlParameter>();
+            var safeParams = parms ?? [];
 
             ValidateSqlCommand(sqlQuery);
             ValidateSqlParameterNames(safeParams.Select(p => p.ParameterName));
-            return _unitOfWork.ExecuteQuery<TEntity>(sqlQuery, safeParams).ToList();
+            return [.. _unitOfWork.ExecuteQuery<TEntity>(sqlQuery, safeParams)];
         }
 
         private static void ValidateSqlIdentifier(string identifier, string argumentName)
