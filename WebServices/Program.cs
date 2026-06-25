@@ -1,3 +1,8 @@
+using Aplicacion.Core;
+using Infraestructura.Context;
+using Microsoft.AspNetCore.RateLimiting;
+using Scalar.AspNetCore;
+using System.Threading.RateLimiting;
 using WebServices.Extensions;
 using WebServices.Jwtoken;
 using WebServices.Middleware;
@@ -34,10 +39,6 @@ builder.Services.AddOpenApi();
 builder.ConfigureJwt();
 
 builder.Services.AddAutoMapper(cfg => cfg.AddMaps(typeof(AutoMapperProfile).Assembly));
-
-// FluentValidation: register automatic validation and scan for validators in Aplicacion assembly
-builder.Services.AddFluentValidationAutoValidation();
-builder.Services.AddValidatorsFromAssembly(typeof(Aplicacion.Services.Seguridad.Validators.UsuarioDTOValidator).Assembly);
 
 const string AllowSpecificOriginsPolicy = "AllowSpecificOriginsPolicy";
 const string AuthRateLimitPolicy = "AuthPolicy";
