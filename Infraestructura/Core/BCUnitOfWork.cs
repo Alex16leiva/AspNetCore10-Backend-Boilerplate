@@ -49,32 +49,31 @@ namespace Infraestructura.Core
                 {
                     ApplyTransactionInfo(transaction, entry);
 
-                    if (!generateTransaction)
+                    
+                    // Get the deleted records info first
+                    if (entry.State == EntityState.Deleted)
                     {
-                        // Get the deleted records info first
-                        if (entry.State == EntityState.Deleted)
+                        EntityMapping? entityMapping = GetEntityMappingConfiguration(tableMapping, entry);
+                        if (entityMapping.IsNull())
                         {
-                            EntityMapping? entityMapping = GetEntityMappingConfiguration(tableMapping, entry);
-                            if (entityMapping.IsNull())
-                            {
-                                throw new NullReferenceException($"No se pudo encontrar el mapeo de la entidad para el tipo: {entry.Entity.GetType().Name}");
-                            }
+                            throw new NullReferenceException($"No se pudo encontrar el mapeo de la entidad para el tipo: {entry.Entity.GetType().Name}");
+                        }
+                        if (generateTransaction)
+                        {
                             SqlCommandInfo? sqlCommandInfo = GetSqlCommandInfo(transaction, entry, entityMapping);
                             if (sqlCommandInfo != null) sqlCommandInfos.Add(sqlCommandInfo);
+                        }
 
-                            transaction.AddDetail(entityMapping.TableName, entry.State.ToString(), transaction.TransactionType);
-                        }
-                        else
-                        {
-                            changedEntities.Add(new ModifiedEntityEntry(entry, entry.State.ToString()));
-                        }
+                        transaction.AddDetail(entityMapping.TableName, entry.State.ToString(), transaction.TransactionType);
+                    }
+                    else
+                    {
+                        changedEntities.Add(new ModifiedEntityEntry(entry, entry.State.ToString()));
                     }
 
                 }
                 base.SaveChanges();
 
-                if (!generateTransaction)
-                {
                     // Get the Added and Mdified records after changes, that way we will be able to get the generated .
                     foreach (ModifiedEntityEntry entry in changedEntities)
                     {
@@ -83,10 +82,17 @@ namespace Infraestructura.Core
                         {
                             throw new NullReferenceException($"No se pudo encontrar el mapeo de la entidad para el tipo: {entry.EntityEntry.Entity.GetType().Name}");
                         }
-                        SqlCommandInfo? sqlCommandInfo = GetSqlCommandInfo(transaction, entry.EntityEntry, entityMapping);
-                        if (sqlCommandInfo != null) sqlCommandInfos.Add(sqlCommandInfo);
 
-                        transaction.AddDetail(entityMapping.TableName, entry.State, transaction.TransactionType);
+                    if (generateTransaction)
+                    {
+                        SqlCommandInfo sqlCommandInfo = GetSqlCommandInfo(transaction, entry.EntityEntry, entityMapping);
+                        if (sqlCommandInfo != null)
+                        {
+                            sqlCommandInfos.Add(sqlCommandInfo);
+                        }
+                    }
+
+                    transaction.AddDetail(entityMapping.TableName, entry.State, transaction.TransactionType);
                     }
 
                     // Adding Audit Detail Transaction CommandInfo.
@@ -98,9 +104,7 @@ namespace Infraestructura.Core
                         Database.ExecuteSqlRaw(sqlCommandInfo.Sql, sqlCommandInfo.Parameters);
                     }
 
-                }
-
-                scope.Complete();
+                    scope.Complete();
             }
             finally
             {
