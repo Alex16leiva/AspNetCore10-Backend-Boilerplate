@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>false</InvariantGlobalization>
-    <UserSecretsId>TemplateBackEndNetCore-WebServices</UserSecretsId>
+	<UserSecretsId>1baa61cb-3b09-4852-b0fc-c259535d84b3</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
