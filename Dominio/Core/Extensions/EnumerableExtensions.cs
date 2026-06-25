@@ -1,4 +1,6 @@
-﻿namespace Dominio.Core.Extensions
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace Dominio.Core.Extensions
 {
     public static class EnumerableExtensions
     {
@@ -86,9 +88,9 @@
         /// Console.WriteLine($"Objeto2 es nulo: {esNulo2}");
         /// </code>
         /// </example>
-        public static bool IsNull(this object? item)
+        public static bool IsNull([NotNullWhen(false)] this object? item)
         {
-            return item == null;
+            return item is null;
         }
 
         /// <summary>
@@ -111,9 +113,9 @@
         /// Console.WriteLine($"Objeto2 no es nulo: {noEsNulo2}");
         /// </code>
         /// </example>
-        public static bool IsNotNull(this object item)
+        public static bool IsNotNull([NotNullWhen(true)] this object? item)
         {
-            return item != null;
+            return item is not null;
         }
 
         /// <summary>
@@ -244,26 +246,29 @@
         /// // Luis
         /// </code>
         /// </example>
-        public static List<T> ExcludeByPropertyValue<T>(this IEnumerable<T> list, string nameProperty, string value)
+        public static IEnumerable<T> ExcludeByPropertyValue<T>(this IEnumerable<T> list, string nameProperty, string? value)
         {
-            var filteredCollection = new List<T>();
+            if (list == null) throw new ArgumentNullException(nameof(list));
+
+            // 1. Obtenemos la propiedad una sola vez fuera del bucle
+            var propertyInfo = typeof(T).GetProperty(nameProperty);
+
+            if (propertyInfo.IsNull())
+                throw new ArgumentException($"La propiedad '{nameProperty}' no existe en el tipo {typeof(T).Name}");
+
             foreach (var item in list)
             {
+                if (item.IsNull()) continue;
 
-                var propertyInfo =
-                    item.GetType()
-                        .GetProperty(nameProperty);
-                if (propertyInfo == null)
-                    return list.ToList();
+                // 2. Obtenemos el valor de forma segura
+                var propertyValue = propertyInfo.GetValue(item)?.ToString();
 
-                var propertyValue = propertyInfo.GetValue(item, null);
-                if (propertyValue.ToString() != value)
+                // 3. Comparamos
+                if (propertyValue != value)
                 {
-                    filteredCollection.Add(item);
+                    yield return item;
                 }
             }
-
-            return filteredCollection;
         }
 
         /// <summary>
@@ -382,8 +387,18 @@
         /// </example>
         public static List<string> GetStringListOf<T>(this IEnumerable<T> collection, string propertyName)
         {
-            var result = collection.Select(s => s.GetType().GetProperty(propertyName).GetValue(s, null).ToString());
-            return result.Distinct().ToList();
+            if (collection.IsNull()) return new List<string>();
+
+            var propertyInfo = typeof(T).GetProperty(propertyName);
+            if (propertyInfo.IsNull())
+            {
+                throw new ArgumentException($"La propiedad '{propertyName}' no existe en el tipo {typeof(T).Name}");
+            }
+
+            return collection
+                .Select(item => propertyInfo.GetValue(item)?.ToString() ?? string.Empty)
+                .Distinct()
+                .ToList();
         }
 
         /// <summary>

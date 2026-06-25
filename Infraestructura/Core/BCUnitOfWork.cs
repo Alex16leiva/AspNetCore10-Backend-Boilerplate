@@ -1,4 +1,5 @@
 ﻿using Dominio.Core;
+using Dominio.Core.Extensions;
 using Infraestructura.Context;
 using Infraestructura.Core.Identity;
 using Infraestructura.Core.Logging;
@@ -14,8 +15,7 @@ namespace Infraestructura.Core
 {
     public class BCUnitOfWork : DbContext
     {
-        private string Transact { get; set; }
-        public BCUnitOfWork(DbContextOptions<MyContext>? context)
+        public BCUnitOfWork(DbContextOptions<MyContext> context)
             : base(context)
         {
             // Command timeout is configured at the concrete DbContext level.
@@ -28,6 +28,10 @@ namespace Infraestructura.Core
 
         public virtual void Commit(TransactionInfo? transactionInfo)
         {
+            if (transactionInfo.IsNull())
+            {
+                throw new ArgumentNullException(nameof(transactionInfo), "TransactionInfo cannot be null.");
+            }
             Logging.Transaction transaction = BuildTransactionInfo(transactionInfo);
             Commit(transaction, transactionInfo.GenerateTransaction);
         }
@@ -57,8 +61,12 @@ namespace Infraestructura.Core
                             // Get the deleted records info first
                             if (entry.State == EntityState.Deleted)
                             {
-                                EntityMapping entityMapping = GetEntityMappingConfiguration(tableMapping, entry);
-                                SqlCommandInfo sqlCommandInfo = GetSqlCommandInfo(transaction, entry, entityMapping);
+                                EntityMapping? entityMapping = GetEntityMappingConfiguration(tableMapping, entry);
+                                if (entityMapping.IsNull())
+                                {
+                                    throw new NullReferenceException($"No se pudo encontrar el mapeo de la entidad para el tipo: {entry.Entity.GetType().Name}");
+                                }
+                                SqlCommandInfo? sqlCommandInfo = GetSqlCommandInfo(transaction, entry, entityMapping);
                                 if (sqlCommandInfo != null) sqlCommandInfos.Add(sqlCommandInfo);
 
                                 transaction.AddDetail(entityMapping.TableName, entry.State.ToString(), transaction.TransactionType);
@@ -77,8 +85,12 @@ namespace Infraestructura.Core
                         // Get the Added and Mdified records after changes, that way we will be able to get the generated .
                         foreach (ModifiedEntityEntry entry in changedEntities)
                         {
-                            EntityMapping entityMapping = GetEntityMappingConfiguration(tableMapping, entry.EntityEntry);
-                            SqlCommandInfo sqlCommandInfo = GetSqlCommandInfo(transaction, entry.EntityEntry, entityMapping);
+                            EntityMapping? entityMapping = GetEntityMappingConfiguration(tableMapping, entry.EntityEntry);
+                            if (entityMapping.IsNull())
+                            {
+                                throw new NullReferenceException($"No se pudo encontrar el mapeo de la entidad para el tipo: {entry.EntityEntry.Entity.GetType().Name}");
+                            }
+                            SqlCommandInfo? sqlCommandInfo = GetSqlCommandInfo(transaction, entry.EntityEntry, entityMapping);
                             if (sqlCommandInfo != null) sqlCommandInfos.Add(sqlCommandInfo);
                             
                             transaction.AddDetail(entityMapping.TableName, entry.State, transaction.TransactionType);
@@ -151,7 +163,7 @@ namespace Infraestructura.Core
             return new SqlCommandInfo(sqlInsert, param);
         }
 
-        private SqlCommandInfo GetSqlCommandInfo(Logging.Transaction transaction, EntityEntry entry, EntityMapping entityMapping)
+        private SqlCommandInfo? GetSqlCommandInfo(Logging.Transaction transaction, EntityEntry entry, EntityMapping entityMapping)
         {
             if (entityMapping.TableName.Contains("_Transacciones"))
             {
@@ -196,9 +208,12 @@ namespace Infraestructura.Core
                         fields.Append(string.Format(", {0}", prop));
                         paramNames.Append(string.Format(", {0}{1}{2}", "{", index, "}"));
                     }
-
-                    values.Add(GetEntityPropertyValue(entry, prop, transaction));
-                    index++;
+                    object? entityProperty = GetEntityPropertyValue(entry, property, transaction);
+                    if (entityProperty.IsNotNull())
+                    {
+                        values.Add(entityProperty);
+                        index++;
+                    }
                 }
             }
 
@@ -212,26 +227,44 @@ namespace Infraestructura.Core
             objects = values.ToArray();
         }
 
-        private object GetEntityPropertyValue(EntityEntry? entry, string? prop, Logging.Transaction? transaction)
+        private object? GetEntityPropertyValue(EntityEntry? entry, string? prop, Logging.Transaction? transaction)
         {
-            object value;
-            TryGeTransactionInfo(prop, transaction, out value);
-            if (value != null)
+            // 1. Validación defensiva de parámetros
+            if (entry.IsNull() || prop.IsMissingValue() || transaction.IsNull())
+            {
+                return null;
+            }
+
+            // 2. Intentar obtener info de la transacción
+            if (TryGeTransactionInfo(prop, transaction, out var value) && value.IsNotNull())
             {
                 return value;
             }
 
+            // 3. Manejo de estado de entidad
             if (entry.State == EntityState.Deleted || entry.State == EntityState.Detached)
             {
-                return prop == "DescripcionTransaccion"
-                           ? EntityState.Deleted.ToString()
-                           : entry.Property(prop).OriginalValue;
+                if (prop == "DescripcionTransaccion")
+                {
+                    return entry.State.ToString();
+                }
+
+                // Usamos la propiedad de forma segura
+                return entry.Property(prop).OriginalValue;
             }
+
+            // 4. Valor actual
             return entry.Property(prop).CurrentValue;
         }
 
-        private static void TryGeTransactionInfo(string property, Logging.Transaction transaction, out object value)
+        private static bool TryGeTransactionInfo(string property, Logging.Transaction transaction, out object? value)
         {
+            if (transaction.IsNull())
+            {
+                value = null;
+                return false;
+            }
+
             switch (property)
             {
                 case "TransaccionUId":
@@ -254,44 +287,64 @@ namespace Infraestructura.Core
                     value = null;
                     break;
             }
+
+            return value.IsNotNull();
         }
 
         private List<string> GetPropertiesEntity(EntityEntry? entry, PropertyValues? originalValues)
         {
-            List<string> propertyNames = [];
-            var entity = entry.Entity;
-            var entityType =  entity.GetType();
+            // 1. Guardar contra entry nulo
+            if (entry.IsNull() || entry.OriginalValues.IsNull())
+            {
+                return new List<string>();
+            }
 
+            List<string> propertyNames = new();
+            var entity = entry.Entity;
+            var entityType = entity.GetType();
             var properties = entry.OriginalValues.Properties;
 
             foreach (var prop in properties)
             {
-                if (entityType.GetProperty(prop.Name) == null)
+                // 2. Usar GetProperty de forma segura
+                var propertyInfo = entityType.GetProperty(prop.Name);
+
+                // Si no existe la propiedad en el tipo, la saltamos
+                if (propertyInfo.IsNull())
                     continue;
-                var pp = entityType.GetProperty(prop.Name);
-                if (pp.GetValue(entity) == null)
-                    continue;
-                propertyNames.Add(prop.Name);
+
+                // 3. Obtener el valor y verificar nulo
+                var value = propertyInfo.GetValue(entity);
+
+                // Usamos tu extensión IsNotNull (si está disponible) o 'is not null'
+                if (value.IsNotNull())
+                {
+                    propertyNames.Add(prop.Name);
+                }
             }
 
             return propertyNames;
         }
 
-        private static EntityMapping GetEntityMappingConfiguration(List<EntityMapping> tableMapping, EntityEntry entry)
+        private static EntityMapping? GetEntityMappingConfiguration(List<EntityMapping> tableMapping, EntityEntry entry)
         {
+            // 1. Validamos que el tipo de dominio no sea nulo
             var type = GetDomainEntityType(entry);
+            if (type.IsNull()) return null;
 
             var name = entry.Metadata.GetTableName();
             var schema = entry.Metadata.GetSchema();
+            var nameTable = $"{schema}.{name}"; // Usamos interpolación de strings, es más limpio
 
-            var nameTable = string.Format("{0}.{1}", schema, name);
+            // 2. Buscamos el mapeo (puede ser null)
+            EntityMapping? entityMapping = tableMapping.FirstOrDefault(m => m.EntityType == type);
 
-            EntityMapping entityMapping = tableMapping.FirstOrDefault(m => m.EntityType == type);
-            if (entityMapping == null)
+            if (entityMapping.IsNull())
             {
                 entityMapping = CreateTableMapping(type, nameTable);
                 tableMapping.Add(entityMapping);
             }
+
             return entityMapping;
         }
 
@@ -312,19 +365,25 @@ namespace Infraestructura.Core
             return result;
         }
 
-        private static Type GetDomainEntityType(EntityEntry entry)
+        private static Type? GetDomainEntityType(EntityEntry entry)
         {
-            Type type = entry.Entity.GetType();
-            if (type.FullName != null)
+            var type = entry.Entity.GetType();
+
+            // 1. Si el tipo actual ya es del dominio, lo devolvemos
+            // (Asegúrate de que 'TuNamespace' sea el namespace real de tu capa de dominio)
+            if (type.Namespace?.Contains("Dominio") == true)
             {
-                if (type.FullName.Contains("Dominio"))
-                {
-                    return type;
-                }
-                if (type.BaseType != null)
-                {
-                    return type.BaseType;
-                }
+                return type;
+            }
+
+            // 2. Si es un proxy de EF (clase generada dinámicamente), 
+            // el tipo real suele ser el BaseType.
+            var baseType = type.BaseType;
+
+            // Verificamos si el tipo base pertenece al dominio
+            if (baseType != null && baseType.Namespace?.Contains("Dominio") == true)
+            {
+                return baseType;
             }
 
             return null;
@@ -342,10 +401,10 @@ namespace Infraestructura.Core
 
         private static void AplicarInformacionTransaccion(EntityEntry item, string nombrePropiedad, object valorPropiedad)
         {
-            if (item != null && item.Entity != null)
+            if (item.IsNotNull() && item.Entity.IsNotNull() && nombrePropiedad.IsNotNull())
             {
-                PropertyInfo propInfoEntity = item.Entity.GetType().GetProperty(nombrePropiedad);
-                if (propInfoEntity != null)
+                PropertyInfo? propInfoEntity = item.Entity.GetType().GetProperty(nombrePropiedad);
+                if (propInfoEntity.IsNotNull())
                 {
                     propInfoEntity.SetValue(item.Entity, valorPropiedad, null);
                 }
@@ -370,7 +429,7 @@ namespace Infraestructura.Core
                 TransactionDate = transaccionId.TransactionDate,
                 TransactionOrigen = transactionInfo.TipoTransaccion,
                 TransactionType = transactionInfo.TipoTransaccion,
-                ModifiedBy = transactionInfo.ModificadoPor
+                ModifiedBy = transactionInfo.ModificadoPor.IsMissingValue() ? "Sistema" : transactionInfo.ModificadoPor
             };
         }
 
@@ -440,7 +499,7 @@ namespace Infraestructura.Core
             return Database.SqlQueryRaw<TEntity>(sqlCommand, parameters);
         }
 
-        public TType ExecuteScalarFunction<TType>(string scalarFunction, params object[] parameters)
+        public TType? ExecuteScalarFunction<TType>(string scalarFunction, params object[] parameters)
         {
             var returnValue = Database.SqlQueryRaw<TType>(scalarFunction, parameters);
 
@@ -457,10 +516,10 @@ namespace Infraestructura.Core
             return Set<TEntity>();
         }
 
-        public void Attach<TEntity>(TEntity item) where TEntity : class
+        public new void Attach<TEntity>(TEntity item) where TEntity : class
         {
-            //Attach and set as unchanged
-            Entry(item).State = EntityState.Unchanged;
+            // Attach y set como unchanged
+            base.Attach(item).State = EntityState.Unchanged;
         }
 
         public void SetModified<TEntity>(TEntity item) where TEntity : class

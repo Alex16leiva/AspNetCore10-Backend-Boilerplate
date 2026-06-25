@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Text.RegularExpressions;
 
 namespace Dominio.Core.Extensions
 {
@@ -94,7 +95,7 @@ namespace Dominio.Core.Extensions
             int decimalValue = 0;
             if (decimalStringValue.HasValue())
             {
-                Int32.TryParse(decimalStringValue, out decimalValue);
+                _ = int.TryParse(decimalStringValue, out decimalValue);
             }
             return decimalValue;
         }
@@ -158,7 +159,7 @@ namespace Dominio.Core.Extensions
         /// Console.WriteLine($"Texto1: {resultado1}, Texto2: {resultado2}, Texto3: {resultado3}, Texto4: {resultado4}");
         /// </code>
         /// </example>
-        public static bool HasValue(this string? stringValue)
+        public static bool HasValue([NotNullWhen(true)] this string? stringValue)
         {
             return !string.IsNullOrEmpty(stringValue) && !string.IsNullOrWhiteSpace(stringValue);
         }
@@ -216,9 +217,9 @@ namespace Dominio.Core.Extensions
         /// Console.WriteLine($"Resultado1: '{resultado1}', Resultado2: '{resultado2}', Resultado3: '{resultado3}'");
         /// </code>
         /// </example>
-        public static string ToStringValue(this object stringValue)
+        public static string ToStringValue(this object? stringValue)
         {
-            return stringValue != null ? stringValue.ToString().Trim() : string.Empty;
+            return item?.ToString()?.Trim() ?? string.Empty;
         }
 
         /// <summary>
@@ -245,7 +246,7 @@ namespace Dominio.Core.Extensions
         /// Console.WriteLine($"Texto1: {resultado1}, Texto2: {resultado2}, Texto3: {resultado3}, Texto4: {resultado4}");
         /// </code>
         /// </example>
-        public static bool IsMissingValue(this string? stringValue)
+        public static bool IsMissingValue([NotNullWhen(false)] this string? stringValue)
         {
             return !HasValue(stringValue);
         }

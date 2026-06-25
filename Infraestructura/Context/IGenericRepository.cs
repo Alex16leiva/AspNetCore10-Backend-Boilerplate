@@ -103,7 +103,7 @@ namespace Infraestructura.Context
         /// <typeparam name="TEntity">The entity type</typeparam>
         /// <param name="predicate">The where (the qyery expression)</param>
         /// <returns>Object of the TEntity class</returns>
-        TEntity GetSingle<TEntity>(Expression<Func<TEntity, bool>> predicate) 
+        TEntity? GetSingle<TEntity>(Expression<Func<TEntity, bool>> predicate) 
             where TEntity : Entity;
 
         /// <summary>
@@ -112,7 +112,7 @@ namespace Infraestructura.Context
         /// <typeparam name="TEntity">The entity type</typeparam>
         /// <param name="predicate">The where (the query expression)</param>
         /// <returns>Object of the TEntity class</returns>
-        Task<TEntity> GetSingleAsync<TEntity>(Expression<Func<TEntity, bool>> predicate)
+        Task<TEntity?> GetSingleAsync<TEntity>(Expression<Func<TEntity, bool>> predicate)
             where TEntity : Entity;
 
         /// <summary>
@@ -122,7 +122,7 @@ namespace Infraestructura.Context
         /// <param name="predicate">Filter that the element do match</param>
         /// <param name="includes">Related entities to include in the result set</param>
         /// <returns>Selected element</returns>
-        TEntity GetSingle<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
+        TEntity? GetSingle<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
             where TEntity : Entity;
 
         /// <summary>
@@ -132,7 +132,7 @@ namespace Infraestructura.Context
         /// <param name="predicate">Filter that the element do match</param>
         /// <param name="includes">Related entities to include in the result set</param>
         /// <returns>Selected element</returns>
-        Task<TEntity> GetSingleAsync<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
+        Task<TEntity?> GetSingleAsync<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
             where TEntity : Entity;
 
         /// <summary>

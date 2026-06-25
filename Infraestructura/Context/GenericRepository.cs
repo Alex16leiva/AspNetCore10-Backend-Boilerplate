@@ -134,14 +134,14 @@ namespace Infraestructura.Context
         }
 
         /// <inheritdoc/>
-        public TEntity GetSingle<TEntity>(Expression<Func<TEntity, bool>> predicate) 
+        public TEntity? GetSingle<TEntity>(Expression<Func<TEntity, bool>> predicate) 
             where TEntity : Entity
         {
             return GetSet<TEntity>().FirstOrDefault(predicate);
         }
 
         /// <inheritdoc/>
-        public async Task<TEntity> GetSingleAsync<TEntity>(Expression<Func<TEntity, bool>> predicate) 
+        public async Task<TEntity?> GetSingleAsync<TEntity>(Expression<Func<TEntity, bool>> predicate) 
             where TEntity : Entity
         {
             return await GetSet<TEntity>().FirstOrDefaultAsync(predicate);
@@ -149,7 +149,7 @@ namespace Infraestructura.Context
 
 
         /// <inheritdoc/>
-        public TEntity GetSingle<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
+        public TEntity? GetSingle<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
             where TEntity : Entity
         {
             IQueryable<TEntity> items = GetSet<TEntity>();
@@ -164,7 +164,7 @@ namespace Infraestructura.Context
         }
 
         /// <inheritdoc/>
-        public async Task<TEntity> GetSingleAsync<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
+        public async Task<TEntity?> GetSingleAsync<TEntity>(Expression<Func<TEntity, bool>> predicate, List<string> includes)
             where TEntity : Entity
         {
             IQueryable<TEntity> items = GetSet<TEntity>();
@@ -406,9 +406,11 @@ namespace Infraestructura.Context
 
         public void ExecuteQuery(SqlParameter[] parms, string sqlQuery)
         {
+            // Si parms es nulo, usamos un array vacío para satisfacer el contrato
+            var safeParams = parms ?? Array.Empty<SqlParameter>();
             ValidateSqlCommand(sqlQuery);
-            ValidateSqlParameterNames(parms?.Select(p => p.ParameterName));
-            _unitOfWork.ExecuteCommand(sqlQuery, parms);
+            ValidateSqlParameterNames(safeParams.Select(p => p.ParameterName));
+            _unitOfWork.ExecuteCommand(sqlQuery, safeParams);
         }
 
         public async Task<bool> IsRunningJobsAsync(string jobName)
@@ -455,9 +457,12 @@ namespace Infraestructura.Context
 
         public IEnumerable<TEntity> ExecuteQuery<TEntity>(SqlParameter[] parms, string sqlQuery)
         {
+            // Si parms es nulo, usamos un array vacío para satisfacer el contrato
+            var safeParams = parms ?? Array.Empty<SqlParameter>();
+
             ValidateSqlCommand(sqlQuery);
-            ValidateSqlParameterNames(parms?.Select(p => p.ParameterName));
-            return _unitOfWork.ExecuteQuery<TEntity>(sqlQuery, parms).ToList();
+            ValidateSqlParameterNames(safeParams.Select(p => p.ParameterName));
+            return _unitOfWork.ExecuteQuery<TEntity>(sqlQuery, safeParams).ToList();
         }
 
         private static void ValidateSqlIdentifier(string identifier, string argumentName)
@@ -470,7 +475,7 @@ namespace Infraestructura.Context
 
         private static void ValidateSqlParameterNames(IEnumerable<string>? parameterNames)
         {
-            if (parameterNames == null) return;
+            if (parameterNames.IsNull()) return;
 
             foreach (var parameterName in parameterNames)
             {
