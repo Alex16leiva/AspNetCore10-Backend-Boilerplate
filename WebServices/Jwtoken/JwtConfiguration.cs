@@ -1,4 +1,5 @@
-﻿using Dominio.Core.Jwtoken;
+﻿using Dominio.Core.Extensions;
+using Dominio.Core.Jwtoken;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -20,7 +21,7 @@ namespace WebServices.Jwtoken
                 ?? throw new InvalidOperationException("JwtSettings section is missing.");
 
             var secret = settings.Secret;
-            if (string.IsNullOrWhiteSpace(secret) || secret == "CHANGE_ME_TO_A_STRONG_SECRET")
+            if (secret.IsMissingValue() || secret == "CHANGE_ME_TO_A_STRONG_SECRET")
             {
                 throw new InvalidOperationException("JwtSettings:Secret must be configured in production using an environment variable or a secret manager.");
             }
@@ -30,7 +31,7 @@ namespace WebServices.Jwtoken
                 throw new InvalidOperationException("JwtSettings:Secret must be at least 32 bytes long.");
             }
 
-            if (string.IsNullOrWhiteSpace(settings.Issuer) || string.IsNullOrWhiteSpace(settings.Audience))
+            if (settings.Issuer.IsMissingValue() || settings.Audience.IsMissingValue())
             {
                 throw new InvalidOperationException("JwtSettings:Issuer and JwtSettings:Audience must be configured.");
             }
