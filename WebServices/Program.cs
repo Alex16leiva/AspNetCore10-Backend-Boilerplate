@@ -1,6 +1,7 @@
 using Aplicacion.Core;
 using Infraestructura.Context;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using System.Threading.RateLimiting;
 using WebServices.Extensions;
@@ -34,7 +35,36 @@ builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options 
     };
 });
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer((document, context, cancellationToken) =>
+    {
+        const string bearerScheme = "Bearer";
+
+        document.Components ??= new OpenApiComponents();
+        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+        document.Components.SecuritySchemes[bearerScheme] = new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            Description = "JWT Authorization header using the Bearer scheme."
+        };
+
+        var securityRequirement = new OpenApiSecurityRequirement
+        {
+            [new OpenApiSecuritySchemeReference(bearerScheme, document)] = []
+        };
+
+        foreach (var operation in document.Paths?.Values.SelectMany(path => path.Operations?.Values ?? Enumerable.Empty<OpenApiOperation>()) ?? Enumerable.Empty<OpenApiOperation>())
+        {
+            operation.Security ??= [];
+            operation.Security.Add(securityRequirement);
+        }
+
+        return Task.CompletedTask;
+    });
+});
 
 builder.ConfigureJwt();
 
@@ -96,7 +126,14 @@ using (var scope = app.Services.CreateScope())
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    app.MapScalarApiReference();
+    app.MapScalarApiReference(options =>
+    {
+        options.AddPreferredSecuritySchemes("Bearer");
+        options.AddHttpAuthentication("Bearer", scheme =>
+        {
+            scheme.Token = string.Empty;
+        });
+    });
 }
 
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
