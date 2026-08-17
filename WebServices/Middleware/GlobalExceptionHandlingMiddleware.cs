@@ -62,7 +62,6 @@ namespace WebServices.Middleware
 
                 var errorResponse = new
                 {
-                    
                     status = (int)HttpStatusCode.InternalServerError,
                     title = "Server Error",
                     ValidationErrorMessage = $"Ha ocurrido un error interno en el servidor. Por favor contacte al soporte si el problema persiste. reference Error {referenciaError}",
