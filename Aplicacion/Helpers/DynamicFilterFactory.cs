@@ -1,5 +1,6 @@
 ﻿using Aplicacion.DTOs;
 using Dominio.Core;
+using Dominio.Core.Extensions;
 
 namespace Aplicacion.Helpers
 {
@@ -15,7 +16,7 @@ namespace Aplicacion.Helpers
                 newQueryInfo.SortFields = queryInfo.SortFields;
                 newQueryInfo.Ascending = queryInfo.Ascending;
                 newQueryInfo.Predicate = queryInfo.Predicate;
-                newQueryInfo.ParamValues = CreateParam(queryInfo.ParamValues);
+                newQueryInfo.ParamValues = queryInfo.ParamValues.IsNotNull() ? CreateParam(queryInfo.ParamValues) : [];
 
                 if (queryInfo.PageIndex >= 0) newQueryInfo.PageIndex = queryInfo.PageIndex;
                 if (queryInfo.PageSize > 0) newQueryInfo.PageSize = queryInfo.PageSize;
