@@ -72,7 +72,8 @@ namespace Infraestructura.Core.RestClient
 
             string stringData = response.Content.ReadAsStringAsync().Result;
 
-            return JsonConvert.DeserializeObject<TResponse>(stringData);
+            var result = JsonConvert.DeserializeObject<TResponse>(stringData);
+            return result ?? throw new InvalidOperationException($"No se pudo deserializar la respuesta desde '{uri}' hacia {typeof(TResponse).Name}.");
         }
 
         /// <summary>
@@ -89,7 +90,7 @@ namespace Infraestructura.Core.RestClient
                         where TContent : class
             where TResponse : class
         {
-            ByteArrayContent byteContent = null;
+            ByteArrayContent? byteContent = null;
 
             if (content != null)
             {
@@ -124,7 +125,8 @@ namespace Infraestructura.Core.RestClient
 
             string stringData = response.Content.ReadAsStringAsync().Result;
 
-            return JsonConvert.DeserializeObject<TResponse>(stringData);
+            var result = JsonConvert.DeserializeObject<TResponse>(stringData);
+            return result ?? throw new InvalidOperationException($"No se pudo deserializar la respuesta desde '{uri}' hacia {typeof(TResponse).Name}.");
         }
     }
 }

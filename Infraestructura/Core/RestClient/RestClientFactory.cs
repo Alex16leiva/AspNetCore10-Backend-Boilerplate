@@ -2,7 +2,7 @@
 {
     public static class RestClientFactory
     {
-        private static IRestClientFactory _currentRestClientFactory;
+        private static IRestClientFactory? _currentRestClientFactory;
 
         /// <summary>
         /// Set the  rest client factory to use.
@@ -23,7 +23,12 @@
         /// <returns>Created IRestClient</returns>        
         public static IRestClient CreateClient(string baseAddress)
         {
-            return (_currentRestClientFactory != null) ? _currentRestClientFactory.Create(baseAddress) : null;
+            if (_currentRestClientFactory is null)
+            {
+                throw new InvalidOperationException("No hay un RestClientFactory configurado. Llama a RestClientFactory.SetCurrent(...) antes de crear clientes.");
+            }
+
+            return _currentRestClientFactory.Create(baseAddress);
         }
     }
 }

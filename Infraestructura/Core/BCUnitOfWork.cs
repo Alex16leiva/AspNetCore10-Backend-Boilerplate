@@ -64,7 +64,7 @@ namespace Infraestructura.Core
                             if (sqlCommandInfo != null) sqlCommandInfos.Add(sqlCommandInfo);
                         }
 
-                        transaction.AddDetail(entityMapping.TableName, entry.State.ToString(), transaction.TransactionType);
+                        transaction.AddDetail(entityMapping.TableName.ValueOrEmpty(), entry.State.ToString(), transaction.TransactionType.ValueOrEmpty());
                     }
                     else
                     {
@@ -85,14 +85,14 @@ namespace Infraestructura.Core
 
                     if (generateTransaction)
                     {
-                        SqlCommandInfo sqlCommandInfo = GetSqlCommandInfo(transaction, entry.EntityEntry, entityMapping);
+                        SqlCommandInfo? sqlCommandInfo = GetSqlCommandInfo(transaction, entry.EntityEntry, entityMapping);
                         if (sqlCommandInfo != null)
                         {
                             sqlCommandInfos.Add(sqlCommandInfo);
                         }
                     }
 
-                    transaction.AddDetail(entityMapping.TableName, entry.State, transaction.TransactionType);
+                    transaction.AddDetail(entityMapping.TableName.ValueOrEmpty(), entry.State, transaction.TransactionType.ValueOrEmpty());
                     }
 
                     // Adding Audit Detail Transaction CommandInfo.
@@ -138,7 +138,7 @@ namespace Infraestructura.Core
 
             var param = new object[]
                                  {
-                                     transactionDetail.TransactionId,transactionDetail.TransactionType, transactionDetail.TableName, transactionDetail.CrudOperation
+                                     transactionDetail.TransactionId, transactionDetail.TransactionType.ValueOrEmpty(), transactionDetail.TableName.ValueOrEmpty(), transactionDetail.CrudOperation.ValueOrEmpty()
                                  };
 
             return new SqlCommandInfo(sqlInsert, param);
@@ -152,8 +152,8 @@ namespace Infraestructura.Core
 
             var param = new object[]
                                  {
-                                     transaction.TransactionId, transaction.TransactionType, transaction.TransactionDate,
-                                     transaction.ModifiedBy, transaction.TransactionOrigen
+                                     transaction.TransactionId, transaction.TransactionType.ValueOrEmpty(), transaction.TransactionDate,
+                                     transaction.ModifiedBy.ValueOrEmpty(), transaction.TransactionOrigen.ValueOrEmpty()
                                  };
 
             return new SqlCommandInfo(sqlInsert, param);
@@ -161,7 +161,7 @@ namespace Infraestructura.Core
 
         private static SqlCommandInfo? GetSqlCommandInfo(Logging.Transaction transaction, EntityEntry entry, EntityMapping entityMapping)
         {
-            if (entityMapping.TableName.Contains("_Transacciones"))
+            if (entityMapping.TableName.IsNull() || entityMapping.TableName.Contains("_Transacciones"))
             {
                 return null;
             }
@@ -374,13 +374,13 @@ namespace Infraestructura.Core
             ((Entity)entry.Entity).DescripcionTransaccion = entry.State.ToString();
             ((Entity)entry.Entity).ModificadoPor = transaction.ModifiedBy;
 
-            AplicarInformacionTransaccion(entry, "TipoTransaccion", transaction.TransactionType);
+            AplicarInformacionTransaccion(entry, "TipoTransaccion", transaction.TransactionType.ValueOrEmpty());
             AplicarInformacionTransaccion(entry, "TransaccionUId", transaction.TransactionId);
         }
 
-        private static void AplicarInformacionTransaccion(EntityEntry item, string nombrePropiedad, object valorPropiedad)
+        private static void AplicarInformacionTransaccion(EntityEntry item, string nombrePropiedad, object? valorPropiedad)
         {
-            if (item.IsNotNull() && item.Entity.IsNotNull() && nombrePropiedad.IsNotNull())
+            if (item.IsNotNull() && item.Entity.IsNotNull() && nombrePropiedad.IsNotNull() && valorPropiedad.IsNotNull())
             {
                 PropertyInfo? propInfoEntity = item.Entity.GetType().GetProperty(nombrePropiedad);
                 if (propInfoEntity.IsNotNull())
