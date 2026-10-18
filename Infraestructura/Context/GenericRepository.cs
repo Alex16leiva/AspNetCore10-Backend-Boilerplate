@@ -1,5 +1,4 @@
-﻿
-using Dominio.Core;
+﻿using Dominio.Core;
 using Dominio.Core.Extensions;
 using Infraestructura.Core;
 using Microsoft.Data.SqlClient;
@@ -218,14 +217,18 @@ namespace Infraestructura.Context
         public PagedCollection GetPagedAndFiltered<TEntity>(DynamicFilter filterDef)
             where TEntity : Entity
         {
+            var values = filterDef.Valores.IsNotNull() ? filterDef.Valores : [];
+            var includes = filterDef.Includes ?? [];
+            var sortFields = filterDef.SortFields ?? [];
+
             IQueryable<TEntity> items = !string.IsNullOrWhiteSpace(filterDef.Filtro)
-                                            ? GetSet<TEntity>().Where(filterDef.Filtro, filterDef.Valores)
+                                            ? GetSet<TEntity>().Where(filterDef.Filtro, values)
                                             : GetSet<TEntity>();
 
-            if (filterDef.Includes.HasItems())
+            if (includes.HasItems())
             {
                 //Adding Includes to the filter
-                items = filterDef.Includes.Aggregate(items, (current, include) => current.Include(include));
+                items = includes.Aggregate(items, (current, include) => current.Include(include));
             }
 
             int totalItems = items.Count();
@@ -233,11 +236,11 @@ namespace Infraestructura.Context
             if (filterDef.PageSize != 0)
             {
                 //Adding sort criteria.
-                if (filterDef.SortFields.HasItems())
+                if (sortFields.HasItems())
                 {
                     string orderKey = filterDef.Ascending ? "ASC" : "DESC";
 
-                    var order = string.Join(" " + orderKey + ", ", filterDef.SortFields.ToArray());
+                    var order = string.Join(" " + orderKey + ", ", sortFields.ToArray());
 
                     if (!order.EndsWith(orderKey))
                     {
@@ -260,14 +263,18 @@ namespace Infraestructura.Context
         public async Task<PagedCollection> GetPagedAndFilteredAsync<TEntity>(DynamicFilter filterDef)
             where TEntity : Entity
         {
+            var values = filterDef.Valores.IsNotNull() ? filterDef.Valores : [];
+            var includes = filterDef.Includes ?? [];
+            var sortFields = filterDef.SortFields ?? [];
+
             IQueryable<TEntity> items = !string.IsNullOrWhiteSpace(filterDef.Filtro)
-                                            ? GetSet<TEntity>().Where(filterDef.Filtro, filterDef.Valores)
+                                            ? GetSet<TEntity>().Where(filterDef.Filtro, values)
                                             : GetSet<TEntity>();
 
-            if (filterDef.Includes.HasItems())
+            if (includes.HasItems())
             {
                 //Adding Includes to the filter
-                items = filterDef.Includes.Aggregate(items, (current, include) => current.Include(include));
+                items = includes.Aggregate(items, (current, include) => current.Include(include));
             }
 
             int totalItems = items.Count();
@@ -275,11 +282,11 @@ namespace Infraestructura.Context
             if (filterDef.PageSize != 0)
             {
                 //Adding sort criteria.
-                if (filterDef.SortFields.HasItems())
+                if (sortFields.HasItems())
                 {
                     string orderKey = filterDef.Ascending ? "ASC" : "DESC";
 
-                    var order = string.Join(" " + orderKey + ", ", filterDef.SortFields.ToArray());
+                    var order = string.Join(" " + orderKey + ", ", sortFields.ToArray());
 
                     if (!order.EndsWith(orderKey))
                     {
@@ -362,7 +369,7 @@ namespace Infraestructura.Context
                 ? _unitOfWork.ExecuteScalarFunction<TType>(string.Format("SELECT {0}();", scalarFunction), sqlParameters)
                 : _unitOfWork.ExecuteScalarFunction<TType>(string.Format("SELECT {0}({1});", scalarFunction, paramNames), sqlParameters);
 
-            return result;
+            return result ?? default!;
         }
 
         private static string GetParamNames(Dictionary<string, object> parameters)
