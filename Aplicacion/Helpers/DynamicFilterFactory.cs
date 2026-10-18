@@ -10,7 +10,7 @@ namespace Aplicacion.Helpers
         {
             var newQueryInfo = new QueryInfo();
 
-            if (queryInfo != null)
+            if (queryInfo.IsNotNull())
             {
                 newQueryInfo.Includes = queryInfo.Includes;
                 newQueryInfo.SortFields = queryInfo.SortFields;
@@ -27,10 +27,15 @@ namespace Aplicacion.Helpers
         }
         private static object[] CreateParam(object[]? paramValues)
         {
-            object[]? param = new object[paramValues.Length];
+            if (paramValues.IsNull() || paramValues.Length == 0)
+            {
+                return [];
+            }
+
+            var param = new object[paramValues.Length];
             for (int i = 0; i < paramValues.Length; i++)
             {
-                param[i] = paramValues[i].ToString();
+                param[i] = paramValues[i]?.ToString() ?? string.Empty;
             }
 
             return param;
