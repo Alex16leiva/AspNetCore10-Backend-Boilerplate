@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using Dominio.Core.Extensions;
+using System.Text;
 
 namespace Aplicacion.DTOs
 {
@@ -9,6 +10,7 @@ namespace Aplicacion.DTOs
             PageIndex = 0;
             PageSize = 10;
             SortFields = [];
+            ParamValues = [];
             CustomFilters = [];
         }
 
@@ -60,7 +62,7 @@ namespace Aplicacion.DTOs
         /// <returns>The Uniform Resource Name for the query request.</returns>
         public string GetUrn()
         {
-            var sortFields = string.Join("|", SortFields.ToArray());
+            var sortFields = string.Join("|", SortFields?.ToArray() ?? []);
             string paramValues = GetParamValues(ParamValues);
 
             var urn = string.Format("{0}-{1}-{2}-{3}-{4}-{5}", Predicate,
@@ -72,7 +74,7 @@ namespace Aplicacion.DTOs
 
         private string GetParamValues(object[] paramValues)
         {
-            if (paramValues != null)
+            if (paramValues.IsNotNull())
             {
                 var valuesStringBuild = new StringBuilder();
 
@@ -86,7 +88,5 @@ namespace Aplicacion.DTOs
 
             return string.Empty;
         }
-
-
     }
 }
