@@ -1,4 +1,5 @@
 using Dominio.Context.Entidades.Seguridad;
+using Dominio.Core.Extensions;
 using Dominio.Core.Jwtoken;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -20,7 +21,10 @@ namespace Infraestructura.Core.Jwtoken
         public string Generate(Usuario user)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));
+            var secret = _jwtSettings.Secret.ValueOrEmpty();
+            var issuer = _jwtSettings.Issuer.ValueOrEmpty();
+            var audience = _jwtSettings.Audience.ValueOrEmpty();
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.Name, user.Nombre ?? string.Empty),
@@ -36,8 +40,8 @@ namespace Infraestructura.Core.Jwtoken
             {
                 Subject = new ClaimsIdentity(claims),
                 Expires = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpirationInMinutes),
-                Issuer = _jwtSettings.Issuer,
-                Audience = _jwtSettings.Audience,
+                Issuer = issuer,
+                Audience = audience,
                 SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature)
             };
             var token = tokenHandler.CreateToken(tokenDescriptor);
@@ -54,14 +58,18 @@ namespace Infraestructura.Core.Jwtoken
 
         public ClaimsPrincipal GetPrincipalFromExpiredToken(string token)
         {
+            var secret = _jwtSettings.Secret.ValueOrEmpty();
+            var issuer = _jwtSettings.Issuer.ValueOrEmpty();
+            var audience = _jwtSettings.Audience.ValueOrEmpty();
+
             var tokenValidationParameters = new TokenValidationParameters
             {
                 ValidateAudience = true,
-                ValidAudience = _jwtSettings.Audience,
+                ValidAudience = audience,
                 ValidateIssuer = true,
-                ValidIssuer = _jwtSettings.Issuer,
+                ValidIssuer = issuer,
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret)),
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)),
                 ValidateLifetime = false,
                 ClockSkew = TimeSpan.Zero
             };
