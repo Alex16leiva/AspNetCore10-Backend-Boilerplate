@@ -55,14 +55,22 @@ namespace Aplicacion.Services.ConfiguracionesApp
             }
 
             var detalleRequest = request.ConfiguracionesDetalle!;
+            if (string.IsNullOrWhiteSpace(detalleRequest.ConfiguracionId)
+                || string.IsNullOrWhiteSpace(detalleRequest.Atributo)
+                || string.IsNullOrWhiteSpace(detalleRequest.Descripcion)
+                || string.IsNullOrWhiteSpace(detalleRequest.Valor))
+            {
+                return Result<ConfiguracionesDetalleDTO>.Failure("Los campos del detalle de configuracion son obligatorios", "INVALID_CONFIGURATION_DETAIL", ResultStatus.ValidationError);
+            }
+
             var existingConfiguracionDetalle = await _genericRepository.GetSingleAsync<ConfiguracionesDetalle>(x => x.ConfiguracionId == detalleRequest.ConfiguracionId && x.Atributo == detalleRequest.Atributo);
             if (existingConfiguracionDetalle.IsNull())
             {
                 return Result<ConfiguracionesDetalleDTO>.Failure($"No existe un detalle de configuracion con el ID {detalleRequest.ConfiguracionId} y el atributo {detalleRequest.Atributo}", "CONFIGURATION_DETAIL_NOT_FOUND");
             }
 
-            existingConfiguracionDetalle.Descripcion = detalleRequest.Descripcion;
-            existingConfiguracionDetalle.Valor = detalleRequest.Valor;
+            existingConfiguracionDetalle.Descripcion = detalleRequest.Descripcion!;
+            existingConfiguracionDetalle.Valor = detalleRequest.Valor!;
 
             TransactionInfo transactionInfo = request.RequestUserInfo!.CrearTransactionInfo("EditarConfiguracionDetalle");
             _genericRepository.UnitOfWork.Commit(transactionInfo);
@@ -102,6 +110,14 @@ namespace Aplicacion.Services.ConfiguracionesApp
             }
 
             var detalleRequest = request.ConfiguracionesDetalle!;
+            if (string.IsNullOrWhiteSpace(detalleRequest.ConfiguracionId)
+                || string.IsNullOrWhiteSpace(detalleRequest.Atributo)
+                || string.IsNullOrWhiteSpace(detalleRequest.Descripcion)
+                || string.IsNullOrWhiteSpace(detalleRequest.Valor))
+            {
+                return Result<ConfiguracionesDetalleDTO>.Failure("Los campos del detalle de configuracion son obligatorios", "INVALID_CONFIGURATION_DETAIL", ResultStatus.ValidationError);
+            }
+
             var existingConfiguracion = await _genericRepository.GetSingleAsync<Configuraciones>(x => x.ConfiguracionId == detalleRequest.ConfiguracionId);
             if (existingConfiguracion.IsNull())
             {
@@ -110,10 +126,10 @@ namespace Aplicacion.Services.ConfiguracionesApp
 
             var configuracionesDetalle = new ConfiguracionesDetalle
             {
-                ConfiguracionId = detalleRequest.ConfiguracionId,
-                Atributo = detalleRequest.Atributo,
-                Descripcion = detalleRequest.Descripcion,
-                Valor = detalleRequest.Valor,
+                ConfiguracionId = detalleRequest.ConfiguracionId!,
+                Atributo = detalleRequest.Atributo!,
+                Descripcion = detalleRequest.Descripcion!,
+                Valor = detalleRequest.Valor!,
             };
 
             await _genericRepository.AddAsync(configuracionesDetalle);
@@ -130,7 +146,7 @@ namespace Aplicacion.Services.ConfiguracionesApp
                 return Result<SearchResult<ConfiguracionesDTO>>.Failure("Solicitud es obligatoria", "NULL_REQUEST", ResultStatus.ValidationError);
             }
 
-            var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(request.QueryInfo);
+            var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(request.QueryInfo ?? new QueryInfo());
             var configuraciones = await _genericRepository.GetPagedAndFilteredAsync<Configuraciones>(dynamicFilter);
             var result = new SearchResult<ConfiguracionesDTO>
             {
@@ -187,13 +203,15 @@ namespace Aplicacion.Services.ConfiguracionesApp
 
         private static ConfiguracionesDTO MapConfiguracionesDTO(Configuraciones query)
         {
+            var detalles = query.ConfiguracionesDetalle?
+                .Select(detalle => MapConfiguracionesDetalleDTO(detalle))
+                .ToList();
+
             return new ConfiguracionesDTO
             {
                 ConfiguracionId = query.ConfiguracionId,
                 Descripcion = query.Descripcion,
-                ConfiguracionesDetalle = query.ConfiguracionesDetalle?
-                    .Select(detalle => MapConfiguracionesDetalleDTO(detalle))
-                    .ToList() ?? new List<ConfiguracionesDetalleDTO>()
+                ConfiguracionesDetalle = detalles ?? new List<ConfiguracionesDetalleDTO>()
             };
         }
     }
