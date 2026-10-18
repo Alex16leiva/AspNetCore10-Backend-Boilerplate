@@ -1,7 +1,6 @@
 using Aplicacion.Core;
 using Aplicacion.DTOs;
 using Aplicacion.DTOs.Seguridad;
-using System.Threading.Tasks;
 using Aplicacion.Helpers;
 using AutoMapper;
 using Dominio.Context.Entidades;
@@ -28,6 +27,8 @@ namespace Aplicacion.Services.Seguridad
         private readonly JwtSettings _jwtSettings;
         public SecurityAplicationService(IGenericRepository<IDataContext> genericRepository, ITokenService tokenService, IMapper mapper, IOptions<JwtSettings> jwtSettings)
         {
+            if (genericRepository.IsNull()) throw new ArgumentNullException(nameof(genericRepository));
+            
             _genericRepository = genericRepository;
             _tokenService = tokenService;
             _mapper = mapper;
@@ -147,7 +148,7 @@ namespace Aplicacion.Services.Seguridad
         {
             var includes = new List<string> { "Rol", "Rol.Permisos" };
 
-            if (string.IsNullOrWhiteSpace(request?.Password) || string.IsNullOrWhiteSpace(request?.UsuarioId))
+            if (request.IsNull() || request.Password.IsMissingValue() || request.UsuarioId.IsMissingValue())
             { 
                 return await Task.FromResult(Result<UsuarioDTO>.Unauthorized("Usuario o Contraseña no valido", "INVALID_CREDENTIALS"));
             }
@@ -167,17 +168,10 @@ namespace Aplicacion.Services.Seguridad
                 usuario.RefreshToken = HashRefreshToken(newRefreshToken);
                 usuario.RefreshTokenExpiraEn = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationInDays);
 
-                if (request.RequestUserInfo != null)
+                request.RequestUserInfo = new RequestUserInfo
                 {
-                    request.RequestUserInfo.UsuarioId = usuario.UsuarioId;
-                }
-                else
-                {
-                    request.RequestUserInfo = new RequestUserInfo
-                    {
-                        UsuarioId = usuario.UsuarioId,
-                    };
-                }
+                    UsuarioId = usuario.UsuarioId,
+                };                
 
                 TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("IniciarSesion");
                 _genericRepository.UnitOfWork.Commit(transactionInfo);
