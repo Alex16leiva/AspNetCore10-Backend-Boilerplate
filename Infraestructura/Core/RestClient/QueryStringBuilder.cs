@@ -14,6 +14,11 @@ namespace Infraestructura.Core.RestClient
         /// <returns>The converted query string.</returns>
         public static string GetQueryString<T>(T obj)
         {
+            if (obj is null)
+            {
+                return string.Empty;
+            }
+
             IEnumerable<PropertyInfo> propertyInfos = from p in obj.GetType().GetProperties()
                                                       where p.GetValue(obj, null) != null
                                                       select p;
@@ -44,7 +49,8 @@ namespace Infraestructura.Core.RestClient
         private static string GetSimpleTypeValue<T>(T obj, PropertyInfo propertyInfo)
         {
             // For primitive types we just need to get the property value.
-            return $"{propertyInfo.Name}={HttpUtility.UrlEncode(propertyInfo.GetValue(obj, null).ToString())}";
+            var value = propertyInfo.GetValue(obj);
+            return $"{propertyInfo.Name}={HttpUtility.UrlEncode(value?.ToString() ?? string.Empty)}";
         }
 
         private static string GetComplexTypeValue<T>(T obj, PropertyInfo propertyInfo)
@@ -59,15 +65,17 @@ namespace Infraestructura.Core.RestClient
 
                 if (IsSimpleType(collectionType))
                 {
-                    IEnumerable collection = (IEnumerable)propertyInfo.GetValue(obj, null);
-
-                    foreach (var item in collection)
+                    var value = propertyInfo.GetValue(obj);
+                    if (value is IEnumerable collection)
                     {
-                        if (item != null)
+                        foreach (var item in collection)
                         {
-                            string collectionItem = $"{collectionPropertyName}={HttpUtility.UrlEncode(item.ToString())}";
+                            if (item is not null)
+                            {
+                                string collectionItem = $"{collectionPropertyName}={HttpUtility.UrlEncode(item.ToString())}";
 
-                            propertiesStringBuilder.Add(collectionItem);
+                                propertiesStringBuilder.Add(collectionItem);
+                            }
                         }
                     }
                 }
