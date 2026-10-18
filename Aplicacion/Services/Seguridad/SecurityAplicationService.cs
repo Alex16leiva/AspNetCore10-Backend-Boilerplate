@@ -231,7 +231,8 @@ namespace Aplicacion.Services.Seguridad
             usuario.RefreshToken = HashRefreshToken(newRefreshToken);
             usuario.RefreshTokenExpiraEn = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationInDays);
 
-            TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("RefreshToken");
+            TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("RefreshToken")
+                ?? new TransactionInfo { GenerateTransaction = false };
             _genericRepository.UnitOfWork.Commit(transactionInfo);
 
             var resultDto = new UsuarioDTO 
