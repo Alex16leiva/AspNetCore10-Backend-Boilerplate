@@ -4,6 +4,6 @@
     {
         public required string ConfiguracionId { get; set; }
         public required string Descripcion { get; set; }
-        public List<ConfiguracionesDetalleDTO> ConfiguracionesDetalle { get; set; }
+        public List<ConfiguracionesDetalleDTO>? ConfiguracionesDetalle { get; set; }
     }
 }
