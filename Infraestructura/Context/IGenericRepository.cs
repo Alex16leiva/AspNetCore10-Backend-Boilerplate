@@ -223,6 +223,6 @@ namespace Infraestructura.Context
         Task<bool> IsRunningJobsAsync(string jobName);
 
         IEnumerable<TEntity> ExecuteQuery<TEntity>(SqlParameter[] parms, string sqlQuery);
-        void Dispose();
+        new void Dispose();
     }
 }
