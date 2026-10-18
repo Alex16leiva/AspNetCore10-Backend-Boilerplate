@@ -22,8 +22,12 @@ namespace Aplicacion.Services.ExcepcionLogServices
 
         public async Task<SearchResult<ExcepcionLogDTO>> ObtenerExcepcionesPaginado(ExcepcionLogRequest request)
         {
-            
-            var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(request.QueryInfo);
+            if (request.IsNull())
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            var dynamicFilter = DynamicFilterFactory.CreateDynamicFilter(request.QueryInfo ?? new QueryInfo());
             var result = await _genericRepository.GetPagedAndFilteredAsync<ExcepcionLog>(dynamicFilter);
             return new SearchResult<ExcepcionLogDTO>
             {
@@ -67,14 +71,16 @@ namespace Aplicacion.Services.ExcepcionLogServices
 
             if (request.RequestUserInfo.IsNull()) throw new ArgumentNullException(nameof(request.RequestUserInfo));
 
-            if (request.RequestUserInfo.UsuarioId.IsMissingValue()) throw new ArgumentNullException(nameof(request.RequestUserInfo.UsuarioId));
+            var usuarioId = request.RequestUserInfo?.UsuarioId;
+            if (string.IsNullOrWhiteSpace(usuarioId))
+                return new ExcepcionLogDTO { Message = "El usuario no está identificado." };
+
+            bool tienePermiso = await _securityAplicationService.TienePermisoEditarAsync(usuarioId, "ExcepcionLog");
+            if (!tienePermiso)
+                return new ExcepcionLogDTO { Message = "Operación denegada: El usuario no cuenta con permisos de edición para el módulo de ExcepcionLog." };
 
             if (request.ExcepcionLog.IsNull() || request.ExcepcionLog.Id <= 0)
                 return new ExcepcionLogDTO { Message = "El Id de la excepción es inválido." };
-
-            bool tienePermiso = await _securityAplicationService.TienePermisoEditarAsync(request.RequestUserInfo?.UsuarioId, "ExcepcionLog");
-            if (!tienePermiso)
-                return new ExcepcionLogDTO { Message = "Operación denegada: El usuario no cuenta con permisos de edición para el módulo de ExcepcionLog." };
 
             var entidad = await _genericRepository.GetSingleAsync<ExcepcionLog>(x => x.Id == request.ExcepcionLog!.Id);
             if (entidad == null)
