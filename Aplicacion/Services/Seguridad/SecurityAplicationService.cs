@@ -42,7 +42,7 @@ namespace Aplicacion.Services.Seguridad
                 return await Task.FromResult(Result<UsuarioDTO>.Failure("Usuario es obligatorio", "NULL_USUARIO"));
             }
 
-            Usuario usuarioExiste = await _genericRepository.GetSingleAsync<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
+            Usuario? usuarioExiste = await _genericRepository.GetSingleAsync<Usuario>(r => r.UsuarioId == request.Usuario.UsuarioId);
 
             if (usuarioExiste.IsNull())
             { 
@@ -51,8 +51,13 @@ namespace Aplicacion.Services.Seguridad
 
             if (request.Usuario.EditarContrasena)
             {
-                usuarioExiste.Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena);
-            } 
+                if (request.Usuario.Contrasena.IsMissingValue())
+                {
+                    return await Task.FromResult(Result<UsuarioDTO>.Failure("La contraseña es obligatoria", "PASSWORD_REQUIRED"));
+                }
+
+                usuarioExiste.Contrasena = PasswordEncryptor.HashPassword(request.Usuario.Contrasena!);
+            }
 
             usuarioExiste.Nombre = request.Usuario.Nombre.ValueOrEmpty();
             usuarioExiste.Apellido = request.Usuario.Apellido.ValueOrEmpty();
@@ -75,10 +80,20 @@ namespace Aplicacion.Services.Seguridad
 
         public async Task<Result<RolDTO>> EdicionPermisos(EdicionPermisosRequest request)
         {
+            if (request.IsNull() || request.RolId.IsMissingValue() || request.Permisos.IsNull())
+            {
+                return await Task.FromResult(Result<RolDTO>.Failure("Los permisos son obligatorios", "NULL_PERMISSIONS"));
+            }
+
             var permisos = await _genericRepository.GetFilteredAsync<Permisos>(r => r.RolId == request.RolId);
 
-            foreach (var item in request.Permisos) 
+            foreach (var item in request.Permisos)
             {
+                if (item.PantallaId.IsMissingValue() || item.RolId.IsMissingValue())
+                {
+                    continue;
+                }
+
                 var permiso = permisos.FirstOrDefault(r => r.PantallaId == item.PantallaId);
                 if (permiso.IsNotNull())
                 {
@@ -97,8 +112,8 @@ namespace Aplicacion.Services.Seguridad
                     {
                         Editar = item.Editar,
                         Eliminar = item.Eliminar,
-                        PantallaId = item.PantallaId,
-                        RolId = item.RolId,
+                        PantallaId = item.PantallaId!,
+                        RolId = item.RolId!,
                         Ver = item.Ver,
                     };
                     _genericRepository.Add(nuevoPermiso); 
@@ -120,7 +135,12 @@ namespace Aplicacion.Services.Seguridad
 
             var usuarioRequest = request.Usuario;
 
-            Usuario usuarioExiste = await _genericRepository.GetSingleAsync<Usuario>(r => r.UsuarioId == usuarioRequest.UsuarioId);
+            if (usuarioRequest.Contrasena.IsMissingValue())
+            {
+                return await Task.FromResult(Result<UsuarioDTO>.Failure("La contraseña es obligatoria", "PASSWORD_REQUIRED"));
+            }
+
+            Usuario? usuarioExiste = await _genericRepository.GetSingleAsync<Usuario>(r => r.UsuarioId == usuarioRequest.UsuarioId);
 
             if (usuarioExiste.IsNotNull())
             { 
@@ -130,7 +150,7 @@ namespace Aplicacion.Services.Seguridad
             var usuario = new Usuario
             {
                 Apellido = usuarioRequest.Apellido.ValueOrEmpty(),
-                Contrasena = PasswordEncryptor.HashPassword(usuarioRequest.Contrasena), 
+                Contrasena = PasswordEncryptor.HashPassword(usuarioRequest.Contrasena!), 
                 Nombre = usuarioRequest.Nombre.ValueOrEmpty(),
                 RolId = usuarioRequest.RolId.ValueOrEmpty(),
                 UsuarioId = usuarioRequest.UsuarioId.ValueOrEmpty(),
@@ -153,9 +173,9 @@ namespace Aplicacion.Services.Seguridad
                 return await Task.FromResult(Result<UsuarioDTO>.Unauthorized("Usuario o Contraseña no valido", "INVALID_CREDENTIALS"));
             }
 
-            Usuario usuario = await _genericRepository.GetSingleAsync<Usuario>(r => r.UsuarioId == request.UsuarioId, includes);
+            Usuario? usuario = await _genericRepository.GetSingleAsync<Usuario>(r => r.UsuarioId == request.UsuarioId, includes);
 
-            if (usuario.IsNotNull() && PasswordEncryptor.VerifyPassword(request.Password, usuario.Contrasena))
+            if (usuario.IsNotNull() && PasswordEncryptor.VerifyPassword(request.Password!, usuario.Contrasena))
             {
                 if (!usuario.Activo)
                 { 
@@ -172,8 +192,8 @@ namespace Aplicacion.Services.Seguridad
                 {
                     UsuarioId = usuario.UsuarioId,
                 };                
-
-                TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("IniciarSesion");
+                TransactionInfo transactionInfo = request.RequestUserInfo?.CrearTransactionInfo("IniciarSesion")
+                    ?? new TransactionInfo { GenerateTransaction = false };
                 _genericRepository.UnitOfWork.Commit(transactionInfo);
 
                 var resultDto = new UsuarioDTO
