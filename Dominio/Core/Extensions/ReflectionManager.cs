@@ -27,10 +27,10 @@ namespace Dominio.Core.Extensions
         /// Console.WriteLine($"Nombre: {nombre}, Edad: {edad}, Altura: {altura}");
         /// </code>
         /// </example>
-        public static T GetPropValue<T>(this object obj, string name)
+        public static T GetPropValue<T>(this object? obj, string name)
         {
-            object retval = GetPropValue(obj, name);
-            if (retval == null) { return default(T); }
+            object? retval = GetPropValue(obj, name);
+            if (retval == null) { return default(T)!; }
 
             return (T)retval;
         }
@@ -56,14 +56,14 @@ namespace Dominio.Core.Extensions
         /// Console.WriteLine(persona.Nombre); // Luis
         /// </code>
         /// </example>
-        public static void SetPropValue<T>(this object obj, string name, object value)
+        public static void SetPropValue<T>(this object? obj, string name, object value)
         {
-            foreach (String part in name.Split('.'))
+            foreach (string part in name.Split('.'))
             {
                 if (obj == null) { return; }
 
                 Type type = obj.GetType();
-                PropertyInfo info = type.GetProperty(part);
+                PropertyInfo? info = type.GetProperty(part);
                 if (info == null) { return; }
 
                 info.SetValue(obj, (T)value, null);
@@ -99,14 +99,14 @@ namespace Dominio.Core.Extensions
         /// Console.WriteLine($"Nombre: {nombre}, Ciudad: {ciudad}, País: {pais}");
         /// </code>
         /// </example>
-        private static object GetPropValue(this object obj, string name)
+        private static object? GetPropValue(this object? obj, string name)
         {
             foreach (string part in name.Split('.'))
             {
                 if (obj == null) { return null; }
 
                 Type type = obj.GetType();
-                PropertyInfo info = type.GetProperty(part);
+                PropertyInfo? info = type.GetProperty(part);
                 if (info == null) { return null; }
 
                 obj = info.GetValue(obj, null);
