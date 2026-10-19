@@ -1,4 +1,6 @@
-﻿namespace Infraestructura.Core.RestClient
+﻿using Dominio.Core.Extensions;
+
+namespace Infraestructura.Core.RestClient
 {
     public static class RestClientFactory
     {
@@ -23,7 +25,7 @@
         /// <returns>Created IRestClient</returns>        
         public static IRestClient CreateClient(string baseAddress)
         {
-            if (_currentRestClientFactory is null)
+            if (_currentRestClientFactory.IsNull())
             {
                 throw new InvalidOperationException("No hay un RestClientFactory configurado. Llama a RestClientFactory.SetCurrent(...) antes de crear clientes.");
             }
